@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {DistributionVault} from "./DistributionVault.sol";
 import {EscrowVault} from "./EscrowVault.sol";
+import {IEscrowVault} from "./interfaces/IEscrowVault.sol";
 import {NFTVault} from "./NFTVault.sol";
 import {ParamsController} from "./ParamsController.sol";
 import {IReputationAdapter} from "./interfaces/IReputationAdapter.sol";
@@ -276,7 +277,12 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         (address[] memory recipients, uint256[] memory amounts, uint256 distributionAmount) =
             _buildDistribution(auctionId, p, candidateDistribution, modules.reputationAdapter);
 
-        modules.distributionVault.openDistribution(auctionId, recipients, amounts, modules.escrowVault);
+        modules.distributionVault.openDistribution(
+    auctionId,
+    recipients,
+    amounts,
+    IEscrowVault(address(modules.escrowVault))
+);
         modules.escrowVault.finalizeSettlement(
             auctionId,
             auction.highestBidder,

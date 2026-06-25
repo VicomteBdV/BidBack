@@ -1,109 +1,58 @@
-# AGENTS.md
+# BidBack Agent Instructions
 
-## Project context
+This file is the local source of truth for Codex work on BidBack.
 
-This repository contains a Web3 auction application.
+## Product Positioning
 
-The goal is to build a simple MVP first, then improve it progressively.
+BidBack is an NFT auction marketplace with conditional redistribution. It is not gambling, not a financial product, and not a guaranteed-yield mechanism.
 
-The project must be developed incrementally, with small, reviewable changes.
+Do not introduce:
 
-Codex must always inspect the existing repository before proposing or implementing changes.
+- Guaranteed yield
+- Lending
+- Leverage
+- Derivatives
+- Minting
+- Redistribution funded by losing bidders' refundable caps
 
-## Product vision
+## Economic Rules
 
-The application allows users to participate in crypto / Web3 auctions.
+The final auction price is the highest valid bid.
 
-The target logic is:
+Redistribution can only be funded from net premium actually created by the auction:
 
-- users connect with a wallet;
-- users can view available auctions;
-- users can place bids;
-- the winner receives the auctioned asset;
-- part of the auction value may be redistributed according to explicit business rules;
-- the application must remain transparent, auditable, and understandable.
+```text
+gross premium = final price - starting price
+net premium = gross premium - protocol fee - configured costs
+```
 
-The detailed product rules must be documented in the repository before implementation.
+If no premium is created, no fee and no redistribution are allowed.
 
-## Main priority
+Losing bidders must be able to recover 100% of their locked cap. The winner must be able to recover any surplus above the final price.
 
-Build a simple MVP first.
+## Architecture
 
-Do not try to build the full final product immediately.
+Keep the MVP modular:
 
-Prefer mock data and simple screens before implementing complex blockchain logic.
+- `AuctionHouse`
+- `EscrowVault`
+- `NFTVault`
+- `DistributionVault`
+- `ReputationAdapter`
+- `ParamsController`
 
-## Working rules
+Avoid monolithic rewrites. Keep custody, accounting, scoring, and parameters separated.
 
-- Read the existing files before doing any work.
-- Do not invent business rules.
-- Do not invent smart contract logic without explicit validation.
-- If a functional rule is unclear, ask a question before implementing it.
-- Make small, incremental changes.
-- Avoid large rewrites unless explicitly requested.
-- Do not modify unrelated files.
-- Do not add major dependencies without explaining why.
-- Keep the implementation simple and maintainable.
-- Prefer clear code over clever code.
-- Explain assumptions and limitations clearly.
+## Security Defaults
 
-## Web3 security rules
+- Use pull payments for ETH claims.
+- Keep NFT release pull-based after finalization.
+- Avoid unbounded loops.
+- Keep participant counts bounded.
+- Use reentrancy protection on state-changing claim and settlement paths.
+- Emergency pause must not block refunds, proceeds, fees, NFT release after finalization, or redistribution claims.
+- Production ownership must be assigned to multisig/timelock governance rather than an EOA.
 
-- Never store private keys in the repository.
-- Never store seed phrases in the repository.
-- Never hardcode wallet secrets, API keys, or credentials.
-- Do not implement real-money flows without explicit validation.
-- Do not deploy smart contracts without explicit validation.
-- Treat auction, bidding, escrow, and reward logic as sensitive.
-- Any smart contract or financial logic must be simple, documented, and reviewable.
+## Frontend Language
 
-## Development approach
-
-For each task, Codex must follow this sequence:
-
-1. Read the relevant files.
-2. Summarize the current state.
-3. Propose a short implementation plan.
-4. Implement only the requested step.
-5. List the modified files.
-6. Explain what changed.
-7. Mention any risk, missing information, or assumption.
-
-## MVP approach
-
-The MVP should be built in phases:
-
-1. Static product definition and README.
-2. Basic web app skeleton.
-3. Home page with mock auctions.
-4. Auction detail page with mock bidding interface.
-5. Simulated wallet connection.
-6. Simulated bid flow.
-7. Simulated reward / redistribution logic.
-8. Only later: real wallet and blockchain integration.
-9. Only later: smart contracts.
-10. Only later: deployment.
-
-## Definition of done
-
-A task is complete only when:
-
-- the requested behavior is implemented;
-- the change is limited to the task;
-- the code remains readable;
-- existing behavior is not broken;
-- modified files are listed;
-- assumptions are documented;
-- next recommended step is clearly stated.
-
-## Forbidden behaviors
-
-Codex must not:
-
-- code the full application in one step;
-- introduce complex architecture prematurely;
-- add smart contracts before the MVP screens are clear;
-- add blockchain dependencies before they are needed;
-- invent legal, financial, or tokenomics rules;
-- push changes without explaining what changed;
-- hide uncertainty.
+Frontend user-facing text must be in English.
