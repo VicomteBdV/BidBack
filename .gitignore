@@ -2,10 +2,24 @@ out/
 cache/
 broadcast/
 lib/
+
 node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/.turbo/
+
 .env
 .env.*
 !.env.example
+!frontend/.env.example
+
+frontend/public/deployments/*.json
+!frontend/public/deployments/.gitkeep
+
 coverage/
 lcov.info
 
+.DS_Store
+Thumbs.db

@@ -1,15 +1,31 @@
 {
-  "name": "BidBack Foundry",
+  "name": "BidBack Codespaces",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
   },
   "postCreateCommand": "bash .devcontainer/install-foundry.sh",
+  "forwardPorts": [3000, 8545],
+  "portsAttributes": {
+    "3000": {
+      "label": "BidBack Frontend",
+      "onAutoForward": "notify"
+    },
+    "8545": {
+      "label": "Anvil RPC",
+      "onAutoForward": "silent"
+    }
+  },
   "customizations": {
     "vscode": {
       "extensions": [
-        "JuanBlanco.solidity"
+        "JuanBlanco.solidity",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode"
       ]
     }
   }
