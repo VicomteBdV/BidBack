@@ -6,6 +6,7 @@ import {Ownable, ZeroAddress} from "./utils/Ownable.sol";
 import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
 error NotAuctionHouse();
+error AuctionHouseAlreadySet();
 error NFTAlreadyLocked();
 error NFTNotLocked();
 error NFTAlreadyReleased();
@@ -35,6 +36,7 @@ contract NFTVault is Ownable, ReentrancyGuard, IERC721Receiver {
 
     function setAuctionHouse(address newAuctionHouse) external onlyOwner {
         if (newAuctionHouse == address(0)) revert ZeroAddress();
+        if (auctionHouse != address(0)) revert AuctionHouseAlreadySet();
         auctionHouse = newAuctionHouse;
         emit AuctionHouseUpdated(newAuctionHouse);
     }

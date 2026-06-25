@@ -6,6 +6,7 @@ import {Ownable, ZeroAddress} from "./utils/Ownable.sol";
 import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
 error NotAuctionHouse();
+error AuctionHouseAlreadySet();
 error DistributionAlreadyOpened();
 error DistributionNotOpened();
 error LengthMismatch();
@@ -43,6 +44,7 @@ contract DistributionVault is Ownable, ReentrancyGuard {
 
     function setAuctionHouse(address newAuctionHouse) external onlyOwner {
         if (newAuctionHouse == address(0)) revert ZeroAddress();
+        if (auctionHouse != address(0)) revert AuctionHouseAlreadySet();
         auctionHouse = newAuctionHouse;
         emit AuctionHouseUpdated(newAuctionHouse);
     }

@@ -150,8 +150,10 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         if (nft == address(0)) revert ZeroAddress();
         if (duration == 0) revert InvalidDuration();
 
-        auctionId = nextAuctionId++;
         ParamsController.Params memory p = paramsController.params();
+        if (duration < p.minAuctionDuration) revert InvalidDuration();
+
+        auctionId = nextAuctionId++;
         Modules memory modules = Modules({
             nftVault: nftVault,
             escrowVault: escrowVault,
@@ -278,11 +280,8 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
             _buildDistribution(auctionId, p, candidateDistribution, modules.reputationAdapter);
 
         modules.distributionVault.openDistribution(
-    auctionId,
-    recipients,
-    amounts,
-    IEscrowVault(address(modules.escrowVault))
-);
+            auctionId, recipients, amounts, IEscrowVault(address(modules.escrowVault))
+        );
         modules.escrowVault.finalizeSettlement(
             auctionId,
             auction.highestBidder,

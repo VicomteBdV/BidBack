@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
 error NotAuctionHouse();
 error NotDistributionVault();
+error AuctionHouseAlreadySet();
 error InvalidDeposit();
 error AuctionAlreadySettled();
 error AuctionNotSettled();
@@ -58,6 +59,7 @@ contract EscrowVault is Ownable, ReentrancyGuard {
 
     function setAuctionHouse(address newAuctionHouse) external onlyOwner {
         if (newAuctionHouse == address(0)) revert ZeroAddress();
+        if (auctionHouse != address(0)) revert AuctionHouseAlreadySet();
         auctionHouse = newAuctionHouse;
         emit AuctionHouseUpdated(newAuctionHouse);
     }
