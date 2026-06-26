@@ -1,0 +1,11 @@
+{
+  "name": "bidback",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:sync": "npm --prefix frontend run sync:deployment",
+    "local:deploy": "bash scripts/local-demo.sh",
+    "local:check": "forge test -vv && npm --prefix frontend run check"
+  }
+}

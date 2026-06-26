@@ -14,6 +14,7 @@ frontend/.turbo/
 .env.*
 !.env.example
 !frontend/.env.example
+frontend/.env.local
 
 frontend/public/deployments/*.json
 !frontend/public/deployments/.gitkeep
@@ -22,5 +23,5 @@ coverage/
 lcov.info
 
 .DS_Store
-Thumbs.dbfrontend/tsconfig.tsbuildinfo
+Thumbs.db
 frontend/tsconfig.tsbuildinfo
