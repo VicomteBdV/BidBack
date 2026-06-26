@@ -22,6 +22,10 @@ contract DeployLocal {
 
     address private constant ANVIL_DEPLOYER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
+    uint256 private constant DEMO_TOKEN_ID = 1;
+    uint256 private constant DEMO_START_PRICE = 1 ether;
+    uint64 private constant DEMO_DURATION = 2 hours;
+
     event LocalDeployment(
         address indexed deployer,
         address paramsController,
@@ -32,6 +36,15 @@ contract DeployLocal {
         address auctionHouse,
         address localNft,
         address feeRecipient
+    );
+
+    event LocalDemoAuctionCreated(
+        uint256 indexed auctionId,
+        address indexed seller,
+        address indexed localNft,
+        uint256 tokenId,
+        uint256 startPrice,
+        uint64 duration
     );
 
     function run()
@@ -74,6 +87,11 @@ contract DeployLocal {
         localNft = new LocalERC721("BidBack Local NFT", "BBLOCAL");
         localNft.mintBatch(owner, 12);
 
+        localNft.setApprovalForAll(address(nftVault), true);
+
+        uint256 demoAuctionId =
+            auctionHouse.createAuction(address(localNft), DEMO_TOKEN_ID, DEMO_START_PRICE, DEMO_DURATION);
+
         emit LocalDeployment(
             owner,
             address(paramsController),
@@ -84,6 +102,15 @@ contract DeployLocal {
             address(auctionHouse),
             address(localNft),
             feeRecipient
+        );
+
+        emit LocalDemoAuctionCreated(
+            demoAuctionId,
+            owner,
+            address(localNft),
+            DEMO_TOKEN_ID,
+            DEMO_START_PRICE,
+            DEMO_DURATION
         );
 
         vm.stopBroadcast();
