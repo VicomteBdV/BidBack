@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertLocalDevActionsEnabled } from "@/lib/server/localDevGuard";
 import { withdrawDemoSellerProceeds } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,8 @@ function errorMessage(error: unknown) {
 
 export async function POST(request: Request) {
   try {
+    await assertLocalDevActionsEnabled();
+
     const auctionId = await readAuctionId(request);
     const payload = await withdrawDemoSellerProceeds(auctionId);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { DevBidderRole } from "@/lib/auctionTypes";
+import { assertLocalDevActionsEnabled } from "@/lib/server/localDevGuard";
 import { claimDemoReward } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ function errorMessage(error: unknown) {
 
 export async function POST(request: Request) {
   try {
+    await assertLocalDevActionsEnabled();
+
     const { auctionId, bidderRole } = await readBody(request);
     const payload = await claimDemoReward(auctionId, bidderRole);
 
