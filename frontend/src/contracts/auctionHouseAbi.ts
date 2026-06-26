@@ -74,5 +74,22 @@ export const auctionHouseAbi = [
     stateMutability: "view",
     inputs: [{ name: "auctionId", type: "uint256" }],
     outputs: [{ name: "", type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "placeBid",
+    stateMutability: "payable",
+    inputs: [
+      { name: "auctionId", type: "uint256" },
+      { name: "newCap", type: "uint256" }
+    ],
+    outputs: []
+  },
+  {
+    type: "function",
+    name: "finalizeAuction",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: []
   }
 ] as const;

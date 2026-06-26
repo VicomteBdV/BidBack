@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AuctionDevActions } from "@/components/AuctionDevActions";
+import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
-import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 
 export function AuctionDetail({ auctionId }: { auctionId: string }) {
   const [data, setData] = useState<AuctionDetailApiResponse | null>(null);
@@ -88,6 +89,13 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
           Refresh
         </button>
       </div>
+
+      <AuctionDevActions
+        auctionId={auction.auctionId}
+        auctionState={auction.state}
+        finalized={auction.finalized}
+        onActionComplete={loadAuction}
+      />
 
       <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-2">
         <DetailItem label="AuctionHouse" value={data.auctionHouse} mono />
