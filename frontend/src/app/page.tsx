@@ -1,3 +1,4 @@
+import { AuctionList } from "@/components/AuctionList";
 import { ModuleAddresses } from "@/components/ModuleAddresses";
 import { WalletButton } from "@/components/WalletButton";
 
@@ -10,7 +11,7 @@ export default function Home() {
             <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">BidBack MVP</p>
             <h1 className="mt-2 text-3xl font-semibold text-white">Local deployment console</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              This page can inspect the local deployment file without requiring MetaMask to be connected to Anvil.
+              The browser talks to Next.js on port 3000. Next.js reads Anvil locally on the server side.
             </p>
           </div>
           <WalletButton />
@@ -29,8 +30,8 @@ export default function Home() {
                 <span className="font-mono text-cyan-200">No</span>
               </div>
               <div className="flex items-center justify-between gap-4 rounded-md bg-slate-950 px-4 py-3">
-                <span>On-chain actions</span>
-                <span className="font-mono text-cyan-200">Disabled in this lot</span>
+                <span>Auction reads</span>
+                <span className="font-mono text-cyan-200">Next.js server</span>
               </div>
             </div>
           </div>
@@ -39,12 +40,13 @@ export default function Home() {
             <h2 className="text-lg font-semibold text-white">Frontend status</h2>
             <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
               <p>The deployment view remains available even when MetaMask cannot read the Codespaces Anvil RPC.</p>
-              <p>The next lot can add auction reads using the deployed AuctionHouse address from the same file.</p>
+              <p>Auction data is loaded through API routes, so the browser does not need direct access to port 8545.</p>
             </div>
           </div>
         </section>
 
         <ModuleAddresses />
+        <AuctionList />
       </div>
     </main>
   );
