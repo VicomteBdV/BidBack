@@ -8,6 +8,13 @@ export const auctionHouseAbi = [
   },
   {
     type: "function",
+    name: "feeRecipient",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }]
+  },
+  {
+    type: "function",
     name: "getAuction",
     stateMutability: "view",
     inputs: [{ name: "auctionId", type: "uint256" }],
@@ -88,6 +95,13 @@ export const auctionHouseAbi = [
   {
     type: "function",
     name: "finalizeAuction",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: []
+  },
+  {
+    type: "function",
+    name: "claimNft",
     stateMutability: "nonpayable",
     inputs: [{ name: "auctionId", type: "uint256" }],
     outputs: []

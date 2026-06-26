@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { DevBidderRole } from "@/lib/auctionTypes";
-import { placeDemoBid } from "@/lib/server/auctionWriter";
+import { claimDemoRefund } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
 
@@ -17,25 +17,26 @@ async function readBody(request: Request) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to place demo bid";
+  return error instanceof Error ? error.message : "Unable to claim refund";
 }
 
 export async function POST(request: Request) {
   try {
     const { auctionId, bidderRole } = await readBody(request);
-    const payload = await placeDemoBid(auctionId, bidderRole);
+    const payload = await claimDemoRefund(auctionId, bidderRole);
 
     return NextResponse.json({
       status: "ok",
-      action: "place-demo-bid",
+      action: "claim-demo-refund",
       localDevOnly: true,
+      bidderRole,
       ...payload
     });
   } catch (error) {
     return NextResponse.json(
       {
         status: "error",
-        action: "place-demo-bid",
+        action: "claim-demo-refund",
         localDevOnly: true,
         error: errorMessage(error)
       },

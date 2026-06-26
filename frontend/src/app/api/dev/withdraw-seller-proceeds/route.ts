@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { finalizeDemoAuction } from "@/lib/server/auctionWriter";
+import { withdrawDemoSellerProceeds } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +9,17 @@ async function readAuctionId(request: Request) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to finalize demo auction";
+  return error instanceof Error ? error.message : "Unable to withdraw seller proceeds";
 }
 
 export async function POST(request: Request) {
   try {
     const auctionId = await readAuctionId(request);
-    const payload = await finalizeDemoAuction(auctionId);
+    const payload = await withdrawDemoSellerProceeds(auctionId);
 
     return NextResponse.json({
       status: "ok",
-      action: "finalize-demo-auction",
+      action: "withdraw-demo-seller-proceeds",
       localDevOnly: true,
       ...payload
     });
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         status: "error",
-        action: "finalize-demo-auction",
+        action: "withdraw-demo-seller-proceeds",
         localDevOnly: true,
         error: errorMessage(error)
       },

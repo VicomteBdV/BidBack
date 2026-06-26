@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
-import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
+import type { AuctionDetailApiResponse, BidderEconomics } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
 export function AuctionDetail({ auctionId }: { auctionId: string }) {
@@ -66,6 +66,7 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
   }
 
   const { auction } = data;
+  const economics = auction.economics;
 
   return (
     <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
@@ -76,7 +77,7 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
             <AuctionStateBadge state={auction.state} />
           </div>
           <p className="mt-2 text-sm text-slate-400">
-            Read-only details fetched through Next.js from the local Anvil node.
+            Read-only details and local dev actions are routed through Next.js server routes.
           </p>
         </div>
 
@@ -94,8 +95,29 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
         auctionId={auction.auctionId}
         auctionState={auction.state}
         finalized={auction.finalized}
+        economics={economics}
         onActionComplete={loadAuction}
       />
+
+      {economics ? (
+        <section className="mt-5 rounded-lg border border-slate-800 bg-slate-950 p-4">
+          <h3 className="text-base font-semibold text-white">Economic state</h3>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <BidderPanel bidder={economics.primaryBidder} />
+            <BidderPanel bidder={economics.secondBidder} />
+          </div>
+
+          <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-3">
+            <EconomicItem label="Seller proceeds credit" value={formatEth(economics.seller.credit)} />
+            <EconomicItem label="Protocol fee credit" value={formatEth(economics.feeRecipient.credit)} />
+            <EconomicItem label="Distribution reserve" value={formatEth(economics.settlement.distributionReserve)} />
+            <EconomicItem label="Total assigned" value={formatEth(economics.distribution.totalAssigned)} />
+            <EconomicItem label="Total claimed" value={formatEth(economics.distribution.totalClaimed)} />
+            <EconomicItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-2">
         <DetailItem label="AuctionHouse" value={data.auctionHouse} mono />
@@ -127,6 +149,39 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function BidderPanel({ bidder }: { bidder: BidderEconomics }) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-900 px-4 py-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-white">{bidder.label}</h4>
+          <p className="mt-1 break-all font-mono text-xs text-slate-500">
+            {bidder.address ?? "Not configured"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2">
+        <EconomicItem label="Cap" value={formatEth(bidder.cap)} />
+        <EconomicItem label="Refundable amount" value={formatEth(bidder.refundableAmount)} />
+        <EconomicItem label="Refund claimed" value={bidder.refundClaimed ? "Yes" : "No"} />
+        <EconomicItem label="Reward entitlement" value={formatEth(bidder.rewardEntitlement)} />
+        <EconomicItem label="Reward claimed" value={bidder.rewardClaimed ? "Yes" : "No"} />
+        <EconomicItem label="Configured" value={bidder.configured ? "Yes" : "No"} />
+      </div>
+    </div>
+  );
+}
+
+function EconomicItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-slate-950 px-3 py-2">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 break-all font-mono text-sm text-slate-200">{value}</div>
+    </div>
   );
 }
 
