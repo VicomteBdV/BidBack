@@ -304,6 +304,26 @@ On a fresh local deployment, `DeployLocal.s.sol` mints 12 `LocalERC721` tokens t
 
 `LocalERC721` is a local mock only. It is not a BidBack product minting feature.
 
+### Wallet-Signed Auction Creation
+
+The `/create` page also includes a separate **Wallet-signed create auction** panel.
+
+This is the production-target flow:
+
+1. The connected wallet must own the NFT
+2. The user signs `approve(NFTVault, tokenId)`
+3. The user signs `AuctionHouse.createAuction(nft, tokenId, startPrice, duration)`
+
+This flow does not call `/api/dev/*`.
+
+It does not use server-held private keys.
+
+It only works when MetaMask can access the target RPC and is connected to the expected chain ID.
+
+In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably. In that case, keep using the local-dev panel for MVP testing, or expose Anvil through a reliable localhost or testnet RPC.
+
+The local-dev panel and wallet-signed panel are intentionally separate. There is no silent fallback from wallet-signed actions to local-dev server-side actions.
+
 These actions are executed by Next.js API routes using `viem` on the server side and local Anvil dev private keys from `frontend/.env.local`.
 
 This is not production architecture. Production user actions must be wallet-signed by the user and must not rely on server-held private keys.

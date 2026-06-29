@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { isAddress, parseEther } from "viem";
+import { CreateAuctionFields } from "@/components/CreateAuctionFields";
+import { validateCreateAuctionFields } from "@/lib/createAuctionValidation";
 import { formatDurationSeconds, formatEth, shortenAddress } from "@/lib/format";
 
 type CreateContext = {
@@ -93,37 +94,19 @@ export function CreateAuctionForm() {
     };
   }, []);
 
-  const validationError = useMemo(() => {
-    if (!isAddress(nftContract)) return "Invalid NFT contract address.";
-    if (!/^\d+$/.test(tokenId.trim()) || BigInt(tokenId.trim()) < 1n) return "Token ID must be a positive integer.";
+  const values = useMemo(
+    () => ({ nftContract, tokenId, startPriceEth, durationSeconds }),
+    [durationSeconds, nftContract, startPriceEth, tokenId]
+  );
 
-    if (!durationSeconds.trim() || !/^\d+$/.test(durationSeconds.trim())) {
-      return "Duration must be a positive integer in seconds.";
-    }
-
-    const duration = BigInt(durationSeconds.trim());
-
-    if (duration < 1n) return "Duration must be greater than zero.";
-
-    if (context && duration < BigInt(context.minAuctionDuration)) {
-      return `Duration below minimum. minAuctionDuration is ${context.minAuctionDuration} seconds.`;
-    }
-
-    try {
-      if (!startPriceEth.trim() || startPriceEth.trim().startsWith("-")) {
-        return "Start price must be zero or greater.";
-      }
-
-      const parsed = parseEther(startPriceEth.trim());
-      if (parsed < 0n) return "Start price must be zero or greater.";
-    } catch {
-      return "Start price must be a valid ETH amount.";
-    }
-
-    if (context?.paused) return "Protocol is paused. Auction creation is disabled.";
-
-    return null;
-  }, [context, durationSeconds, nftContract, startPriceEth, tokenId]);
+  const validationError = useMemo(
+    () =>
+      validateCreateAuctionFields(values, {
+        minAuctionDuration: context?.minAuctionDuration,
+        paused: context?.paused
+      }),
+    [context, values]
+  );
 
   async function submitCreateAuction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -143,12 +126,7 @@ export function CreateAuctionForm() {
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify({
-          nftContract,
-          tokenId,
-          startPriceEth,
-          durationSeconds
-        })
+        body: JSON.stringify(values)
       });
 
       const payload = (await response.json().catch(() => null)) as CreateAuctionResponse | null;
@@ -215,50 +193,17 @@ export function CreateAuctionForm() {
       ) : null}
 
       <form onSubmit={submitCreateAuction} className="mt-6 grid gap-5">
-        <label className="grid gap-2">
-          <span className="text-sm font-medium text-slate-200">NFT contract</span>
-          <input
-            value={nftContract}
-            onChange={(event) => setNftContract(event.target.value)}
-            className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
-            placeholder="0x..."
-          />
-        </label>
-
-        <div className="grid gap-5 md:grid-cols-3">
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-200">Token ID</span>
-            <input
-              value={tokenId}
-              onChange={(event) => setTokenId(event.target.value)}
-              className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
-              placeholder="2"
-              inputMode="numeric"
-            />
-          </label>
-
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-200">Start price in ETH</span>
-            <input
-              value={startPriceEth}
-              onChange={(event) => setStartPriceEth(event.target.value)}
-              className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
-              placeholder="1"
-              inputMode="decimal"
-            />
-          </label>
-
-          <label className="grid gap-2">
-            <span className="text-sm font-medium text-slate-200">Duration in seconds</span>
-            <input
-              value={durationSeconds}
-              onChange={(event) => setDurationSeconds(event.target.value)}
-              className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
-              placeholder="7200"
-              inputMode="numeric"
-            />
-          </label>
-        </div>
+        <CreateAuctionFields
+          nftContract={nftContract}
+          tokenId={tokenId}
+          startPriceEth={startPriceEth}
+          durationSeconds={durationSeconds}
+          disabled={isSubmitting}
+          onNftContractChange={setNftContract}
+          onTokenIdChange={setTokenId}
+          onStartPriceEthChange={setStartPriceEth}
+          onDurationSecondsChange={setDurationSeconds}
+        />
 
         <div className="rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
           On a fresh local deployment, token #1 is locked by the demo auction. Use token #2 or higher for additional

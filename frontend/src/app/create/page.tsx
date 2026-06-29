@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CreateAuctionForm } from "@/components/CreateAuctionForm";
+import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { WalletButton } from "@/components/WalletButton";
 
 export default function CreateAuctionPage() {
@@ -13,13 +14,15 @@ export default function CreateAuctionPage() {
             </Link>
             <h1 className="mt-2 text-3xl font-semibold text-white">Create auction</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Create an additional local auction through a guarded Next.js server route for Codespaces testing.
+              Use the local-dev flow for reliable Codespaces testing, or the wallet-signed flow when MetaMask can reach
+              the target RPC.
             </p>
           </div>
           <WalletButton />
         </header>
 
         <CreateAuctionForm />
+        <WalletCreateAuctionForm />
       </div>
     </main>
   );
