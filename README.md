@@ -96,6 +96,13 @@ Stores a non-blocking multiplier used only for redistribution.
 
 Stores bounded economic and safety parameters.
 
+## MVP Checkpoint
+
+The current MVP status, UI modes, local workflow, test commands, CI coverage, known limitations, and recommended next steps are documented in:
+
+```text
+docs/MVP_CHECKPOINT.md
+```
 ---
 
 ## Local Codespaces Demo
