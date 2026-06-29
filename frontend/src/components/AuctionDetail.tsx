@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
 import { AuctionSummary } from "@/components/AuctionSummary";
 import { ModeBadge } from "@/components/ModeBadge";
