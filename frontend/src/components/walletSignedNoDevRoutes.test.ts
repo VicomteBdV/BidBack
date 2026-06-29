@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const walletSignedComponents = [
@@ -9,7 +10,8 @@ const walletSignedComponents = [
 
 describe("wallet-signed component separation", () => {
   it.each(walletSignedComponents)("%s does not fetch /api/dev routes", (fileName) => {
-    const source = readFileSync(new URL(`./${fileName}`, import.meta.url), "utf8");
+    const componentPath = path.resolve(process.cwd(), "src", "components", fileName);
+    const source = readFileSync(componentPath, "utf8");
 
     expect(source).not.toMatch(/fetch\s*\(\s*["'`]\/api\/dev(?:\/|\b)/);
   });
