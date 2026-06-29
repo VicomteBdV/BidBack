@@ -17,6 +17,7 @@ This document prepares the repository for a future testnet deployment while keep
 * Local-dev demo actions guarded by `ENABLE_LOCAL_DEV_ACTIONS=true`
 * Wallet-signed UI panels for the production-target transaction model
 * CI for Foundry tests, frontend tests, typecheck, and build
+* Deployment JSON validation command for local and future deployment files
 
 ### Not Done Yet
 
@@ -124,6 +125,64 @@ Optional contracts:
 `localNft` is expected for the local Anvil demo because `LocalERC721` is a local mock.
 
 `localNft` should not be required for a public testnet deployment unless a test-only NFT mock is deliberately deployed there.
+
+---
+
+## Deployment JSON Validation
+
+BidBack includes a local deployment JSON validator to catch malformed deployment files before they are used by the frontend.
+
+The validator exists because future environments will be loaded through:
+
+```text
+frontend/public/deployments/<chainId>.json
+```
+
+A malformed file could make the frontend point to incomplete, stale, or invalid contract addresses.
+
+Validate the local Anvil deployment after running `npm run local:deploy` or `npm run frontend:sync`:
+
+```bash
+npm run validate:deployment -- 31337
+```
+
+From inside `frontend/`, the equivalent command is:
+
+```bash
+npm run validate:deployment:local
+```
+
+For a future testnet deployment file:
+
+```bash
+npm run validate:deployment -- <testnet-chain-id>
+```
+
+The validator checks:
+
+* the deployment file exists;
+* the JSON is readable;
+* `chainId` exists;
+* `chainId` matches the CLI argument and filename expectation;
+* `contracts` exists;
+* all core contract fields are present;
+* all core contract addresses are valid Ethereum addresses;
+* `localNft` is optional;
+* `localNft` is a valid Ethereum address when present;
+* unknown fields produce warnings but do not fail validation.
+
+The validator guarantees only the shape and address format of the JSON file.
+
+It does not guarantee:
+
+* the contracts exist on-chain;
+* the addresses contain the expected bytecode;
+* the contracts are wired correctly;
+* ownership or governance is production-ready;
+* the deployment was verified on a block explorer;
+* the deployment is economically safe.
+
+This command is intentionally not part of CI yet because `frontend/public/deployments/31337.json` is generated locally and can be absent in a fresh clone.
 
 ---
 
@@ -291,6 +350,12 @@ Then create:
 frontend/public/deployments/<chainId>.json
 ```
 
+Validate the deployment JSON before using it in the frontend:
+
+```bash
+npm run validate:deployment -- <chainId>
+```
+
 Finally run:
 
 ```bash
@@ -309,6 +374,7 @@ npm --prefix frontend run build
 * Wallet-signed actions require the wallet to reach the configured RPC.
 * Contract verification is not automated yet.
 * Deployment JSON must exactly match the deployed contract addresses.
+* Deployment JSON validation checks shape and address format only; it does not verify on-chain bytecode.
 * `LocalERC721` is a mock and must not be treated as a product minting feature.
 * No indexer exists yet, so read-only auction discovery still depends on bounded on-chain reads.
 * Economic parameters should be reviewed before public testing.
@@ -333,6 +399,7 @@ Before broadcasting any public testnet deployment:
 * Confirm pause behavior.
 * Confirm claims remain pull-based.
 * Confirm deployment JSON format.
+* Validate the deployment JSON with `npm run validate:deployment -- <chainId>`.
 * Confirm frontend points to the target chain.
 * Confirm MetaMask can reach the target RPC.
 * Confirm block explorer verification plan.

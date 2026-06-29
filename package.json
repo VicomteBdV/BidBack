@@ -6,6 +6,7 @@
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:sync": "npm --prefix frontend run sync:deployment",
     "frontend:test": "npm --prefix frontend run test",
+    "validate:deployment": "npm --prefix frontend run validate:deployment --",
     "local:deploy": "bash scripts/local-demo.sh",
     "local:check": "forge test -vv && npm --prefix frontend run test && npm --prefix frontend run typecheck && npm --prefix frontend run build"
   }

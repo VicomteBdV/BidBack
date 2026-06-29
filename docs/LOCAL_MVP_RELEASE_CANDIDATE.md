@@ -15,6 +15,7 @@ This release candidate covers the current BidBack MVP running in the local Codes
 * Local Anvil deployment on chain ID `31337`
 * Foundry deployment through `script/DeployLocal.s.sol`
 * Local deployment sync into `frontend/public/deployments/31337.json`
+* Deployment JSON validation for generated local deployment files
 * Read-only deployment and auction views
 * Read-only auction detail sections:
 
@@ -77,6 +78,14 @@ The local deployment script should:
 * create a demo auction;
 * sync `frontend/public/deployments/31337.json`.
 
+Validate the generated deployment JSON:
+
+```bash
+npm run validate:deployment -- 31337
+```
+
+This command assumes `frontend/public/deployments/31337.json` exists, so run it after `npm run local:deploy` or `npm run frontend:sync`.
+
 Start the frontend:
 
 ```bash
@@ -90,6 +99,7 @@ If Anvil restarts, redeploy and refresh:
 ```bash
 npm run local:deploy
 npm run frontend:sync
+npm run validate:deployment -- 31337
 ```
 
 ---
@@ -268,6 +278,14 @@ Expected result:
 * TypeScript typecheck passes;
 * Next.js build passes.
 
+Validate the generated local deployment JSON after local deployment:
+
+```bash
+npm run validate:deployment -- 31337
+```
+
+This deployment validation is not part of `local:check` yet because `frontend/public/deployments/31337.json` is generated locally and may be absent in a fresh clone.
+
 ---
 
 ## Known Non-Goals
@@ -306,6 +324,7 @@ This local MVP release candidate can be considered valid when all criteria below
 * The local app can be relaunched from a clean Anvil restart.
 * `npm run local:deploy` recreates a usable local deployment.
 * `frontend/public/deployments/31337.json` is regenerated correctly.
+* `npm run validate:deployment -- 31337` validates the generated deployment JSON.
 * The read-only deployment console loads without MetaMask.
 * Auction list and auction detail load through Next.js server routes.
 * The local-dev full cycle is manually validated.
