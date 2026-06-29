@@ -160,6 +160,7 @@ This runs:
 forge test -vv
 cd frontend
 npm run typecheck
+npm run test
 npm run build
 ```
 
@@ -170,7 +171,38 @@ forge test -vv
 
 cd frontend
 npm run typecheck
+npm run test
 npm run build
+```
+
+---
+
+## Frontend Tests
+
+The frontend includes a small Vitest test suite for critical MVP behavior.
+
+The tests cover:
+
+* guarded `/api/dev/*` routes refusing execution when local dev actions are disabled
+* guarded `/api/dev/*` routes refusing execution when the RPC chain ID is not Anvil `31337`
+* wallet-signed components not calling `/api/dev/*`
+* the auction detail page rendering the main mode-separated sections
+
+The tests do not require Anvil.
+
+The tests do not require `frontend/.env.local`.
+
+Run them with:
+
+```bash
+cd frontend
+npm run test
+```
+
+The full local check from the repo root also runs the frontend tests:
+
+```bash
+npm run local:check
 ```
 
 ---
@@ -453,6 +485,7 @@ GitHub Actions runs the minimal MVP checks on push and pull request:
 forge test -vv
 npm --prefix frontend ci
 npm --prefix frontend run typecheck
+npm --prefix frontend run test
 npm --prefix frontend run build
 ```
 
