@@ -96,6 +96,8 @@ Stores a non-blocking multiplier used only for redistribution.
 
 Stores bounded economic and safety parameters.
 
+---
+
 ## MVP Checkpoint
 
 The current MVP status, UI modes, local workflow, test commands, CI coverage, known limitations, and recommended next steps are documented in:
@@ -103,6 +105,13 @@ The current MVP status, UI modes, local workflow, test commands, CI coverage, kn
 ```text
 docs/MVP_CHECKPOINT.md
 ```
+
+The local MVP release candidate checklist is documented in:
+
+```text
+docs/LOCAL_MVP_RELEASE_CANDIDATE.md
+```
+
 Testnet readiness and future deployment-environment preparation are documented in:
 
 ```text
