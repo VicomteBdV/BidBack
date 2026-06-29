@@ -362,6 +362,46 @@ In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably.
 
 The local-dev bid buttons and wallet-signed bid panel are intentionally separate. There is no silent fallback from wallet-signed bidding to local-dev server-side actions.
 
+### Wallet-Signed Claims and Withdrawals
+
+The auction detail page includes a separate **Wallet-signed claims / withdrawals** panel.
+
+This is the production-target post-finalization flow:
+
+1. The wallet must be connected
+2. The wallet must be on Anvil chain ID `31337`
+3. The auction must be finalized for claim and withdrawal actions
+4. The user signs the relevant transaction in MetaMask
+
+Supported wallet-signed actions:
+
+* `AuctionHouse.claimNft(auctionId)`
+* `EscrowVault.claimRefund(auctionId)`
+* `DistributionVault.claim(auctionId)`
+* `EscrowVault.withdrawSellerProceeds()`
+* `EscrowVault.withdrawProtocolFees()`
+
+The frontend reads claimable and withdrawable amounts before enabling actions:
+
+* `EscrowVault.refundableAmount(auctionId, connectedAddress)`
+* `EscrowVault.refundClaimed(auctionId, connectedAddress)`
+* `DistributionVault.entitlementOf(auctionId, connectedAddress)`
+* `DistributionVault.claimed(auctionId, connectedAddress)`
+* `EscrowVault.sellerCredits(connectedAddress)`
+* `EscrowVault.protocolFeeCredits(connectedAddress)`
+
+This flow does not call `/api/dev/*`.
+
+It does not use server-held private keys.
+
+Claims and withdrawals remain pull-based.
+
+It only works when MetaMask can access the target RPC and is connected to the expected chain ID.
+
+In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably. In that case, keep using the local-dev panel for MVP testing, or expose Anvil through a reliable localhost or testnet RPC.
+
+The local-dev claim buttons and wallet-signed claim panel are intentionally separate. There is no silent fallback from wallet-signed claims to local-dev server-side actions.
+
 ---
 
 ## Frontend Architecture

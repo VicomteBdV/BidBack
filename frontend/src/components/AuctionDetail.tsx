@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
+import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import type { AuctionDetailApiResponse, BidderEconomics } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
@@ -102,6 +103,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       />
 
       <WalletBidPanel auctionId={auction.auctionId} auctionState={auction.state} onBidComplete={loadAuction} />
+
+      <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
 
       {economics ? (
         <section className="mt-5 rounded-lg border border-slate-800 bg-slate-950 p-4">
