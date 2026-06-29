@@ -1,0 +1,339 @@
+# Testnet Readiness
+
+BidBack is not deployed to a public testnet yet.
+
+This document prepares the repository for a future testnet deployment while keeping the current local Anvil workflow as the default and reliable MVP environment.
+
+---
+
+## Current Status
+
+### Ready Today
+
+* Local Anvil chain `31337`
+* Foundry local deployment script
+* Frontend deployment files under `frontend/public/deployments/`
+* Read-only auction views through Next.js server routes
+* Local-dev demo actions guarded by `ENABLE_LOCAL_DEV_ACTIONS=true`
+* Wallet-signed UI panels for the production-target transaction model
+* CI for Foundry tests, frontend tests, typecheck, and build
+
+### Not Done Yet
+
+* No public testnet deployment
+* No production deployment script with real network configuration
+* No contract verification workflow
+* No production governance ownership handoff
+* No hosted frontend environment
+* No production indexer
+* No production RPC provider selection
+
+---
+
+## Environment Separation
+
+### Local Anvil
+
+Local Anvil remains the default environment.
+
+Defaults:
+
+```text
+chainId = 31337
+deployment file = frontend/public/deployments/31337.json
+RPC = http://127.0.0.1:8545
+```
+
+Local-dev actions remain strictly limited to:
+
+* `/api/dev/*`
+* Anvil only
+* chain ID `31337` only
+* Codespaces MVP testing only
+
+They must never be enabled in production.
+
+### Future Testnet
+
+A future public testnet deployment should use:
+
+```text
+frontend/public/deployments/<chainId>.json
+```
+
+The frontend can then point wallet-signed actions and read-only views at that chain, provided the RPC is reachable from the relevant runtime.
+
+Server-side reads should use a server-side RPC URL.
+
+Wallet-signed actions require the connected wallet to access the target RPC directly.
+
+---
+
+## Deployment JSON Format
+
+Deployment files live in:
+
+```text
+frontend/public/deployments/
+```
+
+Local Anvil uses:
+
+```text
+frontend/public/deployments/31337.json
+```
+
+Future testnet deployments should use:
+
+```text
+frontend/public/deployments/<chainId>.json
+```
+
+Expected format:
+
+```json
+{
+  "chainId": 31337,
+  "generatedAt": "2026-06-29T00:00:00.000Z",
+  "source": "foundry-broadcast",
+  "contracts": {
+    "auctionHouse": "0x0000000000000000000000000000000000000000",
+    "nftVault": "0x0000000000000000000000000000000000000000",
+    "escrowVault": "0x0000000000000000000000000000000000000000",
+    "distributionVault": "0x0000000000000000000000000000000000000000",
+    "paramsController": "0x0000000000000000000000000000000000000000",
+    "reputationAdapter": "0x0000000000000000000000000000000000000000",
+    "localNft": "0x0000000000000000000000000000000000000000"
+  }
+}
+```
+
+Required contracts:
+
+* `auctionHouse`
+* `nftVault`
+* `escrowVault`
+* `distributionVault`
+* `paramsController`
+* `reputationAdapter`
+
+Optional contracts:
+
+* `localNft`
+
+`localNft` is expected for the local Anvil demo because `LocalERC721` is a local mock.
+
+`localNft` should not be required for a public testnet deployment unless a test-only NFT mock is deliberately deployed there.
+
+---
+
+## Environment Variables
+
+### Local Defaults
+
+The repo defaults to Anvil `31337` when no testnet variables are set.
+
+```env
+NEXT_PUBLIC_CHAIN_ID=31337
+NEXT_PUBLIC_CHAIN_NAME=Anvil Local
+NEXT_PUBLIC_WALLET_RPC_URL=http://127.0.0.1:8545
+NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8545
+ANVIL_RPC_URL=http://127.0.0.1:8545
+```
+
+### Future Testnet Frontend Variables
+
+Prepare these when a public testnet deployment exists:
+
+```env
+NEXT_PUBLIC_CHAIN_ID=<testnet-chain-id>
+NEXT_PUBLIC_CHAIN_NAME=<testnet-name>
+NEXT_PUBLIC_WALLET_RPC_URL=<rpc-url-that-wallets-can-reach>
+NEXT_PUBLIC_BLOCK_EXPLORER_URL=<optional-block-explorer-url>
+```
+
+These values are public frontend configuration. They must not contain private keys.
+
+### Future Testnet Server-Side Variables
+
+Prepare these for Next.js server-side reads:
+
+```env
+BIDBACK_CHAIN_ID=<testnet-chain-id>
+BIDBACK_RPC_URL=<server-side-rpc-url>
+```
+
+`BIDBACK_RPC_URL` may use a private RPC provider URL, but it must not expose private keys.
+
+### Deployment Script Variables
+
+A future testnet deployment script will need a deployer private key or signer configuration.
+
+That key must be used only by Foundry scripts or secure deployment tooling.
+
+It must never be committed.
+
+It must never be exposed through frontend variables.
+
+Do not put deployer private keys in:
+
+* `frontend/.env.local`
+* `frontend/.env.example`
+* `README.md`
+* `docs/`
+
+---
+
+## Example Local Environment File
+
+The following block documents the expected shape of `frontend/.env.example`.
+
+```env
+# Default target chain for the frontend.
+# If no testnet variables are set, BidBack defaults to local Anvil 31337.
+NEXT_PUBLIC_CHAIN_ID=31337
+NEXT_PUBLIC_CHAIN_NAME=Anvil Local
+
+# RPC used by browser wallet flows.
+# For local Anvil this is usually http://127.0.0.1:8545, but MetaMask may not always reach it from Codespaces.
+# For a future testnet, set this to a public RPC URL that wallets can reach.
+NEXT_PUBLIC_WALLET_RPC_URL=http://127.0.0.1:8545
+
+# Local Anvil browser RPC fallback.
+NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8545
+
+# Optional public block explorer URL for a future testnet.
+NEXT_PUBLIC_BLOCK_EXPLORER_URL=
+
+# Future server-side read configuration for non-local deployments.
+# Leave these unset for the default local Anvil flow.
+# BIDBACK_CHAIN_ID=11155111
+# BIDBACK_RPC_URL=https://example-testnet-rpc.invalid
+
+# Server-side local Anvil access used by Next.js API routes.
+ANVIL_RPC_URL=http://127.0.0.1:8545
+
+# Enables the local demo transaction routes under /api/dev/*.
+# This must be exactly "true" for local dev actions to run.
+# Never enable this in production.
+ENABLE_LOCAL_DEV_ACTIONS=true
+
+# Local Anvil dev keys only.
+# These keys are public, known default Anvil development keys.
+# They only make sense on a local Anvil network and must never receive real funds.
+#
+# In Anvil output:
+# - "Available Accounts" are public addresses.
+# - "Private Keys" are the values to copy into frontend/.env.local.
+#
+# In frontend/.env.local, use private keys, not addresses.
+# Each private key must be 0x + 64 hexadecimal characters.
+#
+# Recommended local demo mapping:
+# - seller / fee recipient = Anvil account #0
+# - bidder #1 = Anvil account #1
+# - bidder #2 = Anvil account #2
+#
+# If Anvil prints different keys, use the private keys printed by your current Anvil process.
+# If you see "insufficient funds" or "must be a 32-byte hex private key", re-check these values.
+# Never use a real private key.
+# Never commit frontend/.env.local.
+ANVIL_DEV_SELLER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+ANVIL_DEV_BIDDER_PRIVATE_KEY=0x59c6995e998f97a5a004497e5da5f49c4e2a0897da4d99a988dc3e5f4afc0e9
+ANVIL_DEV_SECOND_BIDDER_PRIVATE_KEY=0x5de4111afa1a4b4f3f2bdb6d601e0ab45970cd3f1ff31bce42c45b7bc0921f01
+ANVIL_DEV_FEE_RECIPIENT_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+```
+
+---
+
+## Commands for Future Testnet Day
+
+These commands are indicative only.
+
+Do not run a real testnet deployment until the deployment script, governance setup, and checklist are reviewed.
+
+Run local checks first:
+
+```bash
+forge test -vv
+npm --prefix frontend run test
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+```
+
+Prepare environment variables outside the repo:
+
+```bash
+export TESTNET_RPC_URL=<rpc-url>
+export TESTNET_DEPLOYER_PRIVATE_KEY=<private-key>
+```
+
+Dry-run or simulate first if possible:
+
+```bash
+forge script script/<FutureTestnetDeploy>.s.sol:<FutureTestnetDeploy> \
+  --rpc-url "$TESTNET_RPC_URL" \
+  -vvv
+```
+
+Broadcast only after review:
+
+```bash
+forge script script/<FutureTestnetDeploy>.s.sol:<FutureTestnetDeploy> \
+  --rpc-url "$TESTNET_RPC_URL" \
+  --broadcast \
+  -vvv
+```
+
+Then create:
+
+```text
+frontend/public/deployments/<chainId>.json
+```
+
+Finally run:
+
+```bash
+npm --prefix frontend run test
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+```
+
+---
+
+## Known Risks Before Real Testnet
+
+* Current production ownership handoff is not finalized.
+* A multisig and timelock process should be defined before production-like deployment.
+* Public RPC reliability must be tested from both Next.js server runtime and user wallets.
+* Wallet-signed actions require the wallet to reach the configured RPC.
+* Contract verification is not automated yet.
+* Deployment JSON must exactly match the deployed contract addresses.
+* `LocalERC721` is a mock and must not be treated as a product minting feature.
+* No indexer exists yet, so read-only auction discovery still depends on bounded on-chain reads.
+* Economic parameters should be reviewed before public testing.
+* Any public deployment must avoid language implying guaranteed rewards or yield.
+
+---
+
+## Checklist Before Real Testnet
+
+Before broadcasting any public testnet deployment:
+
+* Confirm target chain ID.
+* Confirm RPC provider and rate limits.
+* Confirm deployer wallet is funded only for testnet gas.
+* Confirm no real private key is committed.
+* Run `forge test -vv`.
+* Run frontend tests, typecheck, and build.
+* Review constructor parameters and module wiring.
+* Confirm vault `setAuctionHouse` one-time locks are expected.
+* Confirm `ParamsController` values.
+* Confirm fee recipient address.
+* Confirm pause behavior.
+* Confirm claims remain pull-based.
+* Confirm deployment JSON format.
+* Confirm frontend points to the target chain.
+* Confirm MetaMask can reach the target RPC.
+* Confirm block explorer verification plan.
+* Confirm no docs or UI imply guaranteed yield.

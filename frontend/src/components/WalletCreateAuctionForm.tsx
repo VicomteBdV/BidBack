@@ -7,24 +7,27 @@ import {
   createWalletClient,
   custom,
   type Address,
-  type EIP1193Provider
+  type EIP1193Provider,
+  type PublicClient
 } from "viem";
 import { useAccount } from "wagmi";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
+import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
-import { anvil } from "@/lib/chains";
+import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { validateCreateAuctionFields, parseCreateAuctionValues } from "@/lib/createAuctionValidation";
+import { fetchDeployment } from "@/lib/deployment";
 import { formatDurationSeconds, shortenAddress } from "@/lib/format";
 
 type CreateContext = {
   chainId: number;
   auctionHouse: Address;
   nftVault: Address;
-  localNft: Address;
+  localNft?: Address;
   paramsController: Address;
-  minAuctionDuration: string;
-  paused: boolean;
+  minAuctionDuration: string | null;
+  paused: boolean | null;
   defaultTokenId: string;
   defaultDuration: string;
 };
@@ -69,14 +72,65 @@ function createBrowserClients(account: Address) {
   return {
     provider,
     publicClient: createPublicClient({
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     }),
     walletClient: createWalletClient({
       account,
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     })
+  };
+}
+
+function getField<T>(raw: unknown, key: string, index: number): T {
+  if (Array.isArray(raw)) return raw[index] as T;
+  return (raw as Record<string, unknown>)[key] as T;
+}
+
+function toBigInt(value: unknown) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  if (typeof value === "string") return BigInt(value);
+  return 0n;
+}
+
+async function verifyWalletChain(provider: EIP1193Provider) {
+  let walletChainId: unknown;
+
+  try {
+    walletChainId = await provider.request({ method: "eth_chainId" });
+  } catch (error) {
+    throw new Error(
+      `Wallet RPC unreachable. Wallet-signed mode requires MetaMask access to the target RPC. ${walletErrorMessage(
+        error,
+        ""
+      )}`
+    );
+  }
+
+  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+    throw new Error(`Wrong network. Wallet-signed mode requires the target chain (${targetChainLabel}).`);
+  }
+}
+
+async function readCreateParams(publicClient: PublicClient, context: CreateContext) {
+  const [paramsRaw, paused] = await Promise.all([
+    publicClient.readContract({
+      address: context.paramsController,
+      abi: paramsControllerAbi,
+      functionName: "params"
+    }),
+    publicClient.readContract({
+      address: context.paramsController,
+      abi: paramsControllerAbi,
+      functionName: "paused"
+    })
+  ]);
+
+  return {
+    minAuctionDuration: toBigInt(getField(paramsRaw, "minAuctionDuration", 10)).toString(),
+    paused
   };
 }
 
@@ -112,22 +166,24 @@ export function WalletCreateAuctionForm() {
       try {
         setIsContextLoading(true);
 
-        const response = await fetch("/api/local-create-context", {
-          cache: "no-store"
-        });
-
-        const payload = (await response.json().catch(() => null)) as CreateContext | { error?: string } | null;
-
-        if (!response.ok) {
-          throw new Error(payload && "error" in payload && payload.error ? payload.error : "Unable to load create context");
-        }
-
-        const loaded = payload as CreateContext;
+        const deployment = await fetchDeployment();
 
         if (active) {
+          const loaded: CreateContext = {
+            chainId: deployment.chainId,
+            auctionHouse: deployment.contracts.auctionHouse,
+            nftVault: deployment.contracts.nftVault,
+            localNft: deployment.contracts.localNft,
+            paramsController: deployment.contracts.paramsController,
+            minAuctionDuration: null,
+            paused: null,
+            defaultTokenId: deployment.contracts.localNft ? "2" : "",
+            defaultDuration: "7200"
+          };
+
           setContext(loaded);
           setContextError(null);
-          setNftContract((current) => current || loaded.localNft);
+          setNftContract((current) => current || loaded.localNft || "");
           setTokenId((current) => current || loaded.defaultTokenId);
           setDurationSeconds((current) => current || loaded.defaultDuration);
         }
@@ -168,12 +224,12 @@ export function WalletCreateAuctionForm() {
     () =>
       validateCreateAuctionFields(values, {
         minAuctionDuration: context?.minAuctionDuration,
-        paused: context?.paused
+        paused: context?.paused === true
       }),
     [context, values]
   );
 
-  const wrongNetwork = isConnected && chainId !== anvil.id;
+  const wrongNetwork = isConnected && chainId !== targetChainId;
   const ownerMatches = Boolean(owner && address && sameAddress(owner, address));
   const hasApproval = Boolean(
     ownerMatches && context && (approvedForAll || sameAddress(approvedAddress, context.nftVault))
@@ -182,32 +238,13 @@ export function WalletCreateAuctionForm() {
   const modeMessage = !isConnected
     ? "Connect a wallet to use wallet-signed mode."
     : wrongNetwork
-      ? "Wallet connected, but not on Anvil 31337."
+      ? `Wallet connected, but not on the target chain (${targetChainLabel}).`
       : null;
-
-  async function verifyWalletChain(provider: EIP1193Provider) {
-    let walletChainId: unknown;
-
-    try {
-      walletChainId = await provider.request({ method: "eth_chainId" });
-    } catch (error) {
-      throw new Error(
-        `Wallet RPC unreachable. Wallet-signed mode requires MetaMask access to the target RPC. ${walletErrorMessage(
-          error,
-          ""
-        )}`
-      );
-    }
-
-    if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== anvil.id) {
-      throw new Error("Wrong network. Wallet-signed mode requires Anvil chainId 31337.");
-    }
-  }
 
   async function checkOwnershipAndApproval(successMessage?: string) {
     if (!address) throw new Error("Wallet not connected.");
     if (!context) throw new Error("Deployment context is unavailable.");
-    if (wrongNetwork) throw new Error("Wrong network. Switch MetaMask to Anvil 31337.");
+    if (wrongNetwork) throw new Error(`Wrong network. Switch MetaMask to the target chain (${targetChainLabel}).`);
     if (validationError) throw new Error(validationError);
 
     try {
@@ -218,6 +255,16 @@ export function WalletCreateAuctionForm() {
       const { provider, publicClient } = createBrowserClients(address);
 
       await verifyWalletChain(provider);
+
+      const nextParams = await readCreateParams(publicClient, context);
+
+      setContext((current) => (current ? { ...current, ...nextParams } : current));
+
+      const paramsValidationError = validateCreateAuctionFields(values, nextParams);
+
+      if (paramsValidationError) {
+        throw new Error(paramsValidationError);
+      }
 
       let tokenOwner: Address;
 
@@ -371,15 +418,16 @@ export function WalletCreateAuctionForm() {
         <h2 className="text-xl font-semibold text-white">Wallet-signed create auction</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
           This is the production-target flow. MetaMask signs both transactions: NFTVault approval first, then
-          AuctionHouse.createAuction. No server private key is used.
+          AuctionHouse.createAuction. No server private key is used and no /api/dev route is called.
         </p>
       </div>
 
       <div className="mt-5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
         <p className="mt-1 text-sm leading-6 text-cyan-100/80">
-          Wallet-signed mode requires MetaMask access to the target RPC. Use local-dev mode in Codespaces, or expose
-          Anvil through a reliable localhost/testnet RPC.
+          Wallet-signed mode requires MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
+          Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev mode there or expose Anvil through a
+          reliable localhost/testnet RPC.
         </p>
       </div>
 
@@ -397,10 +445,14 @@ export function WalletCreateAuctionForm() {
 
       {context ? (
         <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-          <InfoItem label="Target chain" value={`Anvil ${context.chainId}`} />
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Deployment chain" value={String(context.chainId)} />
           <InfoItem label="AuctionHouse" value={shortenAddress(context.auctionHouse)} mono />
           <InfoItem label="NFTVault approval target" value={shortenAddress(context.nftVault)} mono />
-          <InfoItem label="Minimum duration" value={formatDurationSeconds(context.minAuctionDuration)} />
+          <InfoItem
+            label="Minimum duration"
+            value={context.minAuctionDuration ? formatDurationSeconds(context.minAuctionDuration) : "Loaded from contract check"}
+          />
         </div>
       ) : null}
 

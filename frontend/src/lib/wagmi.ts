@@ -1,12 +1,12 @@
 import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { anvil } from "@/lib/chains";
+import { targetChain } from "@/lib/chains";
 
 export const wagmiConfig = createConfig({
-  chains: [anvil],
+  chains: [targetChain],
   connectors: [injected()],
   transports: {
-    [anvil.id]: http(anvil.rpcUrls.default.http[0])
+    [targetChain.id]: http(targetChain.rpcUrls.default.http[0])
   },
   ssr: true
 });

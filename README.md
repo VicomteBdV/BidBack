@@ -103,6 +103,12 @@ The current MVP status, UI modes, local workflow, test commands, CI coverage, kn
 ```text
 docs/MVP_CHECKPOINT.md
 ```
+Testnet readiness and future deployment-environment preparation are documented in:
+
+```text
+docs/TESTNET_READINESS.md
+```
+
 ---
 
 ## Local Codespaces Demo

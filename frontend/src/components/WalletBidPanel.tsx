@@ -14,8 +14,8 @@ import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
-import { anvil } from "@/lib/chains";
-import { fetchLocalDeployment, type LocalDeployment } from "@/lib/deployment";
+import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
+import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, shortenAddress } from "@/lib/format";
 
 type WindowWithInjectedEthereum = Window & {
@@ -54,12 +54,12 @@ function createBrowserClients(account: Address) {
   return {
     provider,
     publicClient: createPublicClient({
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     }),
     walletClient: createWalletClient({
       account,
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     })
   };
@@ -76,8 +76,8 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     );
   }
 
-  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== anvil.id) {
-    throw new Error("Wallet connected, but not on Anvil 31337.");
+  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+    throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
   }
 }
 
@@ -106,7 +106,7 @@ export function WalletBidPanel({
 }) {
   const { address, chainId, isConnected } = useAccount();
 
-  const [deployment, setDeployment] = useState<LocalDeployment | null>(null);
+  const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
 
@@ -119,7 +119,7 @@ export function WalletBidPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
 
-  const wrongNetwork = isConnected && chainId !== anvil.id;
+  const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionOpen = auctionState === 0;
 
   const auctionIdBigInt = useMemo(() => {
@@ -133,7 +133,7 @@ export function WalletBidPanel({
     async function loadDeployment() {
       try {
         setIsDeploymentLoading(true);
-        const loaded = await fetchLocalDeployment();
+        const loaded = await fetchDeployment();
 
         if (active) {
           setDeployment(loaded);
@@ -178,7 +178,7 @@ export function WalletBidPanel({
   const bidValidationError = useMemo(() => {
     if (!auctionOpen) return "Auction is not OPEN.";
     if (!isConnected) return "Wallet not connected.";
-    if (wrongNetwork) return "Wallet connected, but not on Anvil 31337.";
+    if (wrongNetwork) return `Wallet connected, but not on the target chain (${targetChainLabel}).`;
     if (deploymentError) return deploymentError;
     if (!deployment) return "Deployment missing or stale.";
     if (!auctionIdBigInt) return "Invalid auction ID.";
@@ -213,7 +213,7 @@ export function WalletBidPanel({
     if (!deployment) throw new Error("Deployment missing or stale.");
     if (!auctionIdBigInt) throw new Error("Invalid auction ID.");
     if (!auctionOpen) throw new Error("Auction is not OPEN.");
-    if (wrongNetwork) throw new Error("Wallet connected, but not on Anvil 31337.");
+    if (wrongNetwork) throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
 
     try {
       setIsLoadingBidData(true);
@@ -337,7 +337,7 @@ export function WalletBidPanel({
   const statusMessage = !isConnected
     ? "Wallet not connected."
     : wrongNetwork
-      ? "Wallet connected, but not on Anvil 31337."
+      ? `Wallet connected, but not on the target chain (${targetChainLabel}).`
       : !auctionOpen
         ? "Auction is not OPEN."
         : null;
@@ -353,8 +353,9 @@ export function WalletBidPanel({
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed bidding requires MetaMask access to the target RPC. If Codespaces forwarding is unavailable to
-        MetaMask, keep using local-dev actions or expose Anvil through a reliable localhost/testnet RPC.
+        Wallet-signed bidding requires MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
+        Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+        reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (
@@ -376,6 +377,7 @@ export function WalletBidPanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
         <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />

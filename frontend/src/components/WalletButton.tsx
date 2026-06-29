@@ -1,8 +1,8 @@
 "use client";
 
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { anvil } from "@/lib/chains";
 import { shortenAddress } from "@/lib/format";
+import { targetChainId, targetChainLabel } from "@/lib/chains";
 
 export function WalletButton() {
   const { address, chainId, isConnected } = useAccount();
@@ -10,7 +10,7 @@ export function WalletButton() {
   const { disconnect } = useDisconnect();
 
   const connector = connectors[0];
-  const isWrongNetwork = isConnected && chainId !== anvil.id;
+  const isWrongNetwork = isConnected && chainId !== targetChainId;
 
   if (!isConnected) {
     return (
@@ -24,7 +24,7 @@ export function WalletButton() {
           {isPending ? "Connecting..." : "Connect wallet"}
         </button>
         <p className="max-w-sm text-xs text-slate-400">
-          Wallet connection is optional for the read-only local deployment view.
+          Wallet connection is optional for the read-only deployment view.
         </p>
       </div>
     );
@@ -48,11 +48,12 @@ export function WalletButton() {
 
       {isWrongNetwork ? (
         <p className="max-w-md rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-          Wallet connected, but not on Anvil 31337. Read-only deployment view remains available.
+          Wallet connected, but not on the target chain ({targetChainLabel}). Read-only deployment view remains
+          available.
         </p>
       ) : (
         <p className="max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
-          Wallet connected on Anvil 31337.
+          Wallet connected on {targetChainLabel}.
         </p>
       )}
     </div>

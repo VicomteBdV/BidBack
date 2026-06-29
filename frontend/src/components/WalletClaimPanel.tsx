@@ -13,8 +13,8 @@ import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
-import { anvil } from "@/lib/chains";
-import { fetchLocalDeployment, type LocalDeployment } from "@/lib/deployment";
+import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
+import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, isZeroAddress, shortenAddress } from "@/lib/format";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 
@@ -74,12 +74,12 @@ function createBrowserClients(account: Address) {
   return {
     provider,
     publicClient: createPublicClient({
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     }),
     walletClient: createWalletClient({
       account,
-      chain: anvil,
+      chain: targetChain,
       transport: custom(provider)
     })
   };
@@ -96,8 +96,8 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     );
   }
 
-  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== anvil.id) {
-    throw new Error("Wallet connected, but not on Anvil 31337.");
+  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+    throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
   }
 }
 
@@ -110,7 +110,7 @@ export function WalletClaimPanel({
 }) {
   const { address, chainId, isConnected } = useAccount();
 
-  const [deployment, setDeployment] = useState<LocalDeployment | null>(null);
+  const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
 
@@ -126,7 +126,7 @@ export function WalletClaimPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
 
-  const wrongNetwork = isConnected && chainId !== anvil.id;
+  const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
     auction.auctionId
   ]);
@@ -140,7 +140,7 @@ export function WalletClaimPanel({
     async function loadDeployment() {
       try {
         setIsDeploymentLoading(true);
-        const loaded = await fetchLocalDeployment();
+        const loaded = await fetchDeployment();
 
         if (active) {
           setDeployment(loaded);
@@ -177,7 +177,7 @@ export function WalletClaimPanel({
 
   function requireWalletContext() {
     if (!address) throw new Error("Wallet not connected.");
-    if (wrongNetwork) throw new Error("Wallet connected, but not on Anvil 31337.");
+    if (wrongNetwork) throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
     if (!deployment) throw new Error("Deployment missing or stale.");
     if (!auctionIdBigInt) throw new Error("Invalid auction ID.");
 
@@ -511,7 +511,7 @@ export function WalletClaimPanel({
 
   function baseDisabledReason() {
     if (!isConnected) return "Wallet not connected.";
-    if (wrongNetwork) return "Wallet connected, but not on Anvil 31337.";
+    if (wrongNetwork) return `Wallet connected, but not on the target chain (${targetChainLabel}).`;
     if (deploymentError) return deploymentError;
     if (!deployment) return "Deployment missing or stale.";
     if (!auctionIdBigInt) return "Invalid auction ID.";
@@ -574,7 +574,7 @@ export function WalletClaimPanel({
   const statusMessage = !isConnected
     ? "Wallet not connected."
     : wrongNetwork
-      ? "Wallet connected, but not on Anvil 31337."
+      ? `Wallet connected, but not on the target chain (${targetChainLabel}).`
       : !auction.finalized
         ? "Auction is not finalized."
         : null;
@@ -591,8 +591,9 @@ export function WalletClaimPanel({
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed claims require MetaMask access to the target RPC. If Codespaces forwarding is unavailable to
-        MetaMask, keep using local-dev actions or expose Anvil through a reliable localhost/testnet RPC.
+        Wallet-signed claims require MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
+        Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+        reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (
@@ -614,6 +615,7 @@ export function WalletClaimPanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
         <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="NFT claimant" value={shortenAddress(expectedNftClaimant)} mono />

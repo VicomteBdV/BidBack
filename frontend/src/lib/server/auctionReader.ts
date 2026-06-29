@@ -1,10 +1,11 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
-import { createPublicClient, defineChain, http, isAddress, type Address } from "viem";
+import { createPublicClient, defineChain, http, isAddress, type Address, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { anvilChainId } from "@/lib/chains";
 import type {
   AuctionDetailApiResponse,
   AuctionEconomics,
@@ -16,14 +17,25 @@ import type {
   SerializedAuction,
   SettlementEconomics
 } from "@/lib/auctionTypes";
-import { orderedContractKeys, type ContractKey } from "@/lib/contracts";
+import {
+  orderedCoreContractKeys,
+  orderedOptionalContractKeys,
+  type ContractKey,
+  type DeploymentContracts
+} from "@/lib/contracts";
 import { formatAuctionState, ZERO_ADDRESS } from "@/lib/format";
 
 export type DeploymentFile = {
   chainId: number;
   generatedAt?: string;
   source?: string;
-  contracts: Record<ContractKey, Address>;
+  contracts: DeploymentContracts;
+};
+
+export type LocalDeploymentFile = DeploymentFile & {
+  contracts: DeploymentContracts & {
+    localNft: Address;
+  };
 };
 
 type DevAccountRole = "seller" | "feeRecipient" | "primary" | "secondary";
@@ -41,10 +53,37 @@ export class AuctionNotFoundError extends Error {
   }
 }
 
-export const anvilRpcUrl = process.env.ANVIL_RPC_URL ?? "http://127.0.0.1:8545";
+function cleanEnv(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function parseChainId(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+export const anvilRpcUrl = cleanEnv(process.env.ANVIL_RPC_URL) ?? "http://127.0.0.1:8545";
+
+export const targetServerChainId = parseChainId(
+  cleanEnv(process.env.BIDBACK_CHAIN_ID) ?? cleanEnv(process.env.NEXT_PUBLIC_CHAIN_ID),
+  anvilChainId
+);
+
+export const targetServerRpcUrl =
+  cleanEnv(process.env.BIDBACK_RPC_URL) ??
+  (targetServerChainId === anvilChainId ? anvilRpcUrl : cleanEnv(process.env.NEXT_PUBLIC_WALLET_RPC_URL)) ??
+  anvilRpcUrl;
 
 export const anvilServerChain = defineChain({
-  id: 31337,
+  id: anvilChainId,
   name: "Anvil Local",
   nativeCurrency: {
     decimals: 18,
@@ -58,10 +97,32 @@ export const anvilServerChain = defineChain({
   }
 });
 
+export const targetServerChain = defineChain({
+  id: targetServerChainId,
+  name: targetServerChainId === anvilChainId ? "Anvil Local" : `BidBack Target ${targetServerChainId}`,
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH"
+  },
+  rpcUrls: {
+    default: {
+      http: [targetServerRpcUrl]
+    }
+  }
+});
+
 export function createAnvilPublicClient() {
   return createPublicClient({
     chain: anvilServerChain,
     transport: http(anvilRpcUrl)
+  });
+}
+
+export function createTargetPublicClient() {
+  return createPublicClient({
+    chain: targetServerChain,
+    transport: http(targetServerRpcUrl)
   });
 }
 
@@ -100,10 +161,11 @@ export function readOptionalDevAccount(role: DevAccountRole): DevAccountInfo {
   };
 }
 
-async function resolveDeploymentPath() {
+async function resolveDeploymentPath(chainId: number) {
+  const fileName = `${chainId}.json`;
   const candidates = [
-    path.join(process.cwd(), "public", "deployments", "31337.json"),
-    path.join(process.cwd(), "frontend", "public", "deployments", "31337.json")
+    path.join(process.cwd(), "public", "deployments", fileName),
+    path.join(process.cwd(), "frontend", "public", "deployments", fileName)
   ];
 
   for (const candidate of candidates) {
@@ -126,8 +188,11 @@ function assertAddress(value: unknown, label: string): Address {
   throw new Error(`Deployment file is missing ${label}`);
 }
 
-export async function readLocalDeployment(): Promise<DeploymentFile> {
-  const deploymentPath = await resolveDeploymentPath();
+async function readDeploymentFile(
+  chainId: number,
+  options: { requireLocalNft?: boolean } = {}
+): Promise<DeploymentFile> {
+  const deploymentPath = await resolveDeploymentPath(chainId);
   const raw = await readFile(deploymentPath, "utf8");
   const payload = JSON.parse(raw) as {
     chainId?: unknown;
@@ -140,22 +205,54 @@ export async function readLocalDeployment(): Promise<DeploymentFile> {
     throw new Error("Deployment file is missing chainId");
   }
 
+  if (payload.chainId !== chainId) {
+    throw new Error(`Deployment chainId mismatch. Expected ${chainId}, got ${payload.chainId}`);
+  }
+
   if (!payload.contracts || typeof payload.contracts !== "object") {
     throw new Error("Deployment file is missing contracts");
   }
 
-  const contracts = {} as Record<ContractKey, Address>;
+  const contracts: Partial<Record<ContractKey, Address>> = {};
 
-  for (const key of orderedContractKeys) {
+  for (const key of orderedCoreContractKeys) {
     contracts[key] = assertAddress(payload.contracts[key], key);
+  }
+
+  for (const key of orderedOptionalContractKeys) {
+    const value = payload.contracts[key];
+
+    if (value !== undefined && value !== null) {
+      contracts[key] = assertAddress(value, key);
+    }
+  }
+
+  if (options.requireLocalNft && !contracts.localNft) {
+    throw new Error("Deployment file is missing localNft");
   }
 
   return {
     chainId: payload.chainId,
     generatedAt: typeof payload.generatedAt === "string" ? payload.generatedAt : undefined,
     source: typeof payload.source === "string" ? payload.source : undefined,
-    contracts
+    contracts: contracts as DeploymentContracts
   };
+}
+
+export async function readDeployment(chainId = targetServerChainId): Promise<DeploymentFile> {
+  return readDeploymentFile(chainId);
+}
+
+export async function readTargetDeployment(): Promise<DeploymentFile> {
+  return readDeployment(targetServerChainId);
+}
+
+export async function readLocalDeployment(): Promise<LocalDeploymentFile> {
+  const deployment = await readDeploymentFile(anvilChainId, {
+    requireLocalNft: true
+  });
+
+  return deployment as LocalDeploymentFile;
 }
 
 function getField<T>(raw: unknown, key: string, index: number): T {
@@ -254,7 +351,8 @@ async function readBidderEconomics({
   label,
   finalized,
   distributionOpened,
-  deployment
+  deployment,
+  client
 }: {
   auctionId: bigint;
   bidder: DevAccountInfo;
@@ -263,6 +361,7 @@ async function readBidderEconomics({
   finalized: boolean;
   distributionOpened: boolean;
   deployment: DeploymentFile;
+  client: PublicClient;
 }): Promise<BidderEconomics> {
   if (!bidder.address) {
     return {
@@ -279,8 +378,6 @@ async function readBidderEconomics({
       canClaimReward: false
     };
   }
-
-  const client = createAnvilPublicClient();
 
   const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed] = await Promise.all([
     client.readContract({
@@ -333,10 +430,9 @@ async function readBidderEconomics({
 async function readAuctionEconomics(
   auctionId: bigint,
   auction: SerializedAuction,
-  deployment: DeploymentFile
+  deployment: DeploymentFile,
+  client: PublicClient
 ): Promise<AuctionEconomics> {
-  const client = createAnvilPublicClient();
-
   const primary = readOptionalDevAccount("primary");
   const secondary = readOptionalDevAccount("secondary");
   const sellerAccount = readOptionalDevAccount("seller");
@@ -373,7 +469,8 @@ async function readAuctionEconomics(
       label: "Bidder #1",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
-      deployment
+      deployment,
+      client
     }),
     readBidderEconomics({
       auctionId,
@@ -382,7 +479,8 @@ async function readAuctionEconomics(
       label: "Bidder #2",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
-      deployment
+      deployment,
+      client
     }),
     client.readContract({
       address: deployment.contracts.escrowVault,
@@ -443,8 +541,8 @@ async function readAuctionEconomics(
 }
 
 export async function readAllAuctions(): Promise<AuctionsApiResponse> {
-  const deployment = await readLocalDeployment();
-  const client = createAnvilPublicClient();
+  const deployment = await readTargetDeployment();
+  const client = createTargetPublicClient();
 
   const nextAuctionId = await client.readContract({
     address: deployment.contracts.auctionHouse,
@@ -481,8 +579,8 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     throw new AuctionNotFoundError(auctionIdParam);
   }
 
-  const deployment = await readLocalDeployment();
-  const client = createAnvilPublicClient();
+  const deployment = await readTargetDeployment();
+  const client = createTargetPublicClient();
 
   const nextAuctionId = await client.readContract({
     address: deployment.contracts.auctionHouse,
@@ -502,7 +600,7 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
   });
 
   const auction = serializeAuction(auctionId, rawAuction);
-  auction.economics = await readAuctionEconomics(auctionId, auction, deployment);
+  auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
 
   return {
     chainId: deployment.chainId,
