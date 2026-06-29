@@ -273,6 +273,37 @@ A complete local BidBack economic cycle can be tested as follows:
 9. Seller withdraws proceeds
 10. Fee recipient withdraws fees
 
+### Create Additional Local Auctions
+
+The home page includes a `Create local auction` link.
+
+This opens `/create`, a strictly local development form that calls:
+
+```text
+POST /api/dev/create-auction
+```
+
+This route is protected by the same local dev guard as the other `/api/dev/*` routes:
+
+* `ENABLE_LOCAL_DEV_ACTIONS` must be exactly `true`
+* `ANVIL_RPC_URL` must be reachable
+* The RPC chain ID must be Anvil `31337`
+
+The route uses the local Anvil seller private key from `frontend/.env.local`.
+
+It then:
+
+1. Verifies that the configured seller owns the NFT token
+2. Approves `NFTVault`, not `AuctionHouse`
+3. Calls `AuctionHouse.createAuction`
+4. Returns the new auction ID and transaction hash
+
+This is not production architecture. Production auction creation must be wallet-signed by the NFT owner.
+
+On a fresh local deployment, `DeployLocal.s.sol` mints 12 `LocalERC721` tokens to the seller. Token #1 is locked by the demo auction, so use token #2 or higher for additional local auctions.
+
+`LocalERC721` is a local mock only. It is not a BidBack product minting feature.
+
 These actions are executed by Next.js API routes using `viem` on the server side and local Anvil dev private keys from `frontend/.env.local`.
 
 This is not production architecture. Production user actions must be wallet-signed by the user and must not rely on server-held private keys.

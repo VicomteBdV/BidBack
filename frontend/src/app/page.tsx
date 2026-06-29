@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AuctionList } from "@/components/AuctionList";
 import { ModuleAddresses } from "@/components/ModuleAddresses";
 import { WalletButton } from "@/components/WalletButton";
@@ -14,7 +15,15 @@ export default function Home() {
               The browser talks to Next.js on port 3000. Next.js reads Anvil locally on the server side.
             </p>
           </div>
-          <WalletButton />
+          <div className="flex flex-col gap-3 sm:flex-row lg:items-start">
+            <Link
+              href="/create"
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Create local auction
+            </Link>
+            <WalletButton />
+          </div>
         </header>
 
         <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">

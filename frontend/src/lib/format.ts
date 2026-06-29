@@ -43,6 +43,41 @@ export function formatTimestamp(value?: string | number | bigint | null) {
   }).format(new Date(timestamp * 1000));
 }
 
+export function formatDurationSeconds(value?: string | number | bigint | null) {
+  let seconds: bigint;
+
+  try {
+    seconds = typeof value === "bigint" ? value : BigInt(value ?? "0");
+  } catch {
+    return "0 seconds";
+  }
+
+  if (seconds <= 0n) return "0 seconds";
+
+  const units = [
+    { label: "day", seconds: 86_400n },
+    { label: "hour", seconds: 3_600n },
+    { label: "minute", seconds: 60n },
+    { label: "second", seconds: 1n }
+  ];
+
+  const parts: string[] = [];
+  let remaining = seconds;
+
+  for (const unit of units) {
+    const amount = remaining / unit.seconds;
+
+    if (amount > 0n) {
+      parts.push(`${amount.toString()} ${unit.label}${amount === 1n ? "" : "s"}`);
+      remaining -= amount * unit.seconds;
+    }
+
+    if (parts.length >= 2) break;
+  }
+
+  return parts.join(" ");
+}
+
 export function formatAuctionState(state?: number | string | null) {
   const normalized = Number(state);
 

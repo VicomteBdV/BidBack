@@ -15,6 +15,18 @@ export const auctionHouseAbi = [
   },
   {
     type: "function",
+    name: "createAuction",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "nft", type: "address" },
+      { name: "tokenId", type: "uint256" },
+      { name: "startPrice", type: "uint256" },
+      { name: "duration", type: "uint64" }
+    ],
+    outputs: [{ name: "auctionId", type: "uint256" }]
+  },
+  {
+    type: "function",
     name: "getAuction",
     stateMutability: "view",
     inputs: [{ name: "auctionId", type: "uint256" }],
