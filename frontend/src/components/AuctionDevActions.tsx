@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ModeBadge } from "@/components/ModeBadge";
 import type { AuctionEconomics, DevBidderRole } from "@/lib/auctionTypes";
 import { formatEth, shortenAddress } from "@/lib/format";
 
@@ -106,14 +107,17 @@ export function AuctionDevActions({
   }
 
   return (
-    <section className="mt-5 rounded-lg border border-amber-400/30 bg-amber-400/10 p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-100">Local dev actions only</h3>
-      <p className="mt-1 max-w-3xl text-sm leading-6 text-amber-100/80">
-        These buttons use local Anvil dev keys on the Next.js server. They are for Codespaces MVP testing only and are
-        not a production transaction flow.
+    <section className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-xl font-semibold text-white">Local dev actions</h2>
+        <ModeBadge variant="local-dev" />
+      </div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-100/80">
+        These controls use local Anvil private keys from frontend/.env.local through guarded /api/dev/* routes. They are
+        for Codespaces MVP testing only and are not production architecture.
       </p>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <ActionButton
           label="Place primary demo bid"
           disabled={!canPrimaryBid || pendingAction !== null}

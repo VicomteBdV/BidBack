@@ -11,6 +11,7 @@ import {
   type EIP1193Provider
 } from "viem";
 import { useAccount } from "wagmi";
+import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
 import { anvil } from "@/lib/chains";
@@ -20,10 +21,6 @@ import { formatEth, shortenAddress } from "@/lib/format";
 type WindowWithInjectedEthereum = Window & {
   ethereum?: EIP1193Provider;
 };
-
-function sameAddress(a?: string | null, b?: string | null) {
-  return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
-}
 
 function walletErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object") {
@@ -346,16 +343,18 @@ export function WalletBidPanel({
         : null;
 
   return (
-    <section className="mt-5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed bid</h3>
-      <p className="mt-1 max-w-3xl text-sm leading-6 text-cyan-100/80">
-        This panel uses MetaMask to sign AuctionHouse.placeBid. No server private key is used and no /api/dev route is
-        called.
+    <section className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="text-base font-semibold text-white">Wallet-signed bid</h3>
+        <ModeBadge variant="wallet-signed" />
+      </div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-cyan-100/80">
+        MetaMask signs AuctionHouse.placeBid directly. No server private key is used and no /api/dev route is called.
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed bidding requires MetaMask access to the target RPC. Use local-dev mode in Codespaces, or expose
-        Anvil through a reliable localhost/testnet RPC.
+        Wallet-signed bidding requires MetaMask access to the target RPC. If Codespaces forwarding is unavailable to
+        MetaMask, keep using local-dev actions or expose Anvil through a reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (

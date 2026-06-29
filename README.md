@@ -402,6 +402,20 @@ In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably.
 
 The local-dev claim buttons and wallet-signed claim panel are intentionally separate. There is no silent fallback from wallet-signed claims to local-dev server-side actions.
 
+### UI Modes
+
+The auction detail page separates the MVP into explicit modes:
+
+* `Read-only`: auction and economic data loaded through Next.js server routes.
+* `Local dev only`: guarded `/api/dev/*` routes using local Anvil private keys from `frontend/.env.local`; Codespaces MVP testing only.
+* `Wallet-signed`: MetaMask-signed transactions with no server-held private key; requires the wallet to access the target RPC.
+
+Local-dev actions are not production architecture.
+
+Wallet-signed actions never call `/api/dev/*`.
+
+There is no silent fallback between local-dev and wallet-signed modes.
+
 ---
 
 ## Frontend Architecture

@@ -9,6 +9,7 @@ import {
   type EIP1193Provider
 } from "viem";
 import { useAccount } from "wagmi";
+import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
@@ -579,17 +580,19 @@ export function WalletClaimPanel({
         : null;
 
   return (
-    <section className="mt-5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-100">
-        Wallet-signed claims / withdrawals
-      </h3>
-      <p className="mt-1 max-w-3xl text-sm leading-6 text-emerald-100/80">
-        These actions are signed by MetaMask. No server private key is used and no /api/dev route is called.
+    <section className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="text-base font-semibold text-white">Wallet-signed claims / withdrawals</h3>
+        <ModeBadge variant="wallet-signed" />
+      </div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-100/80">
+        Pull-based post-finalization actions signed in MetaMask. No server private key is used and no /api/dev route is
+        called.
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed claims require MetaMask access to the target RPC. Use local-dev mode in Codespaces, or expose
-        Anvil through a reliable localhost/testnet RPC.
+        Wallet-signed claims require MetaMask access to the target RPC. If Codespaces forwarding is unavailable to
+        MetaMask, keep using local-dev actions or expose Anvil through a reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (
