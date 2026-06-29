@@ -1,3 +1,4 @@
+import React from "react";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { ModeBadge } from "@/components/ModeBadge";
 import type { SerializedAuction } from "@/lib/auctionTypes";

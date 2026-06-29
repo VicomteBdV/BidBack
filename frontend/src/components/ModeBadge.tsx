@@ -1,3 +1,5 @@
+import React from "react";
+
 type ModeBadgeVariant = "read-only" | "local-dev" | "wallet-signed";
 
 const modeBadgeStyles: Record<ModeBadgeVariant, string> = {

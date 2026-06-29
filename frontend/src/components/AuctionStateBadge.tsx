@@ -1,3 +1,4 @@
+import React from "react";
 import { formatAuctionState } from "@/lib/format";
 
 const stateStyles: Record<string, string> = {
