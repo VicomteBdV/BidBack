@@ -118,6 +118,12 @@ Testnet readiness and future deployment-environment preparation are documented i
 docs/TESTNET_READINESS.md
 ```
 
+Future post-deployment verification steps are documented in:
+
+```text
+docs/POST_DEPLOYMENT_VERIFICATION.md
+```
+
 ---
 
 ## Local Codespaces Demo

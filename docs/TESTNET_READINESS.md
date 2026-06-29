@@ -4,6 +4,12 @@ BidBack is not deployed to a public testnet yet.
 
 This document prepares the repository for a future testnet deployment while keeping the current local Anvil workflow as the default and reliable MVP environment.
 
+Post-deployment verification steps for a future public testnet are documented in:
+
+```text
+docs/POST_DEPLOYMENT_VERIFICATION.md
+```
+
 ---
 
 ## Current Status
@@ -356,6 +362,12 @@ Validate the deployment JSON before using it in the frontend:
 npm run validate:deployment -- <chainId>
 ```
 
+Run the post-deployment verification checklist before treating the deployment as usable:
+
+```text
+docs/POST_DEPLOYMENT_VERIFICATION.md
+```
+
 Finally run:
 
 ```bash
@@ -403,4 +415,5 @@ Before broadcasting any public testnet deployment:
 * Confirm frontend points to the target chain.
 * Confirm MetaMask can reach the target RPC.
 * Confirm block explorer verification plan.
+* Review `docs/POST_DEPLOYMENT_VERIFICATION.md`.
 * Confirm no docs or UI imply guaranteed yield.
