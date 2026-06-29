@@ -24,6 +24,7 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 * Wallet-signed UI panels for the production-target transaction model
 * CI for Foundry tests, frontend tests, typecheck, and build
 * Deployment JSON validation command for local and future deployment files
+* Read-only on-chain deployment verification script for local and future deployments
 
 ### Not Done Yet
 
@@ -192,6 +193,73 @@ This command is intentionally not part of CI yet because `frontend/public/deploy
 
 ---
 
+## On-Chain Deployment Verification
+
+BidBack also includes a read-only on-chain verification script.
+
+It validates the deployment JSON first, then checks the target RPC and deployed bytecode.
+
+For local Anvil:
+
+```bash
+npm run verify:deployment:onchain -- 31337
+```
+
+This command assumes:
+
+* Anvil is running;
+* `frontend/public/deployments/31337.json` exists;
+* the local deployment has already been created with `npm run local:deploy` or synced with `npm run frontend:sync`.
+
+For future testnet verification:
+
+```bash
+BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```
+
+For chain ID `31337`, the script uses:
+
+* `ANVIL_RPC_URL` if set;
+* otherwise `http://127.0.0.1:8545`.
+
+For any other chain ID, the script requires:
+
+```text
+BIDBACK_RPC_URL
+```
+
+The script checks:
+
+* deployment JSON validity;
+* RPC reachability;
+* RPC chain ID matches the deployment file chain ID;
+* bytecode exists for each core contract;
+* bytecode exists for `localNft` if present;
+* `AuctionHouse.nextAuctionId()` can be read;
+* `ParamsController.paused()` can be read;
+* `ParamsController.params()` can be read.
+
+The script fails with a non-zero exit code if:
+
+* the deployment file is missing;
+* the deployment JSON is invalid;
+* the RPC is inaccessible;
+* the RPC chain ID is wrong;
+* a checked contract address has no bytecode;
+* a critical read fails.
+
+The script does not verify yet:
+
+* ownership;
+* complete module linkage;
+* transaction smoke tests;
+* block explorer verification;
+* multisig or timelock governance state.
+
+This command is intentionally not part of CI yet because it requires a running RPC and, for local Anvil, a generated deployment file.
+
+---
+
 ## Environment Variables
 
 ### Local Defaults
@@ -249,68 +317,6 @@ Do not put deployer private keys in:
 
 ---
 
-## Example Local Environment File
-
-The following block documents the expected shape of `frontend/.env.example`.
-
-```env
-# Default target chain for the frontend.
-# If no testnet variables are set, BidBack defaults to local Anvil 31337.
-NEXT_PUBLIC_CHAIN_ID=31337
-NEXT_PUBLIC_CHAIN_NAME=Anvil Local
-
-# RPC used by browser wallet flows.
-# For local Anvil this is usually http://127.0.0.1:8545, but MetaMask may not always reach it from Codespaces.
-# For a future testnet, set this to a public RPC URL that wallets can reach.
-NEXT_PUBLIC_WALLET_RPC_URL=http://127.0.0.1:8545
-
-# Local Anvil browser RPC fallback.
-NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8545
-
-# Optional public block explorer URL for a future testnet.
-NEXT_PUBLIC_BLOCK_EXPLORER_URL=
-
-# Future server-side read configuration for non-local deployments.
-# Leave these unset for the default local Anvil flow.
-# BIDBACK_CHAIN_ID=11155111
-# BIDBACK_RPC_URL=https://example-testnet-rpc.invalid
-
-# Server-side local Anvil access used by Next.js API routes.
-ANVIL_RPC_URL=http://127.0.0.1:8545
-
-# Enables the local demo transaction routes under /api/dev/*.
-# This must be exactly "true" for local dev actions to run.
-# Never enable this in production.
-ENABLE_LOCAL_DEV_ACTIONS=true
-
-# Local Anvil dev keys only.
-# These keys are public, known default Anvil development keys.
-# They only make sense on a local Anvil network and must never receive real funds.
-#
-# In Anvil output:
-# - "Available Accounts" are public addresses.
-# - "Private Keys" are the values to copy into frontend/.env.local.
-#
-# In frontend/.env.local, use private keys, not addresses.
-# Each private key must be 0x + 64 hexadecimal characters.
-#
-# Recommended local demo mapping:
-# - seller / fee recipient = Anvil account #0
-# - bidder #1 = Anvil account #1
-# - bidder #2 = Anvil account #2
-#
-# If Anvil prints different keys, use the private keys printed by your current Anvil process.
-# If you see "insufficient funds" or "must be a 32-byte hex private key", re-check these values.
-# Never use a real private key.
-# Never commit frontend/.env.local.
-ANVIL_DEV_SELLER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-ANVIL_DEV_BIDDER_PRIVATE_KEY=0x59c6995e998f97a5a004497e5da5f49c4e2a0897da4d99a988dc3e5f4afc0e9
-ANVIL_DEV_SECOND_BIDDER_PRIVATE_KEY=0x5de4111afa1a4b4f3f2bdb6d601e0ab45970cd3f1ff31bce42c45b7bc0921f01
-ANVIL_DEV_FEE_RECIPIENT_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
-
----
-
 ## Commands for Future Testnet Day
 
 These commands are indicative only.
@@ -362,6 +368,12 @@ Validate the deployment JSON before using it in the frontend:
 npm run validate:deployment -- <chainId>
 ```
 
+Run read-only on-chain verification:
+
+```bash
+BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```
+
 Run the post-deployment verification checklist before treating the deployment as usable:
 
 ```text
@@ -387,6 +399,7 @@ npm --prefix frontend run build
 * Contract verification is not automated yet.
 * Deployment JSON must exactly match the deployed contract addresses.
 * Deployment JSON validation checks shape and address format only; it does not verify on-chain bytecode.
+* On-chain verification checks bytecode and critical reads only; it does not verify ownership or full linkage yet.
 * `LocalERC721` is a mock and must not be treated as a product minting feature.
 * No indexer exists yet, so read-only auction discovery still depends on bounded on-chain reads.
 * Economic parameters should be reviewed before public testing.
@@ -412,6 +425,7 @@ Before broadcasting any public testnet deployment:
 * Confirm claims remain pull-based.
 * Confirm deployment JSON format.
 * Validate the deployment JSON with `npm run validate:deployment -- <chainId>`.
+* Run on-chain verification with `npm run verify:deployment:onchain -- <chainId>`.
 * Confirm frontend points to the target chain.
 * Confirm MetaMask can reach the target RPC.
 * Confirm block explorer verification plan.

@@ -44,6 +44,69 @@ Post-deployment verification closes that gap.
 
 ---
 
+## On-Chain Verification Script
+
+BidBack includes a read-only on-chain verification script:
+
+```bash
+npm run verify:deployment:onchain -- <chainId>
+```
+
+For local Anvil:
+
+```bash
+npm run verify:deployment:onchain -- 31337
+```
+
+For chain ID `31337`, the script uses:
+
+* `ANVIL_RPC_URL` if set;
+* otherwise `http://127.0.0.1:8545`.
+
+For a future testnet:
+
+```bash
+BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```
+
+The script requires:
+
+* a reachable RPC;
+* a deployment JSON file at `frontend/public/deployments/<chainId>.json`;
+* a deployment JSON file that passes `npm run validate:deployment -- <chainId>`.
+
+The script verifies:
+
+* deployment JSON shape and address format;
+* RPC reachability;
+* RPC chain ID matches the deployment file chain ID;
+* bytecode exists for all core contracts;
+* bytecode exists for `localNft` if present;
+* `AuctionHouse.nextAuctionId()` can be read;
+* `ParamsController.paused()` can be read;
+* `ParamsController.params()` can be read.
+
+The script fails with exit code `1` if:
+
+* the deployment file is missing;
+* the deployment JSON is invalid;
+* the RPC is inaccessible;
+* the RPC chain ID is wrong;
+* a checked contract address has no bytecode;
+* a critical read fails.
+
+The script does not verify yet:
+
+* ownership;
+* complete module linkage;
+* transaction smoke tests;
+* block explorer verification;
+* multisig or timelock governance state.
+
+It is not integrated into CI because it requires a live RPC and, for Anvil, a generated local deployment file.
+
+---
+
 ## What Must Be Verified On-Chain
 
 After a future testnet deployment, verify every item below against the target RPC and block explorer.
@@ -60,6 +123,12 @@ Run the local deployment JSON validator:
 
 ```bash
 npm run validate:deployment -- <chainId>
+```
+
+Run read-only on-chain verification:
+
+```bash
+npm run verify:deployment:onchain -- <chainId>
 ```
 
 ### Bytecode Presence
@@ -221,6 +290,7 @@ Confirm:
 * wallet is on the target testnet;
 * frontend points to `frontend/public/deployments/<chainId>.json`;
 * the deployment JSON validator passes;
+* read-only on-chain verification passes;
 * all core addresses have bytecode;
 * a test ERC-721 NFT is available;
 * the seller wallet owns the NFT;
@@ -356,6 +426,7 @@ Use this checklist on the day of a real testnet deployment.
 * Confirm deployment transaction hashes.
 * Confirm deployment JSON path: `frontend/public/deployments/<chainId>.json`.
 * Run `npm run validate:deployment -- <chainId>`.
+* Run `npm run verify:deployment:onchain -- <chainId>`.
 * Confirm no real private key is committed.
 * Confirm frontend env points to the target chain.
 
@@ -434,21 +505,25 @@ Use this checklist on the day of a real testnet deployment.
 
 ## Future Automation
 
-A future verification script can automate part of this checklist.
+A future verification script can automate more of this checklist.
 
-Potential automation:
+Already automated:
 
-* RPC chain ID checks.
-* Deployment JSON validation.
-* Bytecode presence checks.
-* ABI read checks.
-* Ownership/admin checks.
-* Module linkage checks.
-* `ParamsController` parameter checks.
-* Pause state checks.
-* Fee recipient checks.
-* Read-only smoke checks for `nextAuctionId` and `getAuction`.
-* Optional dry-run transaction simulations.
+* deployment JSON validation;
+* RPC chain ID check;
+* bytecode presence checks;
+* selected critical read checks.
+
+Potential future automation:
+
+* ownership/admin checks;
+* full module linkage checks;
+* `ParamsController` expected-value checks;
+* pause authority checks;
+* fee recipient checks;
+* read-only smoke checks for `getAuction`;
+* optional dry-run transaction simulations;
+* explorer source verification checks.
 
 Automation should not replace manual review for:
 
