@@ -273,6 +273,10 @@ A complete local BidBack economic cycle can be tested as follows:
 9. Seller withdraws proceeds
 10. Fee recipient withdraws fees
 
+These actions are executed by Next.js API routes using `viem` on the server side and local Anvil dev private keys from `frontend/.env.local`.
+
+This is not production architecture. Production user actions must be wallet-signed by the user and must not rely on server-held private keys.
+
 ### Create Additional Local Auctions
 
 The home page includes a `Create local auction` link.
@@ -324,9 +328,39 @@ In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably.
 
 The local-dev panel and wallet-signed panel are intentionally separate. There is no silent fallback from wallet-signed actions to local-dev server-side actions.
 
-These actions are executed by Next.js API routes using `viem` on the server side and local Anvil dev private keys from `frontend/.env.local`.
+### Wallet-Signed Bidding
 
-This is not production architecture. Production user actions must be wallet-signed by the user and must not rely on server-held private keys.
+The auction detail page includes a separate **Wallet-signed bid** panel.
+
+This is the production-target bid flow:
+
+1. The wallet must be connected
+2. The wallet must be on Anvil chain ID `31337`
+3. The auction must be `OPEN`
+4. The frontend reads `AuctionHouse.minimumNextBid(auctionId)`
+5. The frontend reads `EscrowVault.capOf(auctionId, connectedAddress)`
+6. The user enters a new bid cap in ETH
+7. The user signs `AuctionHouse.placeBid(auctionId, newCap)`
+
+BidBack uses step-up-only caps. Therefore the transaction value is not always the full new cap.
+
+```text
+value sent = newCap - current wallet cap
+```
+
+For a first bid, the current wallet cap is zero, so value sent = `newCap`.
+
+For a later step-up bid from the same wallet, only the difference is sent.
+
+This flow does not call `/api/dev/*`.
+
+It does not use server-held private keys.
+
+It only works when MetaMask can access the target RPC and is connected to the expected chain ID.
+
+In Codespaces, MetaMask may be unable to reach the forwarded Anvil RPC reliably. In that case, keep using the local-dev panel for MVP testing, or expose Anvil through a reliable localhost or testnet RPC.
+
+The local-dev bid buttons and wallet-signed bid panel are intentionally separate. There is no silent fallback from wallet-signed bidding to local-dev server-side actions.
 
 ---
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
+import { WalletBidPanel } from "@/components/WalletBidPanel";
 import type { AuctionDetailApiResponse, BidderEconomics } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
@@ -77,7 +78,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
             <AuctionStateBadge state={auction.state} />
           </div>
           <p className="mt-2 text-sm text-slate-400">
-            Read-only details and local dev actions are routed through Next.js server routes.
+            Read-only details are routed through Next.js server routes. Local-dev and wallet-signed actions are kept
+            separate below.
           </p>
         </div>
 
@@ -98,6 +100,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
         economics={economics}
         onActionComplete={loadAuction}
       />
+
+      <WalletBidPanel auctionId={auction.auctionId} auctionState={auction.state} onBidComplete={loadAuction} />
 
       {economics ? (
         <section className="mt-5 rounded-lg border border-slate-800 bg-slate-950 p-4">
