@@ -25,6 +25,7 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 * CI for Foundry tests, frontend tests, typecheck, and build
 * Deployment JSON validation command for local and future deployment files
 * Read-only on-chain deployment verification script for local and future deployments
+* Deployment-level module linkage verification through public getters
 
 ### Not Done Yet
 
@@ -197,7 +198,7 @@ This command is intentionally not part of CI yet because `frontend/public/deploy
 
 BidBack also includes a read-only on-chain verification script.
 
-It validates the deployment JSON first, then checks the target RPC and deployed bytecode.
+It validates the deployment JSON first, then checks the target RPC, deployed bytecode, critical reads, and module linkage exposed by public getters.
 
 For local Anvil:
 
@@ -237,7 +238,15 @@ The script checks:
 * bytecode exists for `localNft` if present;
 * `AuctionHouse.nextAuctionId()` can be read;
 * `ParamsController.paused()` can be read;
-* `ParamsController.params()` can be read.
+* `ParamsController.params()` can be read;
+* `AuctionHouse.nftVault()` matches the deployment JSON;
+* `AuctionHouse.escrowVault()` matches the deployment JSON;
+* `AuctionHouse.distributionVault()` matches the deployment JSON;
+* `AuctionHouse.paramsController()` matches the deployment JSON;
+* `AuctionHouse.reputationAdapter()` matches the deployment JSON;
+* `NFTVault.auctionHouse()` matches the deployment JSON;
+* `EscrowVault.auctionHouse()` matches the deployment JSON;
+* `DistributionVault.auctionHouse()` matches the deployment JSON.
 
 The script fails with a non-zero exit code if:
 
@@ -246,15 +255,18 @@ The script fails with a non-zero exit code if:
 * the RPC is inaccessible;
 * the RPC chain ID is wrong;
 * a checked contract address has no bytecode;
-* a critical read fails.
+* a critical read fails;
+* a verifiable module linkage check fails.
 
-The script does not verify yet:
+The script intentionally does not verify yet:
 
 * ownership;
-* complete module linkage;
+* governance multisig or timelock state;
+* auction-scoped linkage such as `DistributionVault.escrowForAuction(auctionId)`;
+* auction-scoped module snapshots from `AuctionHouse.getAuctionModules(auctionId)`;
 * transaction smoke tests;
 * block explorer verification;
-* multisig or timelock governance state.
+* external security audit status.
 
 This command is intentionally not part of CI yet because it requires a running RPC and, for local Anvil, a generated deployment file.
 
@@ -399,7 +411,7 @@ npm --prefix frontend run build
 * Contract verification is not automated yet.
 * Deployment JSON must exactly match the deployed contract addresses.
 * Deployment JSON validation checks shape and address format only; it does not verify on-chain bytecode.
-* On-chain verification checks bytecode and critical reads only; it does not verify ownership or full linkage yet.
+* On-chain verification checks bytecode, critical reads, and deployment-level module linkage only; it does not verify ownership or auction-scoped linkage yet.
 * `LocalERC721` is a mock and must not be treated as a product minting feature.
 * No indexer exists yet, so read-only auction discovery still depends on bounded on-chain reads.
 * Economic parameters should be reviewed before public testing.

@@ -84,7 +84,19 @@ The script verifies:
 * bytecode exists for `localNft` if present;
 * `AuctionHouse.nextAuctionId()` can be read;
 * `ParamsController.paused()` can be read;
-* `ParamsController.params()` can be read.
+* `ParamsController.params()` can be read;
+* deployment-level module linkage that is exposed by public getters.
+
+The script verifies these module links:
+
+* `AuctionHouse.nftVault()` matches `deployment.contracts.nftVault`;
+* `AuctionHouse.escrowVault()` matches `deployment.contracts.escrowVault`;
+* `AuctionHouse.distributionVault()` matches `deployment.contracts.distributionVault`;
+* `AuctionHouse.paramsController()` matches `deployment.contracts.paramsController`;
+* `AuctionHouse.reputationAdapter()` matches `deployment.contracts.reputationAdapter`;
+* `NFTVault.auctionHouse()` matches `deployment.contracts.auctionHouse`;
+* `EscrowVault.auctionHouse()` matches `deployment.contracts.auctionHouse`;
+* `DistributionVault.auctionHouse()` matches `deployment.contracts.auctionHouse`.
 
 The script fails with exit code `1` if:
 
@@ -93,15 +105,22 @@ The script fails with exit code `1` if:
 * the RPC is inaccessible;
 * the RPC chain ID is wrong;
 * a checked contract address has no bytecode;
-* a critical read fails.
+* a critical read fails;
+* a verifiable module linkage check fails.
+
+The script intentionally skips these auction-scoped checks for now:
+
+* `DistributionVault.escrowForAuction(auctionId)`, because it exists per auction after a distribution is opened;
+* `AuctionHouse.getAuctionModules(auctionId)`, because it is an auction-specific snapshot.
 
 The script does not verify yet:
 
 * ownership;
-* complete module linkage;
+* governance handoff;
 * transaction smoke tests;
 * block explorer verification;
-* multisig or timelock governance state.
+* multisig or timelock governance state;
+* external security audit status.
 
 It is not integrated into CI because it requires a live RPC and, for Anvil, a generated local deployment file.
 
@@ -171,17 +190,25 @@ If these calls fail, the address, ABI, or deployment version is wrong.
 
 Confirm `AuctionHouse` references the intended deployed modules.
 
-Verify the deployed `AuctionHouse` is wired to:
+The on-chain verification script already checks the deployment-level getters currently exposed by the MVP contracts:
 
-* expected `NFTVault`;
-* expected `EscrowVault`;
-* expected `DistributionVault`;
-* expected `ParamsController`;
-* expected `ReputationAdapter`.
+* `AuctionHouse.nftVault()`
+* `AuctionHouse.escrowVault()`
+* `AuctionHouse.distributionVault()`
+* `AuctionHouse.paramsController()`
+* `AuctionHouse.reputationAdapter()`
+* `NFTVault.auctionHouse()`
+* `EscrowVault.auctionHouse()`
+* `DistributionVault.auctionHouse()`
 
-Confirm the vaults are linked to the correct `AuctionHouse`.
+A mismatch means the deployment JSON is stale, a module was wired incorrectly, or a vault is locked to the wrong `AuctionHouse`.
 
-The exact checks depend on the public getters exposed by the current contracts. If a module address is not readable from a getter, verify through deployment logs, constructor args, source verification, or a dedicated future verification script.
+The script does not check auction-scoped module snapshots yet:
+
+* `DistributionVault.escrowForAuction(auctionId)`;
+* `AuctionHouse.getAuctionModules(auctionId)`.
+
+Those should be checked later with an auction-aware verification or smoke test.
 
 ### Vault AuctionHouse Locks
 
@@ -375,6 +402,7 @@ Watch for these failure modes during testnet verification.
 * `DistributionVault` or `EscrowVault` is not the one expected by `AuctionHouse`.
 * `ParamsController` is not the intended instance.
 * `ReputationAdapter` is not the intended instance.
+* Auction-scoped module snapshots differ from the expected deployment for auctions created before a module update.
 
 ### Admin and Ownership
 
@@ -452,6 +480,7 @@ Use this checklist on the day of a real testnet deployment.
 * Confirm `NFTVault` points to expected `AuctionHouse`.
 * Confirm `EscrowVault` points to expected `AuctionHouse`.
 * Confirm `DistributionVault` points to expected `AuctionHouse`.
+* Confirm auction-scoped module snapshots are checked separately when relevant.
 
 ### Admin and Params
 
@@ -512,12 +541,13 @@ Already automated:
 * deployment JSON validation;
 * RPC chain ID check;
 * bytecode presence checks;
-* selected critical read checks.
+* selected critical read checks;
+* deployment-level module linkage checks exposed by public getters.
 
 Potential future automation:
 
 * ownership/admin checks;
-* full module linkage checks;
+* auction-scoped module snapshot checks;
 * `ParamsController` expected-value checks;
 * pause authority checks;
 * fee recipient checks;
