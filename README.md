@@ -124,6 +124,13 @@ Future post-deployment verification steps are documented in:
 docs/POST_DEPLOYMENT_VERIFICATION.md
 ```
 
+Open product and technical architecture decisions are tracked in:
+
+```text
+docs/ARCHITECTURE_DECISIONS.md
+```
+
+
 ---
 
 ## Local Codespaces Demo
