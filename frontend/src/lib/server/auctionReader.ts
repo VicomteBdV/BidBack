@@ -9,6 +9,7 @@ import { anvilChainId } from "@/lib/chains";
 import type {
   AuctionDetailApiResponse,
   AuctionEconomics,
+  AuctionParamsSnapshot,
   AuctionStateValue,
   AuctionsApiResponse,
   BidderEconomics,
@@ -300,6 +301,15 @@ function sameAddress(a?: string | null, b?: string | null) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
+function errorMessage(error: unknown) {
+  if (error && typeof error === "object" && "shortMessage" in error) {
+    const shortMessage = (error as { shortMessage?: unknown }).shortMessage;
+    if (typeof shortMessage === "string") return shortMessage;
+  }
+
+  return error instanceof Error ? error.message : String(error);
+}
+
 function serializeAuction(auctionId: bigint, raw: unknown): SerializedAuction {
   const state = toAuctionState(getField(raw, "state", 8));
 
@@ -321,6 +331,30 @@ function serializeAuction(auctionId: bigint, raw: unknown): SerializedAuction {
     bidCount: toDecimalString(getField(raw, "bidCount", 12)),
     nftClaimed: Boolean(getField(raw, "nftClaimed", 13)),
     finalized: state === 2
+  };
+}
+
+function serializeAuctionParams(raw: unknown): AuctionParamsSnapshot {
+  return {
+    bidbackFeeBps: toDecimalString(getField(raw, "bidbackFeeBps", 0)),
+    redistributionBps: toDecimalString(getField(raw, "redistributionBps", 1)),
+    minParticipants: toDecimalString(getField(raw, "minParticipants", 2)),
+    alphaBps: toDecimalString(getField(raw, "alphaBps", 3)),
+    betaBps: toDecimalString(getField(raw, "betaBps", 4)),
+    gammaBps: toDecimalString(getField(raw, "gammaBps", 5)),
+    minBidIncrementBps: toDecimalString(getField(raw, "minBidIncrementBps", 6)),
+    perUserRewardCapBps: toDecimalString(getField(raw, "perUserRewardCapBps", 7)),
+    maxParticipants: toDecimalString(getField(raw, "maxParticipants", 8)),
+    maxInteractionCount: toDecimalString(getField(raw, "maxInteractionCount", 9)),
+    minAuctionDuration: toDecimalString(getField(raw, "minAuctionDuration", 10)),
+    antiSnipeWindow: toDecimalString(getField(raw, "antiSnipeWindow", 11)),
+    antiSnipeExtension: toDecimalString(getField(raw, "antiSnipeExtension", 12)),
+    maxAntiSnipeExtensions: toDecimalString(getField(raw, "maxAntiSnipeExtensions", 13)),
+    minExposure: toDecimalString(getField(raw, "minExposure", 14)),
+    minPremiumNet: toDecimalString(getField(raw, "minPremiumNet", 15)),
+    efCap: toDecimalString(getField(raw, "efCap", 16)),
+    etCap: toDecimalString(getField(raw, "etCap", 17)),
+    iiCap: toDecimalString(getField(raw, "iiCap", 18))
   };
 }
 
@@ -600,6 +634,20 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
   });
 
   const auction = serializeAuction(auctionId, rawAuction);
+
+  try {
+    const rawParams = await client.readContract({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "getAuctionParams",
+      args: [auctionId]
+    });
+
+    auction.paramsSnapshot = serializeAuctionParams(rawParams);
+  } catch (error) {
+    auction.paramsSnapshotError = `Unable to read auction parameter snapshot: ${errorMessage(error)}`;
+  }
+
   auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
 
   return {

@@ -13,6 +13,8 @@ The current MVP supports:
 * Local demo auction creation during deployment
 * Read-only deployment and auction views through Next.js server routes
 * Read-only auction detail page
+* Read-only auction parameter snapshot display
+* Explicit Foundry tests proving auction parameter snapshots remain stable after global parameter updates
 * Local-dev full auction cycle:
 
   * Primary demo bid
@@ -32,6 +34,8 @@ The current MVP supports:
 
 The MVP keeps local-dev actions and wallet-signed actions visually and technically separated.
 
+Auction economic and operational parameters are copied into an auction-specific snapshot at creation time. Existing auctions continue to use their snapshot even if `ParamsController.setParams(...)` changes the global parameters later.
+
 ---
 
 ## 2. UI Modes
@@ -47,6 +51,7 @@ It is used for:
 * Local deployment display
 * Auction list
 * Auction detail
+* Auction rules snapshot
 * Economic state
 * Technical details
 
@@ -191,6 +196,7 @@ CI does not require:
 * No public testnet deployment is available yet.
 * No backend or event indexer persistence is available yet.
 * No external security audit has been completed yet.
+* `feeRecipient` is still a global setting and is not snapshotted per auction in the current MVP.
 
 ---
 
@@ -200,7 +206,8 @@ Recommended next steps:
 
 * Prepare a public testnet deployment workflow.
 * Improve RPC and wallet configuration for wallet-signed flows.
-* Add event indexing for auctions, bids, finalization, claims, and withdrawals.
+* Add event indexing for auctions, bids, finalization, claims, withdrawals, and auction rule snapshots.
 * Harden transaction error UX.
 * Prepare README sections for testnet and production-style usage.
+* Decide whether `feeRecipient` should be snapshotted per auction before production.
 * Plan external smart contract security review before production deployment.

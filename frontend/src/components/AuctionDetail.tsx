@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
+import { AuctionRulesSnapshot } from "@/components/AuctionRulesSnapshot";
 import { AuctionSummary } from "@/components/AuctionSummary";
 import { ModeBadge } from "@/components/ModeBadge";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
@@ -85,6 +86,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       </div>
 
       <AuctionSummary auction={auction} />
+
+      <AuctionRulesSnapshot snapshot={auction.paramsSnapshot} error={auction.paramsSnapshotError} />
 
       {economics ? (
         <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">

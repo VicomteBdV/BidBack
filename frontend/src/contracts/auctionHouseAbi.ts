@@ -55,6 +55,39 @@ export const auctionHouseAbi = [
   },
   {
     type: "function",
+    name: "getAuctionParams",
+    stateMutability: "view",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "bidbackFeeBps", type: "uint16" },
+          { name: "redistributionBps", type: "uint16" },
+          { name: "minParticipants", type: "uint16" },
+          { name: "alphaBps", type: "uint16" },
+          { name: "betaBps", type: "uint16" },
+          { name: "gammaBps", type: "uint16" },
+          { name: "minBidIncrementBps", type: "uint16" },
+          { name: "perUserRewardCapBps", type: "uint16" },
+          { name: "maxParticipants", type: "uint16" },
+          { name: "maxInteractionCount", type: "uint16" },
+          { name: "minAuctionDuration", type: "uint64" },
+          { name: "antiSnipeWindow", type: "uint64" },
+          { name: "antiSnipeExtension", type: "uint64" },
+          { name: "maxAntiSnipeExtensions", type: "uint8" },
+          { name: "minExposure", type: "uint64" },
+          { name: "minPremiumNet", type: "uint256" },
+          { name: "efCap", type: "uint256" },
+          { name: "etCap", type: "uint256" },
+          { name: "iiCap", type: "uint256" }
+        ]
+      }
+    ]
+  },
+  {
+    type: "function",
     name: "getParticipants",
     stateMutability: "view",
     inputs: [{ name: "auctionId", type: "uint256" }],

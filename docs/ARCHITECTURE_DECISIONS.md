@@ -34,12 +34,14 @@ Current baseline:
 * modular Foundry contracts;
 * Next.js frontend under `frontend/`;
 * read-only auction views through Next.js server routes;
+* read-only auction parameter snapshot display;
 * guarded local-dev actions under `/api/dev/*` for Codespaces testing;
 * wallet-signed create, bid, claim, and withdrawal panels;
 * on-chain NFT custody through `NFTVault`;
 * on-chain ETH accounting through `EscrowVault`;
 * deterministic redistribution through `AuctionHouse` and `DistributionVault`;
 * pull-based NFT, refund, reward, seller proceeds, and protocol fee claims;
+* explicit tests proving auction parameter snapshots do not change after global parameter updates;
 * on-chain checks for deployment bytecode, critical reads, and deployment-level module linkage;
 * CI covering Foundry tests, frontend tests, typecheck, and build.
 
@@ -380,6 +382,7 @@ Open governance questions:
 * Which emergency controls can pause creation and bidding without blocking claims?
 * How should parameter changes be announced and surfaced in the frontend?
 * What is the minimum governance setup for a public testnet?
+* Should `feeRecipient` be snapshotted per auction or remain a global settlement-time setting?
 
 Rules must never be mutable in a way that makes an active auction economically unpredictable or prevents users from recovering funds.
 
@@ -387,11 +390,11 @@ Rules must never be mutable in a way that makes an active auction economically u
 
 ## Auction Parameter Snapshots
 
-Each auction should have an explicit snapshot of the economic and operational parameters that apply to it.
+Each auction has an explicit snapshot of the economic and operational parameters that apply to it.
 
 This prevents a global parameter update from retroactively changing an auction that is already open.
 
-Parameters that should be snapshotted include:
+Parameters snapshotted today include:
 
 * protocol fee basis points;
 * redistribution fraction;
@@ -405,21 +408,26 @@ Parameters that should be snapshotted include:
 * anti-sniping extension;
 * max participants;
 * scoring caps and exposure thresholds;
-* module addresses when relevant.
+* module addresses used by the auction.
 
 Current MVP position:
 
-* the Solidity engine already snapshots `ParamsController.Params` per auction;
-* the engine also snapshots the active modules per auction;
-* this is a good baseline for economic consistency.
+* the Solidity engine snapshots `ParamsController.Params` per auction;
+* the Solidity engine snapshots active modules per auction;
+* dedicated Foundry tests now prove that existing auctions keep using their snapshot after `ParamsController.setParams(...)`;
+* the read-only auction detail view now exposes the auction parameter snapshot;
+* global parameter updates apply to future auctions only;
+* `paused` remains a global emergency control;
+* `feeRecipient` is not snapshotted yet and remains a separate governance decision.
 
 Future work:
 
-* expose snapshot details more clearly in the frontend;
-* include snapshot checks in post-deployment or auction-level verification;
+* decide whether `feeRecipient` should be snapshotted per auction;
+* include auction-level snapshot checks in post-deployment verification;
 * consider emitting richer events for indexers;
 * document which global parameter changes affect only future auctions;
-* make auction-specific rules easy for users to inspect before bidding.
+* make auction-specific rules easier for users to inspect before bidding;
+* ensure any future governance model preserves immutable rules for already-created auctions.
 
 ---
 
@@ -461,18 +469,18 @@ The frontend should never ask users to trust an opaque reward calculation when t
 
 ## Open Decisions Register
 
-| Decision area                     | Current MVP position                                         | Options under consideration                                                                | Key risks                                                     | Impacted components                                     | Decision timing                                    |
-| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| Bidding authorization model       | Wallet-signed bids plus local-dev server actions for testing | Session keys, account abstraction, auction-scoped delegation, signed intents, hybrid model | Unauthorized bids, poor UX, relayer trust, replay risk        | `AuctionHouse`, wallet layer, frontend, future backend  | Before production UX; prototype before public beta |
-| Multi-wallet support              | Wallet-signed panels exist; MetaMask-oriented testing so far | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps      | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                  |
-| Chain selection                   | Local Anvil `31337`; no public testnet yet                   | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity       | contracts, deployment scripts, frontend config, docs    | Before first public testnet deployment             |
-| Redistribution computation model  | Deterministic on-chain SCR in MVP                            | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors     | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data         |
-| Governance controls               | Owner-controlled MVP params; one-time vault locks            | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims        | `ParamsController`, ownership, docs, deployment scripts | Before public testnet with external users          |
-| Auction parameter snapshots       | Params and modules snapshotted internally per auction        | Surface snapshots in UI/events, verify auction snapshots, richer indexer schema            | User cannot inspect rules, stale module confusion             | `AuctionHouse`, frontend, indexer, verification scripts | Before production; improve during testnet          |
-| Indexing and persistence          | Bounded read-only routes; no indexer                         | Event indexer, backend cache, hosted read API                                              | Missing history, scalability limits, stale data               | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
-| Production trust and verification | JSON validation and partial on-chain verification exist      | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps | docs, scripts, deployment process, governance           | Before public testnet and production               |
-| Local-dev tooling boundary        | `/api/dev/*` guarded and local only                          | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse        | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
-| Final UI/UX model                 | Functional MVP UI, not final design                          | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                  | frontend, copy, docs, user education                    | After core public testnet mechanics are validated  |
+| Decision area                     | Current MVP position                                                         | Options under consideration                                                                | Key risks                                                                             | Impacted components                                     | Decision timing                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| Bidding authorization model       | Wallet-signed bids plus local-dev server actions for testing                 | Session keys, account abstraction, auction-scoped delegation, signed intents, hybrid model | Unauthorized bids, poor UX, relayer trust, replay risk                                | `AuctionHouse`, wallet layer, frontend, future backend  | Before production UX; prototype before public beta                 |
+| Multi-wallet support              | Wallet-signed panels exist; MetaMask-oriented testing so far                 | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps                              | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                                  |
+| Chain selection                   | Local Anvil `31337`; no public testnet yet                                   | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before first public testnet deployment                             |
+| Redistribution computation model  | Deterministic on-chain SCR in MVP                                            | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors                             | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data                         |
+| Governance controls               | Owner-controlled MVP params; one-time vault locks                            | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before public testnet with external users                          |
+| Auction parameter snapshots       | Params and modules are snapshotted, explicitly tested, and visible read-only | Snapshot fee recipient, richer events, auction-level verification, richer indexer schema   | User cannot inspect all rules, stale module confusion, unsettled fee recipient policy | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; fee recipient decision before production |
+| Indexing and persistence          | Bounded read-only routes; no indexer                                         | Event indexer, backend cache, hosted read API                                              | Missing history, scalability limits, stale data                                       | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                                  |
+| Production trust and verification | JSON validation and partial on-chain verification exist                      | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public testnet and production                               |
+| Local-dev tooling boundary        | `/api/dev/*` guarded and local only                                          | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                                  |
+| Final UI/UX model                 | Functional MVP UI, not final design                                          | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                                          | frontend, copy, docs, user education                    | After core public testnet mechanics are validated                  |
 
 ---
 
@@ -491,12 +499,13 @@ It already provides:
 * pull-based claims;
 * parameter snapshotting per auction;
 * module snapshotting per auction;
+* read-only display of auction parameter snapshots;
 * local and wallet-signed testing flows.
 
 Areas likely to evolve before production:
 
 * bidding authorization model for lower-friction bids;
-* user-visible auction parameter snapshotting;
+* fee recipient snapshot decision;
 * governance controls and ownership handoff;
 * indexer and backend persistence for scalable reads;
 * public testnet deployment and verification workflow;

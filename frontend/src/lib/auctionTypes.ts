@@ -1,6 +1,28 @@
 export type AuctionStateValue = 0 | 1 | 2;
 export type DevBidderRole = "primary" | "secondary";
 
+export type AuctionParamsSnapshot = {
+  bidbackFeeBps: string;
+  redistributionBps: string;
+  minParticipants: string;
+  alphaBps: string;
+  betaBps: string;
+  gammaBps: string;
+  minBidIncrementBps: string;
+  perUserRewardCapBps: string;
+  maxParticipants: string;
+  maxInteractionCount: string;
+  minAuctionDuration: string;
+  antiSnipeWindow: string;
+  antiSnipeExtension: string;
+  maxAntiSnipeExtensions: string;
+  minExposure: string;
+  minPremiumNet: string;
+  efCap: string;
+  etCap: string;
+  iiCap: string;
+};
+
 export type SerializedAuction = {
   auctionId: string;
   seller: `0x${string}`;
@@ -19,6 +41,8 @@ export type SerializedAuction = {
   bidCount: string;
   nftClaimed: boolean;
   finalized: boolean;
+  paramsSnapshot?: AuctionParamsSnapshot;
+  paramsSnapshotError?: string;
   economics?: AuctionEconomics;
 };
 
