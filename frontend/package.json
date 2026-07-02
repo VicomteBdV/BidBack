@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sync:deployment": "node scripts/sync-deployment.mjs",
+    "sync:deployment:testnet": "node scripts/sync-testnet-deployment.mjs",
     "validate:deployment": "node scripts/validate-deployment-json.mjs",
     "validate:deployment:local": "npm run validate:deployment -- 31337",
     "verify:deployment:onchain": "node scripts/verify-deployment-onchain.mjs",
