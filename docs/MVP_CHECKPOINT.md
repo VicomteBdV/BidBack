@@ -1,6 +1,6 @@
 # BidBack MVP Checkpoint
 
-This document summarizes the current MVP state for the BidBack smart contracts, local Codespaces workflow, frontend, local-dev actions, wallet-signed flows, and CI.
+This document summarizes the current MVP state for the BidBack smart contracts, local Codespaces workflow, frontend, local-dev actions, wallet-signed flows, testnet readiness, and CI.
 
 ---
 
@@ -32,6 +32,11 @@ The current MVP supports:
 * Wallet-signed bid panel
 * Wallet-signed claims / withdrawals panel
 * Frontend Vitest tests for critical guards and UI separation
+* Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
+* Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
+* Deployment JSON validation through `npm run validate:deployment -- <chainId>`
+* Read-only on-chain deployment verification through `npm run verify:deployment:onchain -- <chainId>`
+* Owner, global fee recipient, parameter sanity, bytecode, critical read, and module linkage checks in deployment verification
 * GitHub Actions CI covering Foundry and frontend checks
 
 The MVP keeps local-dev actions and wallet-signed actions visually and technically separated.
@@ -39,6 +44,8 @@ The MVP keeps local-dev actions and wallet-signed actions visually and technical
 Auction economic and operational parameters are copied into an auction-specific snapshot at creation time. Existing auctions continue to use their snapshot even if `ParamsController.setParams(...)` changes the global parameters later.
 
 The protocol fee recipient is also copied into an auction-specific snapshot at creation time. `feeRecipient()` remains the current global configuration for future auctions, while existing auctions continue to settle protocol fees to the fee recipient captured during `createAuction`.
+
+No public testnet deployment has been executed yet. The repository is prepared for a controlled public testnet deployment, but the deployment must still be reviewed, broadcast, verified, and smoke-tested manually.
 
 ---
 
@@ -170,6 +177,22 @@ cd /workspaces/BidBack
 npm run local:check
 ```
 
+Validate a generated deployment JSON:
+
+```bash
+cd /workspaces/BidBack
+npm run validate:deployment -- 31337
+```
+
+Run the minimal technical deployment smoke test against local Anvil:
+
+```bash
+cd /workspaces/BidBack
+npm run verify:deployment:onchain -- 31337
+```
+
+`verify:deployment:onchain` requires a running RPC and an existing deployment JSON file. For local Anvil, run `npm run local:deploy` and `npm run frontend:sync` first if the local deployment was reset.
+
 ---
 
 ## 5. CI Coverage
@@ -198,9 +221,11 @@ CI does not require:
 * MetaMask may not be able to reach Anvil through Codespaces port forwarding.
 * Local-dev actions use known Anvil test private keys.
 * Local-dev actions are not production architecture.
-* No public testnet deployment is available yet.
+* No public testnet deployment has been executed yet.
 * No backend or event indexer persistence is available yet.
 * No external security audit has been completed yet.
+* No block explorer source verification workflow has been automated yet.
+* No production monitoring or alerting exists yet.
 * Production governance, multisig ownership, timelock policy, and incident response are not finalized yet.
 
 ---
@@ -209,10 +234,14 @@ CI does not require:
 
 Recommended next steps:
 
-* Prepare a public testnet deployment workflow.
+* Select the controlled public testnet and RPC provider.
+* Dry-run `script/DeployTestnet.s.sol` against the selected testnet RPC.
+* Broadcast only after human review of deployment variables and dry-run output.
+* Sync, validate, and verify the generated deployment JSON.
+* Run the manual post-deployment smoke test with a real testnet NFT.
+* Verify contracts on a block explorer.
 * Improve RPC and wallet configuration for wallet-signed flows.
 * Add event indexing for auctions, bids, finalization, claims, withdrawals, and auction rule snapshots.
 * Harden transaction error UX.
-* Prepare README sections for testnet and production-style usage.
 * Add post-deployment verification checks for auction-level snapshots where practical.
 * Plan external smart contract security review before production deployment.
