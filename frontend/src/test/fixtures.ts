@@ -101,6 +101,7 @@ export const auctionDetailFixture = {
       },
       feeRecipient: {
         address: testAddresses.feeRecipient,
+        currentGlobalAddress: testAddresses.feeRecipient,q
         configuredAddress: testAddresses.feeRecipient,
         configured: true,
         credit: "0",
