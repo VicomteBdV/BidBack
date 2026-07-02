@@ -4,7 +4,7 @@ This document defines the manual checks to run after a future BidBack public tes
 
 No public testnet deployment exists yet.
 
-This is a preparation document only. It does not trigger deployment and does not replace contract tests, frontend tests, or a security audit.
+This is a preparation document only. It does not trigger deployment and does not replace contract tests, frontend tests, block explorer verification, or a security audit.
 
 For the controlled testnet deployment procedure, start with:
 
@@ -41,12 +41,13 @@ It does not prove that:
 * the addresses contain bytecode;
 * the bytecode matches the expected contracts;
 * contracts are wired to each other correctly;
-* ownership/admin setup is correct;
-* parameters are correct;
+* ownership/admin setup is intended;
+* the global fee recipient is intended;
+* economic parameters are reasonable;
 * the frontend points to the same chain that was deployed;
 * the deployment is safe for production.
 
-Post-deployment verification closes that gap.
+Post-deployment verification closes part of that gap.
 
 ---
 
@@ -91,7 +92,48 @@ The script verifies:
 * `AuctionHouse.nextAuctionId()` can be read;
 * `ParamsController.paused()` can be read;
 * `ParamsController.params()` can be read;
+* each core `owner()` is readable and non-zero;
+* `AuctionHouse.feeRecipient()` is readable and non-zero;
+* selected economic and operational parameter sanity checks;
 * deployment-level module linkage that is exposed by public getters.
+
+The owner checks cover:
+
+* `AuctionHouse.owner()`;
+* `NFTVault.owner()`;
+* `EscrowVault.owner()`;
+* `DistributionVault.owner()`;
+* `ParamsController.owner()`;
+* `ReputationAdapter.owner()`.
+
+By default, owners are reported but not compared to an expected address.
+
+To enforce an expected owner during testnet verification:
+
+```bash
+EXPECTED_OWNER=<expected-owner-address> \
+BIDBACK_RPC_URL=<testnet-rpc-url> \
+npm run verify:deployment:onchain -- <chainId>
+```
+
+To enforce an expected global fee recipient:
+
+```bash
+EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
+BIDBACK_RPC_URL=<testnet-rpc-url> \
+npm run verify:deployment:onchain -- <chainId>
+```
+
+Both expected values can be combined:
+
+```bash
+EXPECTED_OWNER=<expected-owner-address> \
+EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
+BIDBACK_RPC_URL=<testnet-rpc-url> \
+npm run verify:deployment:onchain -- <chainId>
+```
+
+`EXPECTED_OWNER` and `EXPECTED_FEE_RECIPIENT` are optional. They are never required for local Anvil.
 
 The script verifies these module links:
 
@@ -104,6 +146,25 @@ The script verifies these module links:
 * `EscrowVault.auctionHouse()` matches `deployment.contracts.auctionHouse`;
 * `DistributionVault.auctionHouse()` matches `deployment.contracts.auctionHouse`.
 
+The script checks selected parameter invariants, including:
+
+* protocol fee basis points are within the MVP bound;
+* redistribution basis points are not above `10000`;
+* minimum participants is at least `2`;
+* SCR weights respect `alpha > beta >= gamma`;
+* SCR weights sum to `10000`;
+* bid increment is non-zero and at most `10000` bps;
+* per-user reward cap is non-zero and at most `10000` bps;
+* max participants is not below min participants and remains bounded;
+* max interaction count is non-zero;
+* minimum auction duration is non-zero;
+* anti-sniping window and extension are non-zero;
+* max anti-sniping extensions stays within the MVP bound;
+* minimum exposure is not above minimum auction duration;
+* EF / ET / II caps are non-zero and at most `1e18`.
+
+These are sanity checks, not governance approval. Human review must still confirm that parameter values are suitable for the chosen testnet.
+
 The script fails with exit code `1` if:
 
 * the deployment file is missing;
@@ -112,6 +173,11 @@ The script fails with exit code `1` if:
 * the RPC chain ID is wrong;
 * a checked contract address has no bytecode;
 * a critical read fails;
+* an owner is zero or unreadable;
+* `EXPECTED_OWNER` is set and a readable owner differs;
+* `AuctionHouse.feeRecipient()` is zero or unreadable;
+* `EXPECTED_FEE_RECIPIENT` is set and the readable fee recipient differs;
+* a parameter sanity check fails;
 * a verifiable module linkage check fails.
 
 The script intentionally skips these auction-scoped checks for now:
@@ -121,11 +187,11 @@ The script intentionally skips these auction-scoped checks for now:
 
 The script does not verify yet:
 
-* ownership;
-* governance handoff;
+* complete governance readiness;
+* multisig or timelock configuration;
 * transaction smoke tests;
 * block explorer verification;
-* multisig or timelock governance state;
+* source-bytecode equivalence;
 * external security audit status.
 
 It is not integrated into CI because it requires a live RPC and, for Anvil, a generated local deployment file.
@@ -156,6 +222,15 @@ Run read-only on-chain verification:
 
 ```bash
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```
+
+Run stricter read-only verification when the expected owner and fee recipient are known:
+
+```bash
+EXPECTED_OWNER=<expected-owner-address> \
+EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
+BIDBACK_RPC_URL=<testnet-rpc-url> \
+npm run verify:deployment:onchain -- <chainId>
 ```
 
 ### Bytecode Presence
@@ -200,7 +275,7 @@ If these calls fail, the address, ABI, or deployment version is wrong.
 
 Confirm `AuctionHouse` references the intended deployed modules.
 
-The on-chain verification script already checks the deployment-level getters currently exposed by the MVP contracts:
+The on-chain verification script checks the deployment-level getters currently exposed by the MVP contracts:
 
 * `AuctionHouse.nftVault()`
 * `AuctionHouse.escrowVault()`
@@ -236,6 +311,8 @@ A wrong vault-to-house link can break custody, settlement, refunds, or redistrib
 
 Confirm temporary ownership/admin state is explicit and documented.
 
+The on-chain verification script reads every core `owner()` value. If `EXPECTED_OWNER` is set, it fails on any mismatch.
+
 Verify:
 
 * deployer address;
@@ -248,9 +325,19 @@ Verify:
 
 For real production, ownership should move to multisig/timelock governance. A controlled testnet may temporarily use an EOA, but that must be intentional and documented.
 
+### Fee Recipient State
+
+Confirm the current global fee recipient matches the intended testnet recipient.
+
+The on-chain verification script reads `AuctionHouse.feeRecipient()` and fails if it is zero. If `EXPECTED_FEE_RECIPIENT` is set, it fails on mismatch.
+
+Remember that auctions also snapshot the fee recipient at creation. The global fee recipient check confirms the current default for future auctions; auction-specific snapshots must be reviewed on auction details when needed.
+
 ### ParamsController State
 
 Confirm `ParamsController` contains expected MVP parameters.
+
+The on-chain verification script checks basic parameter sanity. Human review must still verify exact intended values.
 
 Verify at minimum:
 
@@ -419,10 +506,22 @@ Watch for these failure modes during testnet verification.
 ### Admin and Ownership
 
 * Owner is an unexpected EOA.
+* `EXPECTED_OWNER` is set to the wrong address.
 * Fee recipient is wrong.
+* `EXPECTED_FEE_RECIPIENT` is set to the wrong address.
 * Pause authority is wrong.
 * Params authority is wrong.
 * Ownership handoff plan is missing or unclear.
+
+### Params
+
+* Protocol fee is above the intended MVP bound.
+* Redistribution bps is above `10000`.
+* SCR weights do not satisfy `alpha > beta >= gamma`.
+* SCR weights do not sum to `10000`.
+* Auction duration or anti-sniping values are zero.
+* Max participants is below min participants.
+* Caps are zero or above their intended scale.
 
 ### ABI and Versioning
 
@@ -469,6 +568,7 @@ Use this checklist on the day of a real testnet deployment.
 * Confirm deployment JSON was generated with `npm run testnet:sync -- <chainId>`.
 * Run `npm run validate:deployment -- <chainId>`.
 * Run `BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>`.
+* If owner and fee recipient are final, run with `EXPECTED_OWNER` and `EXPECTED_FEE_RECIPIENT`.
 * Confirm no real private key is committed.
 * Confirm frontend env points to the target chain.
 * Confirm `ENABLE_LOCAL_DEV_ACTIONS` is not enabled in the hosted frontend.
@@ -503,6 +603,8 @@ Use this checklist on the day of a real testnet deployment.
 * Confirm pause authority.
 * Confirm params authority.
 * Confirm `ParamsController.params()`.
+* Confirm parameter sanity checks pass.
+* Confirm exact parameter values are intentionally chosen.
 * Confirm `ParamsController.paused()` is expected.
 * Confirm `ReputationAdapter` state is expected.
 * Confirm testnet EOA ownership is temporary and documented.
@@ -556,15 +658,17 @@ Already automated:
 * RPC chain ID check;
 * bytecode presence checks;
 * selected critical read checks;
+* owner read checks and optional expected owner comparison;
+* global fee recipient read check and optional expected fee recipient comparison;
+* selected parameter sanity checks;
 * deployment-level module linkage checks exposed by public getters.
 
 Potential future automation:
 
-* ownership/admin checks;
+* exact expected-value checks for a named parameter profile;
+* governance handoff checks for multisig/timelock;
 * auction-scoped module snapshot checks;
-* `ParamsController` expected-value checks;
-* pause authority checks;
-* fee recipient checks;
+* pause authority checks beyond `owner()`;
 * read-only smoke checks for `getAuction`;
 * optional dry-run transaction simulations;
 * explorer source verification checks.
