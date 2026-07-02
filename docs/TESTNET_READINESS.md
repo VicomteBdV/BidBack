@@ -2,9 +2,15 @@
 
 BidBack is not deployed to a public testnet yet.
 
-This document prepares the repository for a future testnet deployment while keeping the current local Anvil workflow as the default and reliable MVP environment.
+This document prepares the repository for a future controlled public testnet deployment while keeping the current local Anvil workflow as the default and reliable MVP environment.
 
-Post-deployment verification steps for a future public testnet are documented in:
+The concrete deployment runbook for a future controlled testnet is documented in:
+
+```text
+docs/TESTNET_DEPLOYMENT_RUNBOOK.md
+```
+
+Post-deployment verification steps are documented in:
 
 ```text
 docs/POST_DEPLOYMENT_VERIFICATION.md
@@ -18,7 +24,10 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 
 * Local Anvil chain `31337`
 * Foundry local deployment script
+* Controlled testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Frontend deployment files under `frontend/public/deployments/`
+* Local deployment sync script for Anvil `31337`
+* Testnet deployment sync script for `frontend/public/deployments/<chainId>.json`
 * Read-only auction views through Next.js server routes
 * Local-dev demo actions guarded by `ENABLE_LOCAL_DEV_ACTIONS=true`
 * Wallet-signed UI panels for the production-target transaction model
@@ -30,12 +39,14 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 ### Not Done Yet
 
 * No public testnet deployment
-* No production deployment script with real network configuration
+* No production deployment
+* No broadcast performed by the testnet scaffold lot
 * No contract verification workflow
 * No production governance ownership handoff
 * No hosted frontend environment
 * No production indexer
 * No production RPC provider selection
+* No external security audit
 
 ---
 
@@ -60,17 +71,32 @@ Local-dev actions remain strictly limited to:
 * chain ID `31337` only
 * Codespaces MVP testing only
 
-They must never be enabled in production.
+They must never be enabled in production or in a hosted testnet frontend.
 
-### Future Testnet
+### Controlled Public Testnet
 
-A future public testnet deployment should use:
+A future controlled public testnet deployment should use:
 
 ```text
 frontend/public/deployments/<chainId>.json
 ```
 
-The frontend can then point wallet-signed actions and read-only views at that chain, provided the RPC is reachable from the relevant runtime.
+The testnet deployment scaffold is:
+
+```text
+script/DeployTestnet.s.sol
+```
+
+It deploys only the core BidBack contracts:
+
+* `ParamsController`
+* `NFTVault`
+* `EscrowVault`
+* `DistributionVault`
+* `ReputationAdapter`
+* `AuctionHouse`
+
+It does not deploy `LocalERC721`, does not mint NFTs, and does not create a demo auction.
 
 Server-side reads should use a server-side RPC URL.
 
@@ -111,8 +137,7 @@ Expected format:
     "escrowVault": "0x0000000000000000000000000000000000000000",
     "distributionVault": "0x0000000000000000000000000000000000000000",
     "paramsController": "0x0000000000000000000000000000000000000000",
-    "reputationAdapter": "0x0000000000000000000000000000000000000000",
-    "localNft": "0x0000000000000000000000000000000000000000"
+    "reputationAdapter": "0x0000000000000000000000000000000000000000"
   }
 }
 ```
@@ -132,21 +157,13 @@ Optional contracts:
 
 `localNft` is expected for the local Anvil demo because `LocalERC721` is a local mock.
 
-`localNft` should not be required for a public testnet deployment unless a test-only NFT mock is deliberately deployed there.
+`localNft` should not be included in a controlled public testnet deployment unless a test-only NFT mock is deliberately deployed there.
 
 ---
 
 ## Deployment JSON Validation
 
 BidBack includes a local deployment JSON validator to catch malformed deployment files before they are used by the frontend.
-
-The validator exists because future environments will be loaded through:
-
-```text
-frontend/public/deployments/<chainId>.json
-```
-
-A malformed file could make the frontend point to incomplete, stale, or invalid contract addresses.
 
 Validate the local Anvil deployment after running `npm run local:deploy` or `npm run frontend:sync`:
 
@@ -248,16 +265,6 @@ The script checks:
 * `EscrowVault.auctionHouse()` matches the deployment JSON;
 * `DistributionVault.auctionHouse()` matches the deployment JSON.
 
-The script fails with a non-zero exit code if:
-
-* the deployment file is missing;
-* the deployment JSON is invalid;
-* the RPC is inaccessible;
-* the RPC chain ID is wrong;
-* a checked contract address has no bytecode;
-* a critical read fails;
-* a verifiable module linkage check fails.
-
 The script intentionally does not verify yet:
 
 * ownership;
@@ -286,6 +293,19 @@ NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8545
 ANVIL_RPC_URL=http://127.0.0.1:8545
 ```
 
+### Controlled Testnet Deployment Variables
+
+Prepare these outside the repo before a future broadcast:
+
+```bash
+export TESTNET_RPC_URL=<testnet-rpc-url>
+export TESTNET_PRIVATE_KEY=<deployer-private-key>
+export TESTNET_OWNER=<final-owner-address>
+export TESTNET_FEE_RECIPIENT=<protocol-fee-recipient-address>
+```
+
+`TESTNET_PRIVATE_KEY` must never be committed and must never be exposed to the frontend.
+
 ### Future Testnet Frontend Variables
 
 Prepare these when a public testnet deployment exists:
@@ -310,32 +330,25 @@ BIDBACK_RPC_URL=<server-side-rpc-url>
 
 `BIDBACK_RPC_URL` may use a private RPC provider URL, but it must not expose private keys.
 
-### Deployment Script Variables
+Do not enable local dev actions in any hosted testnet environment:
 
-A future testnet deployment script will need a deployer private key or signer configuration.
+```env
+ENABLE_LOCAL_DEV_ACTIONS=false
+```
 
-That key must be used only by Foundry scripts or secure deployment tooling.
-
-It must never be committed.
-
-It must never be exposed through frontend variables.
-
-Do not put deployer private keys in:
-
-* `frontend/.env.local`
-* `frontend/.env.example`
-* `README.md`
-* `docs/`
+or leave the variable unset.
 
 ---
 
 ## Commands for Future Testnet Day
 
-These commands are indicative only.
+Follow the full runbook first:
 
-Do not run a real testnet deployment until the deployment script, governance setup, and checklist are reviewed.
+```text
+docs/TESTNET_DEPLOYMENT_RUNBOOK.md
+```
 
-Run local checks first:
+Run local checks:
 
 ```bash
 forge test -vv
@@ -348,13 +361,15 @@ Prepare environment variables outside the repo:
 
 ```bash
 export TESTNET_RPC_URL=<rpc-url>
-export TESTNET_DEPLOYER_PRIVATE_KEY=<private-key>
+export TESTNET_PRIVATE_KEY=<private-key>
+export TESTNET_OWNER=<owner-address>
+export TESTNET_FEE_RECIPIENT=<fee-recipient-address>
 ```
 
-Dry-run or simulate first if possible:
+Dry-run first:
 
 ```bash
-forge script script/<FutureTestnetDeploy>.s.sol:<FutureTestnetDeploy> \
+forge script script/DeployTestnet.s.sol:DeployTestnet \
   --rpc-url "$TESTNET_RPC_URL" \
   -vvv
 ```
@@ -362,16 +377,16 @@ forge script script/<FutureTestnetDeploy>.s.sol:<FutureTestnetDeploy> \
 Broadcast only after review:
 
 ```bash
-forge script script/<FutureTestnetDeploy>.s.sol:<FutureTestnetDeploy> \
+forge script script/DeployTestnet.s.sol:DeployTestnet \
   --rpc-url "$TESTNET_RPC_URL" \
   --broadcast \
   -vvv
 ```
 
-Then create:
+Then create the frontend deployment JSON:
 
-```text
-frontend/public/deployments/<chainId>.json
+```bash
+npm run testnet:sync -- <chainId>
 ```
 
 Validate the deployment JSON before using it in the frontend:
@@ -406,6 +421,7 @@ npm --prefix frontend run build
 
 * Current production ownership handoff is not finalized.
 * A multisig and timelock process should be defined before production-like deployment.
+* A controlled testnet may temporarily use an EOA owner, but that must be intentional and documented.
 * Public RPC reliability must be tested from both Next.js server runtime and user wallets.
 * Wallet-signed actions require the wallet to reach the configured RPC.
 * Contract verification is not automated yet.
@@ -433,6 +449,7 @@ Before broadcasting any public testnet deployment:
 * Confirm vault `setAuctionHouse` one-time locks are expected.
 * Confirm `ParamsController` values.
 * Confirm fee recipient address.
+* Confirm final owner address.
 * Confirm pause behavior.
 * Confirm claims remain pull-based.
 * Confirm deployment JSON format.
@@ -440,6 +457,8 @@ Before broadcasting any public testnet deployment:
 * Run on-chain verification with `npm run verify:deployment:onchain -- <chainId>`.
 * Confirm frontend points to the target chain.
 * Confirm MetaMask can reach the target RPC.
+* Confirm hosted frontend does not enable `ENABLE_LOCAL_DEV_ACTIONS=true`.
 * Confirm block explorer verification plan.
+* Review `docs/TESTNET_DEPLOYMENT_RUNBOOK.md`.
 * Review `docs/POST_DEPLOYMENT_VERIFICATION.md`.
 * Confirm no docs or UI imply guaranteed yield.
