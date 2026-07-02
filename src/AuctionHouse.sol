@@ -80,6 +80,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => BidderStats)) public bidderStats;
     mapping(uint256 => ParamsController.Params) private _auctionParams;
     mapping(uint256 => Modules) private _auctionModules;
+    mapping(uint256 => address) private _auctionFeeRecipients;
     mapping(uint256 => address[]) private _participants;
     mapping(uint256 => BidRecord[]) private _bidRecords;
 
@@ -181,6 +182,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         });
         _auctionParams[auctionId] = p;
         _auctionModules[auctionId] = modules;
+        _auctionFeeRecipients[auctionId] = feeRecipient;
 
         modules.nftVault.lockFrom(auctionId, msg.sender, nft, tokenId);
 
@@ -286,7 +288,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
             auctionId,
             auction.highestBidder,
             auction.seller,
-            feeRecipient,
+            _auctionFeeRecipients[auctionId],
             address(modules.distributionVault),
             finalPrice,
             feeAmount,
@@ -320,6 +322,10 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
 
     function getAuctionParams(uint256 auctionId) external view returns (ParamsController.Params memory) {
         return _auctionParams[auctionId];
+    }
+
+    function getAuctionFeeRecipient(uint256 auctionId) external view returns (address) {
+        return _auctionFeeRecipients[auctionId];
     }
 
     function getAuctionModules(uint256 auctionId) external view returns (Modules memory) {

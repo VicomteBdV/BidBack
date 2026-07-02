@@ -87,7 +87,12 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
 
       <AuctionSummary auction={auction} />
 
-      <AuctionRulesSnapshot snapshot={auction.paramsSnapshot} error={auction.paramsSnapshotError} />
+      <AuctionRulesSnapshot
+        snapshot={auction.paramsSnapshot}
+        error={auction.paramsSnapshotError}
+        feeRecipientSnapshot={auction.auctionFeeRecipient}
+        feeRecipientSnapshotError={auction.auctionFeeRecipientError}
+      />
 
       {economics ? (
         <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
@@ -107,6 +112,7 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
           <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-3">
             <EconomicItem label="Seller proceeds credit" value={formatEth(economics.seller.credit)} />
             <EconomicItem label="Protocol fee credit" value={formatEth(economics.feeRecipient.credit)} />
+            <EconomicItem label="Auction fee recipient" value={economics.feeRecipient.address} />
             <EconomicItem label="Distribution reserve" value={formatEth(economics.settlement.distributionReserve)} />
             <EconomicItem label="Total assigned" value={formatEth(economics.distribution.totalAssigned)} />
             <EconomicItem label="Total claimed" value={formatEth(economics.distribution.totalClaimed)} />
@@ -165,6 +171,15 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
           <DetailItem label="Bid count" value={auction.bidCount} mono />
           <DetailItem label="Finalized" value={auction.finalized ? "Yes" : "No"} />
           <DetailItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
+          {auction.auctionFeeRecipient ? (
+            <DetailItem label="Auction fee recipient snapshot" value={auction.auctionFeeRecipient} mono />
+          ) : null}
+          {auction.auctionFeeRecipientError ? (
+            <DetailItem label="Auction fee recipient snapshot error" value={auction.auctionFeeRecipientError} />
+          ) : null}
+          {economics ? (
+            <DetailItem label="Current global fee recipient" value={economics.feeRecipient.currentGlobalAddress} mono />
+          ) : null}
           <DetailItem label="Seller short" value={shortenAddress(auction.seller)} mono />
           <DetailItem label="NFT short" value={shortenAddress(auction.nft)} mono />
         </div>

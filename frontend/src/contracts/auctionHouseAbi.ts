@@ -15,6 +15,13 @@ export const auctionHouseAbi = [
   },
   {
     type: "function",
+    name: "getAuctionFeeRecipient",
+    stateMutability: "view",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }]
+  },
+  {
+    type: "function",
     name: "createAuction",
     stateMutability: "nonpayable",
     inputs: [

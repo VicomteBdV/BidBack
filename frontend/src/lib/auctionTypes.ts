@@ -43,6 +43,8 @@ export type SerializedAuction = {
   finalized: boolean;
   paramsSnapshot?: AuctionParamsSnapshot;
   paramsSnapshotError?: string;
+  auctionFeeRecipient?: `0x${string}`;
+  auctionFeeRecipientError?: string;
   economics?: AuctionEconomics;
 };
 
@@ -90,6 +92,7 @@ export type AuctionEconomics = {
   };
   feeRecipient: {
     address: `0x${string}`;
+    currentGlobalAddress: `0x${string}`;
     configuredAddress: `0x${string}` | null;
     configured: boolean;
     credit: string;

@@ -36,10 +36,14 @@ function formatScale(value?: string | null) {
 
 export function AuctionRulesSnapshot({
   snapshot,
-  error
+  error,
+  feeRecipientSnapshot,
+  feeRecipientSnapshotError
 }: {
   snapshot?: AuctionParamsSnapshot;
   error?: string;
+  feeRecipientSnapshot?: `0x${string}`;
+  feeRecipientSnapshotError?: string;
 }) {
   return (
     <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
@@ -49,13 +53,20 @@ export function AuctionRulesSnapshot({
       </div>
 
       <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-        These are the parameters captured when this auction was created. They are specific to this auction and do not
-        change when global ParamsController values are updated later.
+        These are the parameters and settlement fee recipient captured when this auction was created. They are specific
+        to this auction and do not change when global ParamsController values or the global fee recipient are updated
+        later.
       </p>
 
       {error ? (
         <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           {error}
+        </div>
+      ) : null}
+
+      {feeRecipientSnapshotError ? (
+        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          {feeRecipientSnapshotError}
         </div>
       ) : null}
 
@@ -74,6 +85,16 @@ export function AuctionRulesSnapshot({
               { label: "Redistribution fraction", value: formatBps(snapshot.redistributionBps) },
               { label: "Minimum premium net", value: formatEth(snapshot.minPremiumNet) },
               { label: "Per-user reward cap", value: formatBps(snapshot.perUserRewardCapBps) }
+            ]}
+          />
+
+          <SnapshotGroup
+            title="Settlement routing"
+            items={[
+              {
+                label: "Fee recipient snapshot",
+                value: feeRecipientSnapshot ?? "Unavailable"
+              }
             ]}
           />
 

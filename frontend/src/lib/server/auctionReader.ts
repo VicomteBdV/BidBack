@@ -472,7 +472,7 @@ async function readAuctionEconomics(
   const sellerAccount = readOptionalDevAccount("seller");
   const feeAccount = readOptionalDevAccount("feeRecipient");
 
-  const [feeRecipient, settlementRaw, distributionRaw] = await Promise.all([
+  const [globalFeeRecipient, settlementRaw, distributionRaw] = await Promise.all([
     client.readContract({
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
@@ -492,6 +492,7 @@ async function readAuctionEconomics(
     })
   ]);
 
+  const auctionFeeRecipient = auction.auctionFeeRecipient ?? globalFeeRecipient;
   const settlement = serializeSettlement(settlementRaw);
   const distribution = serializeDistribution(distributionRaw);
 
@@ -526,7 +527,7 @@ async function readAuctionEconomics(
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "protocolFeeCredits",
-      args: [feeRecipient]
+      args: [auctionFeeRecipient]
     })
   ]);
 
@@ -557,11 +558,12 @@ async function readAuctionEconomics(
       canWithdraw: sellerAccount.configured && sameAddress(sellerAccount.address, auction.seller) && sellerCredit > 0n
     },
     feeRecipient: {
-      address: feeRecipient,
+      address: auctionFeeRecipient,
+      currentGlobalAddress: globalFeeRecipient,
       configuredAddress: feeAccount.address,
       configured: feeAccount.configured,
       credit: protocolFeeCredit.toString(),
-      canWithdraw: feeAccount.configured && sameAddress(feeAccount.address, feeRecipient) && protocolFeeCredit > 0n
+      canWithdraw: feeAccount.configured && sameAddress(feeAccount.address, auctionFeeRecipient) && protocolFeeCredit > 0n
     },
     nftClaim: {
       claimant,
@@ -646,6 +648,17 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     auction.paramsSnapshot = serializeAuctionParams(rawParams);
   } catch (error) {
     auction.paramsSnapshotError = `Unable to read auction parameter snapshot: ${errorMessage(error)}`;
+  }
+
+  try {
+    auction.auctionFeeRecipient = await client.readContract({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "getAuctionFeeRecipient",
+      args: [auctionId]
+    });
+  } catch (error) {
+    auction.auctionFeeRecipientError = `Unable to read auction fee recipient snapshot: ${errorMessage(error)}`;
   }
 
   auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
