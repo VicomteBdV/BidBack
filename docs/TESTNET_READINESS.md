@@ -35,6 +35,7 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 * Deployment JSON validation command for local and future deployment files
 * Read-only on-chain deployment verification script for local and future deployments
 * Deployment-level module linkage verification through public getters
+* Owner, global fee recipient, and selected parameter sanity checks in on-chain deployment verification
 
 ### Not Done Yet
 
@@ -215,7 +216,7 @@ This command is intentionally not part of CI yet because `frontend/public/deploy
 
 BidBack also includes a read-only on-chain verification script.
 
-It validates the deployment JSON first, then checks the target RPC, deployed bytecode, critical reads, and module linkage exposed by public getters.
+It validates the deployment JSON first, then checks the target RPC, deployed bytecode, critical reads, owners, global fee recipient, selected parameter sanity, and module linkage exposed by public getters.
 
 For local Anvil:
 
@@ -233,6 +234,15 @@ For future testnet verification:
 
 ```bash
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```
+
+For stricter testnet verification when expected values are known:
+
+```bash
+EXPECTED_OWNER=<expected-owner-address> \
+EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
+BIDBACK_RPC_URL=<testnet-rpc-url> \
+npm run verify:deployment:onchain -- <chainId>
 ```
 
 For chain ID `31337`, the script uses:
@@ -256,6 +266,11 @@ The script checks:
 * `AuctionHouse.nextAuctionId()` can be read;
 * `ParamsController.paused()` can be read;
 * `ParamsController.params()` can be read;
+* every core `owner()` is readable and non-zero;
+* `EXPECTED_OWNER` matches every readable core owner when provided;
+* `AuctionHouse.feeRecipient()` is readable and non-zero;
+* `EXPECTED_FEE_RECIPIENT` matches `AuctionHouse.feeRecipient()` when provided;
+* selected economic and operational parameter sanity checks pass;
 * `AuctionHouse.nftVault()` matches the deployment JSON;
 * `AuctionHouse.escrowVault()` matches the deployment JSON;
 * `AuctionHouse.distributionVault()` matches the deployment JSON;
@@ -267,12 +282,12 @@ The script checks:
 
 The script intentionally does not verify yet:
 
-* ownership;
 * governance multisig or timelock state;
 * auction-scoped linkage such as `DistributionVault.escrowForAuction(auctionId)`;
 * auction-scoped module snapshots from `AuctionHouse.getAuctionModules(auctionId)`;
 * transaction smoke tests;
 * block explorer verification;
+* source-bytecode equivalence;
 * external security audit status.
 
 This command is intentionally not part of CI yet because it requires a running RPC and, for local Anvil, a generated deployment file.
@@ -305,6 +320,17 @@ export TESTNET_FEE_RECIPIENT=<protocol-fee-recipient-address>
 ```
 
 `TESTNET_PRIVATE_KEY` must never be committed and must never be exposed to the frontend.
+
+### Future Testnet Verification Variables
+
+Prepare these when you want the on-chain verifier to enforce expected owner and fee recipient values:
+
+```bash
+export EXPECTED_OWNER=<expected-owner-address>
+export EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address>
+```
+
+These variables are optional. Without them, the script reports owners and fee recipient without failing on address mismatch.
 
 ### Future Testnet Frontend Variables
 
@@ -401,6 +427,15 @@ Run read-only on-chain verification:
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
 ```
 
+Run read-only on-chain verification with expected owner and fee recipient:
+
+```bash
+EXPECTED_OWNER="$TESTNET_OWNER" \
+EXPECTED_FEE_RECIPIENT="$TESTNET_FEE_RECIPIENT" \
+BIDBACK_RPC_URL="$TESTNET_RPC_URL" \
+npm run verify:deployment:onchain -- <chainId>
+```
+
 Run the post-deployment verification checklist before treating the deployment as usable:
 
 ```text
@@ -427,10 +462,10 @@ npm --prefix frontend run build
 * Contract verification is not automated yet.
 * Deployment JSON must exactly match the deployed contract addresses.
 * Deployment JSON validation checks shape and address format only; it does not verify on-chain bytecode.
-* On-chain verification checks bytecode, critical reads, and deployment-level module linkage only; it does not verify ownership or auction-scoped linkage yet.
+* On-chain verification checks bytecode, owner reads, fee recipient, selected parameter sanity, critical reads, and deployment-level module linkage; it does not verify multisig/timelock state or auction-scoped linkage yet.
 * `LocalERC721` is a mock and must not be treated as a product minting feature.
 * No indexer exists yet, so read-only auction discovery still depends on bounded on-chain reads.
-* Economic parameters should be reviewed before public testing.
+* Economic parameters should be reviewed before public testing even when automated sanity checks pass.
 * Any public deployment must avoid language implying guaranteed rewards or yield.
 
 ---
@@ -448,6 +483,7 @@ Before broadcasting any public testnet deployment:
 * Review constructor parameters and module wiring.
 * Confirm vault `setAuctionHouse` one-time locks are expected.
 * Confirm `ParamsController` values.
+* Confirm parameter sanity checks pass.
 * Confirm fee recipient address.
 * Confirm final owner address.
 * Confirm pause behavior.
@@ -455,6 +491,7 @@ Before broadcasting any public testnet deployment:
 * Confirm deployment JSON format.
 * Validate the deployment JSON with `npm run validate:deployment -- <chainId>`.
 * Run on-chain verification with `npm run verify:deployment:onchain -- <chainId>`.
+* Run stricter on-chain verification with `EXPECTED_OWNER` and `EXPECTED_FEE_RECIPIENT` when those values are final.
 * Confirm frontend points to the target chain.
 * Confirm MetaMask can reach the target RPC.
 * Confirm hosted frontend does not enable `ENABLE_LOCAL_DEV_ACTIONS=true`.
