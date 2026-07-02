@@ -11,6 +11,19 @@ import {
 } from "./deployment-json-validator.mjs";
 
 const ANVIL_CHAIN_ID = 31337;
+const BASIS_POINTS = 10_000n;
+const PARAM_CAP_SCALE = 10n ** 18n;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const contractLabels = {
+  auctionHouse: "AuctionHouse",
+  nftVault: "NFTVault",
+  escrowVault: "EscrowVault",
+  distributionVault: "DistributionVault",
+  paramsController: "ParamsController",
+  reputationAdapter: "ReputationAdapter",
+  localNft: "LocalERC721"
+};
 
 const auctionHouseAbi = [
   {
@@ -19,6 +32,13 @@ const auctionHouseAbi = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "feeRecipient",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }]
   },
   {
     type: "function",
@@ -51,6 +71,16 @@ const auctionHouseAbi = [
   {
     type: "function",
     name: "reputationAdapter",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }]
+  }
+];
+
+const ownableAbi = [
+  {
+    type: "function",
+    name: "owner",
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "address" }]
@@ -129,6 +159,18 @@ function cleanEnv(value) {
   return trimmed ? trimmed : undefined;
 }
 
+function optionalAddressEnv(name) {
+  const value = cleanEnv(process.env[name]);
+
+  if (!value) return undefined;
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
+    throw new Error(`${name} must be a valid Ethereum address.`);
+  }
+
+  return value;
+}
+
 function rpcUrlForChain(chainId) {
   if (chainId === ANVIL_CHAIN_ID) {
     return cleanEnv(process.env.ANVIL_RPC_URL) ?? "http://127.0.0.1:8545";
@@ -184,6 +226,13 @@ function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function toBigInt(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(value);
+  if (typeof value === "string") return BigInt(value);
+  throw new Error(`Cannot convert parameter value to bigint: ${String(value)}`);
+}
+
 function ok(label, detail = "") {
   console.log(`OK   ${label}${detail ? ` - ${detail}` : ""}`);
 }
@@ -200,10 +249,30 @@ function skip(label, detail = "") {
   console.log(`SKIP ${label}${detail ? ` - ${detail}` : ""}`);
 }
 
+function check(label, condition, detail) {
+  if (condition) {
+    ok(label, detail);
+    return 0;
+  }
+
+  fail(label, detail);
+  return 1;
+}
+
 function readParamField(params, key, index) {
   if (Array.isArray(params)) return params[index];
   if (params && typeof params === "object") return params[key];
   return undefined;
+}
+
+function readParamBigInt(params, key, index) {
+  const value = readParamField(params, key, index);
+
+  if (value === undefined) {
+    throw new Error(`ParamsController.params() did not return ${key}.`);
+  }
+
+  return toBigInt(value);
 }
 
 async function readDeploymentFile(chainId) {
@@ -237,18 +306,19 @@ async function verifyBytecode(client, contracts) {
 
   for (const key of coreContractKeys) {
     const address = contracts[key];
+    const label = contractLabels[key] ?? key;
 
     try {
       const bytecode = await client.getBytecode({ address });
 
       if (bytecodePresent(bytecode)) {
-        ok(key, `${address} bytecode present`);
+        ok(label, `${address} bytecode present`);
       } else {
-        fail(key, `${address} bytecode missing`);
+        fail(label, `${address} bytecode missing`);
         failureCount += 1;
       }
     } catch (error) {
-      fail(key, `${address} bytecode check failed: ${errorMessage(error)}`);
+      fail(label, `${address} bytecode check failed: ${errorMessage(error)}`);
       failureCount += 1;
     }
   }
@@ -258,17 +328,17 @@ async function verifyBytecode(client, contracts) {
       const bytecode = await client.getBytecode({ address: contracts.localNft });
 
       if (bytecodePresent(bytecode)) {
-        ok("localNft", `${contracts.localNft} bytecode present`);
+        ok("LocalERC721", `${contracts.localNft} bytecode present`);
       } else {
-        fail("localNft", `${contracts.localNft} bytecode missing`);
+        fail("LocalERC721", `${contracts.localNft} bytecode missing`);
         failureCount += 1;
       }
     } catch (error) {
-      fail("localNft", `${contracts.localNft} bytecode check failed: ${errorMessage(error)}`);
+      fail("LocalERC721", `${contracts.localNft} bytecode check failed: ${errorMessage(error)}`);
       failureCount += 1;
     }
   } else {
-    ok("localNft", "not present in deployment JSON; skipped");
+    ok("LocalERC721", "not present in deployment JSON; skipped");
   }
 
   return failureCount;
@@ -305,22 +375,220 @@ async function verifyReadChecks(client, contracts) {
     failureCount += 1;
   }
 
+  return failureCount;
+}
+
+async function verifyOwners(client, contracts, expectedOwner) {
+  let failureCount = 0;
+
+  console.log("\nOwner checks");
+
+  if (expectedOwner) {
+    console.log(`Expected owner: ${expectedOwner}`);
+  } else {
+    console.log("Expected owner: not provided; owners are reported without comparison.");
+  }
+
+  for (const key of coreContractKeys) {
+    const label = contractLabels[key] ?? key;
+    const address = contracts[key];
+
+    try {
+      const actualOwner = await client.readContract({
+        address,
+        abi: ownableAbi,
+        functionName: "owner"
+      });
+
+      if (addressesEqual(actualOwner, ZERO_ADDRESS)) {
+        fail(`${label}.owner()`, "owner is the zero address");
+        failureCount += 1;
+      } else if (expectedOwner && !addressesEqual(actualOwner, expectedOwner)) {
+        fail(`${label}.owner()`, `expected ${expectedOwner}, on-chain ${actualOwner}`);
+        failureCount += 1;
+      } else if (expectedOwner) {
+        ok(`${label}.owner()`, `matches ${short(expectedOwner)}`);
+      } else {
+        ok(`${label}.owner()`, actualOwner);
+      }
+    } catch (error) {
+      fail(`${label}.owner()`, `read failed: ${errorMessage(error)}`);
+      failureCount += 1;
+    }
+  }
+
+  return failureCount;
+}
+
+async function verifyFeeRecipient(client, contracts, expectedFeeRecipient) {
+  let failureCount = 0;
+
+  console.log("\nFee recipient checks");
+
+  if (expectedFeeRecipient) {
+    console.log(`Expected fee recipient: ${expectedFeeRecipient}`);
+  } else {
+    console.log("Expected fee recipient: not provided; value is reported without comparison.");
+  }
+
   try {
-    const params = await client.readContract({
+    const feeRecipient = await client.readContract({
+      address: contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "feeRecipient"
+    });
+
+    if (addressesEqual(feeRecipient, ZERO_ADDRESS)) {
+      fail("AuctionHouse.feeRecipient()", "fee recipient is the zero address");
+      failureCount += 1;
+    } else if (expectedFeeRecipient && !addressesEqual(feeRecipient, expectedFeeRecipient)) {
+      fail(
+        "AuctionHouse.feeRecipient()",
+        `expected ${expectedFeeRecipient}, on-chain ${feeRecipient}`
+      );
+      failureCount += 1;
+    } else if (expectedFeeRecipient) {
+      ok("AuctionHouse.feeRecipient()", `matches ${short(expectedFeeRecipient)}`);
+    } else {
+      ok("AuctionHouse.feeRecipient()", feeRecipient);
+    }
+  } catch (error) {
+    fail("AuctionHouse.feeRecipient()", `read failed: ${errorMessage(error)}`);
+    failureCount += 1;
+  }
+
+  return failureCount;
+}
+
+async function verifyParams(client, contracts) {
+  let failureCount = 0;
+
+  console.log("\nParameter sanity checks");
+
+  let params;
+
+  try {
+    params = await client.readContract({
       address: contracts.paramsController,
       abi: paramsControllerAbi,
       functionName: "params"
     });
 
-    const minAuctionDuration = readParamField(params, "minAuctionDuration", 10);
-    ok(
-      "ParamsController.params()",
-      minAuctionDuration === undefined
-        ? "decoded"
-        : `decoded, minAuctionDuration=${minAuctionDuration.toString()}`
-    );
+    ok("ParamsController.params()", "decoded");
   } catch (error) {
     fail("ParamsController.params()", errorMessage(error));
+    return failureCount + 1;
+  }
+
+  try {
+    const bidbackFeeBps = readParamBigInt(params, "bidbackFeeBps", 0);
+    const redistributionBps = readParamBigInt(params, "redistributionBps", 1);
+    const minParticipants = readParamBigInt(params, "minParticipants", 2);
+    const alphaBps = readParamBigInt(params, "alphaBps", 3);
+    const betaBps = readParamBigInt(params, "betaBps", 4);
+    const gammaBps = readParamBigInt(params, "gammaBps", 5);
+    const minBidIncrementBps = readParamBigInt(params, "minBidIncrementBps", 6);
+    const perUserRewardCapBps = readParamBigInt(params, "perUserRewardCapBps", 7);
+    const maxParticipants = readParamBigInt(params, "maxParticipants", 8);
+    const maxInteractionCount = readParamBigInt(params, "maxInteractionCount", 9);
+    const minAuctionDuration = readParamBigInt(params, "minAuctionDuration", 10);
+    const antiSnipeWindow = readParamBigInt(params, "antiSnipeWindow", 11);
+    const antiSnipeExtension = readParamBigInt(params, "antiSnipeExtension", 12);
+    const maxAntiSnipeExtensions = readParamBigInt(params, "maxAntiSnipeExtensions", 13);
+    const minExposure = readParamBigInt(params, "minExposure", 14);
+    const minPremiumNet = readParamBigInt(params, "minPremiumNet", 15);
+    const efCap = readParamBigInt(params, "efCap", 16);
+    const etCap = readParamBigInt(params, "etCap", 17);
+    const iiCap = readParamBigInt(params, "iiCap", 18);
+
+    failureCount += check(
+      "Params.bidbackFeeBps",
+      bidbackFeeBps <= 2_000n,
+      `${bidbackFeeBps.toString()} <= 2000`
+    );
+    failureCount += check(
+      "Params.redistributionBps",
+      redistributionBps <= BASIS_POINTS,
+      `${redistributionBps.toString()} <= ${BASIS_POINTS.toString()}`
+    );
+    failureCount += check(
+      "Params.minParticipants",
+      minParticipants >= 2n,
+      `${minParticipants.toString()} >= 2`
+    );
+    failureCount += check(
+      "Params.SCR weights ordering",
+      alphaBps > betaBps && betaBps >= gammaBps,
+      `alpha=${alphaBps.toString()}, beta=${betaBps.toString()}, gamma=${gammaBps.toString()}`
+    );
+    failureCount += check(
+      "Params.SCR weights sum",
+      alphaBps + betaBps + gammaBps === BASIS_POINTS,
+      `${(alphaBps + betaBps + gammaBps).toString()} == ${BASIS_POINTS.toString()}`
+    );
+    failureCount += check(
+      "Params.minBidIncrementBps",
+      minBidIncrementBps > 0n && minBidIncrementBps <= BASIS_POINTS,
+      `${minBidIncrementBps.toString()} in 1..${BASIS_POINTS.toString()}`
+    );
+    failureCount += check(
+      "Params.perUserRewardCapBps",
+      perUserRewardCapBps > 0n && perUserRewardCapBps <= BASIS_POINTS,
+      `${perUserRewardCapBps.toString()} in 1..${BASIS_POINTS.toString()}`
+    );
+    failureCount += check(
+      "Params.maxParticipants",
+      maxParticipants >= minParticipants && maxParticipants <= 256n,
+      `max=${maxParticipants.toString()}, min=${minParticipants.toString()}, cap=256`
+    );
+    failureCount += check(
+      "Params.maxInteractionCount",
+      maxInteractionCount > 0n,
+      `${maxInteractionCount.toString()} > 0`
+    );
+    failureCount += check(
+      "Params.minAuctionDuration",
+      minAuctionDuration > 0n,
+      `${minAuctionDuration.toString()} > 0`
+    );
+    failureCount += check(
+      "Params.antiSnipeWindow",
+      antiSnipeWindow > 0n,
+      `${antiSnipeWindow.toString()} > 0`
+    );
+    failureCount += check(
+      "Params.antiSnipeExtension",
+      antiSnipeExtension > 0n,
+      `${antiSnipeExtension.toString()} > 0`
+    );
+    failureCount += check(
+      "Params.maxAntiSnipeExtensions",
+      maxAntiSnipeExtensions <= 20n,
+      `${maxAntiSnipeExtensions.toString()} <= 20`
+    );
+    failureCount += check(
+      "Params.minExposure",
+      minExposure <= minAuctionDuration,
+      `${minExposure.toString()} <= ${minAuctionDuration.toString()}`
+    );
+    ok("Params.minPremiumNet", minPremiumNet.toString());
+    failureCount += check(
+      "Params.efCap",
+      efCap > 0n && efCap <= PARAM_CAP_SCALE,
+      `${efCap.toString()} in 1..${PARAM_CAP_SCALE.toString()}`
+    );
+    failureCount += check(
+      "Params.etCap",
+      etCap > 0n && etCap <= PARAM_CAP_SCALE,
+      `${etCap.toString()} in 1..${PARAM_CAP_SCALE.toString()}`
+    );
+    failureCount += check(
+      "Params.iiCap",
+      iiCap > 0n && iiCap <= PARAM_CAP_SCALE,
+      `${iiCap.toString()} in 1..${PARAM_CAP_SCALE.toString()}`
+    );
+  } catch (error) {
+    fail("ParamsController.params()", `decode failed: ${errorMessage(error)}`);
     failureCount += 1;
   }
 
@@ -439,6 +707,8 @@ async function verifyModuleLinkage(client, contracts) {
 
 async function main() {
   const chainId = parseChainId(process.argv[2]);
+  const expectedOwner = optionalAddressEnv("EXPECTED_OWNER");
+  const expectedFeeRecipient = optionalAddressEnv("EXPECTED_FEE_RECIPIENT");
   const { deploymentPath, payload } = await readDeploymentFile(chainId);
 
   console.log(`Deployment on-chain verification`);
@@ -482,8 +752,21 @@ async function main() {
 
   const bytecodeFailures = await verifyBytecode(client, payload.contracts);
   const readFailures = await verifyReadChecks(client, payload.contracts);
+  const ownerFailures = await verifyOwners(client, payload.contracts, expectedOwner);
+  const feeRecipientFailures = await verifyFeeRecipient(
+    client,
+    payload.contracts,
+    expectedFeeRecipient
+  );
+  const paramFailures = await verifyParams(client, payload.contracts);
   const linkageFailures = await verifyModuleLinkage(client, payload.contracts);
-  const failureCount = bytecodeFailures + readFailures + linkageFailures;
+  const failureCount =
+    bytecodeFailures +
+    readFailures +
+    ownerFailures +
+    feeRecipientFailures +
+    paramFailures +
+    linkageFailures;
 
   console.log("\nSummary");
 
