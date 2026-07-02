@@ -6,6 +6,12 @@ No public testnet deployment exists yet.
 
 This is a preparation document only. It does not trigger deployment and does not replace contract tests, frontend tests, or a security audit.
 
+For the controlled testnet deployment procedure, start with:
+
+```text
+docs/TESTNET_DEPLOYMENT_RUNBOOK.md
+```
+
 ---
 
 ## Purpose
@@ -134,9 +140,11 @@ After a future testnet deployment, verify every item below against the target RP
 
 Confirm:
 
+* the controlled testnet runbook was followed;
 * the RPC chain ID matches the deployment JSON filename;
 * the deployment JSON `chainId` matches the target chain;
-* `frontend/public/deployments/<chainId>.json` is the latest deployment artifact.
+* `frontend/public/deployments/<chainId>.json` is the latest deployment artifact;
+* the deployment JSON was generated from `broadcast/DeployTestnet.s.sol/<chainId>/run-latest.json`.
 
 Run the local deployment JSON validator:
 
@@ -147,7 +155,7 @@ npm run validate:deployment -- <chainId>
 Run read-only on-chain verification:
 
 ```bash
-npm run verify:deployment:onchain -- <chainId>
+BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
 ```
 
 ### Bytecode Presence
@@ -161,7 +169,7 @@ For each core contract address in the deployment JSON, confirm bytecode exists o
 * `ParamsController`
 * `ReputationAdapter`
 
-If `localNft` is included for a test-only deployment, confirm bytecode exists there as well.
+A controlled public testnet deployment should not include `localNft` unless a mock NFT was deliberately deployed for a test-only environment.
 
 An address with empty bytecode means the deployment JSON is wrong or stale.
 
@@ -175,6 +183,8 @@ Expected examples include:
 * `AuctionHouse.getAuction(uint256)`
 * `AuctionHouse.minimumNextBid(uint256)`
 * `AuctionHouse.feeRecipient()`
+* `AuctionHouse.getAuctionParams(uint256)`
+* `AuctionHouse.getAuctionFeeRecipient(uint256)`
 * `EscrowVault.capOf(uint256,address)`
 * `EscrowVault.refundableAmount(uint256,address)`
 * `EscrowVault.sellerCredits(address)`
@@ -229,13 +239,14 @@ Confirm temporary ownership/admin state is explicit and documented.
 Verify:
 
 * deployer address;
+* final owner address from `TESTNET_OWNER`;
 * owner/admin address for each module;
 * pause authority;
 * parameter authority;
-* fee recipient;
+* fee recipient from `TESTNET_FEE_RECIPIENT`;
 * any remaining EOA ownership.
 
-For real production, ownership should move to multisig/timelock governance. A testnet may temporarily use an EOA, but that must be intentional and documented.
+For real production, ownership should move to multisig/timelock governance. A controlled testnet may temporarily use an EOA, but that must be intentional and documented.
 
 ### ParamsController State
 
@@ -319,7 +330,7 @@ Confirm:
 * the deployment JSON validator passes;
 * read-only on-chain verification passes;
 * all core addresses have bytecode;
-* a test ERC-721 NFT is available;
+* a real testnet ERC-721 NFT is available;
 * the seller wallet owns the NFT;
 * bidder wallets have enough test ETH for gas and bids.
 
@@ -330,6 +341,7 @@ Confirm:
 3. Confirm the NFT moves into vault custody.
 4. Confirm the auction appears in the frontend read-only list.
 5. Confirm auction detail shows `OPEN`.
+6. Confirm auction parameter snapshot and fee recipient snapshot are visible.
 
 ### Bidding
 
@@ -448,15 +460,18 @@ Use this checklist on the day of a real testnet deployment.
 
 ### Pre-Verification
 
+* Confirm `docs/TESTNET_DEPLOYMENT_RUNBOOK.md` was followed.
 * Confirm target chain ID.
 * Confirm target RPC URL.
 * Confirm block explorer URL.
 * Confirm deployment transaction hashes.
 * Confirm deployment JSON path: `frontend/public/deployments/<chainId>.json`.
+* Confirm deployment JSON was generated with `npm run testnet:sync -- <chainId>`.
 * Run `npm run validate:deployment -- <chainId>`.
-* Run `npm run verify:deployment:onchain -- <chainId>`.
+* Run `BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>`.
 * Confirm no real private key is committed.
 * Confirm frontend env points to the target chain.
+* Confirm `ENABLE_LOCAL_DEV_ACTIONS` is not enabled in the hosted frontend.
 
 ### Bytecode and ABI
 
@@ -466,7 +481,6 @@ Use this checklist on the day of a real testnet deployment.
 * Confirm `DistributionVault` has bytecode.
 * Confirm `ParamsController` has bytecode.
 * Confirm `ReputationAdapter` has bytecode.
-* Confirm optional `localNft` has bytecode if present.
 * Confirm critical read calls work.
 * Confirm frontend ABI matches deployed contracts.
 
