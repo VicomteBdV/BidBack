@@ -4,7 +4,7 @@ This runbook describes how to prepare and execute a first controlled public test
 
 No deployment is performed by this document.
 
-The current lot only adds the deployment scaffold, JSON sync tooling, and documentation required to make a future deployment reproducible.
+The current scaffold provides the deployment script, JSON sync tooling, validation tooling, and documentation required to make a future deployment reproducible.
 
 BidBack testnet deployments must remain aligned with the project constraints:
 
@@ -108,6 +108,21 @@ Rules:
 * `TESTNET_OWNER` should be the final owner/admin for the controlled testnet.
 * `TESTNET_FEE_RECIPIENT` is the protocol fee recipient used by future auctions.
 * For production, ownership should move to multisig and timelock governance. A controlled testnet may temporarily use a documented EOA.
+
+Optional verification variables:
+
+```bash
+export EXPECTED_OWNER=<expected-owner-address>
+export EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address>
+```
+
+These are used only by the read-only verification script.
+
+* If `EXPECTED_OWNER` is set, every readable core `owner()` must match it.
+* If `EXPECTED_OWNER` is unset, owners are printed but not compared.
+* If `EXPECTED_FEE_RECIPIENT` is set, `AuctionHouse.feeRecipient()` must match it.
+* If `EXPECTED_FEE_RECIPIENT` is unset, the fee recipient is printed but not compared.
+* These variables are optional and are not required for local Anvil.
 
 ---
 
@@ -232,7 +247,7 @@ npm run validate:deployment -- <chainId>
 
 The validator checks the file shape and Ethereum address format.
 
-It does not prove on-chain bytecode or wiring.
+It does not prove on-chain bytecode, ownership, parameters, or wiring.
 
 ---
 
@@ -244,20 +259,46 @@ Run the on-chain verification script against the target RPC:
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
 ```
 
+For stricter verification when the final owner and fee recipient are known:
+
+```bash
+EXPECTED_OWNER="$TESTNET_OWNER" \
+EXPECTED_FEE_RECIPIENT="$TESTNET_FEE_RECIPIENT" \
+BIDBACK_RPC_URL="$TESTNET_RPC_URL" \
+npm run verify:deployment:onchain -- <chainId>
+```
+
 This verifies:
 
 * RPC reachability;
 * RPC chain ID;
 * bytecode presence for core contracts;
 * critical reads;
+* every core `owner()` is readable and non-zero;
+* `EXPECTED_OWNER` matches readable owners when provided;
+* `AuctionHouse.feeRecipient()` is readable and non-zero;
+* `EXPECTED_FEE_RECIPIENT` matches the global fee recipient when provided;
+* selected `ParamsController.params()` sanity checks;
 * deployment-level module linkage through public getters.
 
-It does not yet verify:
+Parameter sanity checks include basis-point bounds, non-zero duration and anti-sniping values, SCR weight ordering and sum, participant bounds, and cap bounds.
 
-* ownership;
-* governance handoff;
+If the script fails:
+
+* `RPC unreachable` usually means the RPC URL is wrong, unavailable, or rate-limited.
+* `RPC chainId` mismatch means the RPC does not point to the deployment JSON chain.
+* `bytecode missing` means the deployment JSON is stale, wrong, or the address was never deployed.
+* `owner()` mismatch means `EXPECTED_OWNER` does not match the on-chain owner for at least one module.
+* `feeRecipient()` mismatch means `EXPECTED_FEE_RECIPIENT` does not match the current global `AuctionHouse` fee recipient.
+* parameter failures mean the deployed `ParamsController` values are outside the MVP sanity bounds and need human review before using the deployment.
+* module linkage failures mean a module address is stale or wired to the wrong `AuctionHouse`.
+
+The script does not verify:
+
+* multisig or timelock readiness;
 * explorer source verification;
 * transaction smoke tests;
+* source-bytecode equivalence;
 * external audit status.
 
 ---
