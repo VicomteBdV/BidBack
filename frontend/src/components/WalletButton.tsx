@@ -1,16 +1,49 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { shortenAddress } from "@/lib/format";
-import { targetChainId, targetChainLabel } from "@/lib/chains";
+import { targetChainId, targetChainLabel, targetChainName } from "@/lib/chains";
+import {
+  getInjectedEthereumProvider,
+  switchToTargetChain,
+  walletNetworkErrorMessage
+} from "@/lib/walletNetwork";
 
 export function WalletButton() {
   const { address, chainId, isConnected } = useAccount();
   const { connectors, connect, isPending } = useConnect();
   const { disconnect } = useDisconnect();
 
+  const [isSwitchingChain, setIsSwitchingChain] = useState(false);
+  const [networkMessage, setNetworkMessage] = useState<string | null>(null);
+
   const connector = connectors[0];
   const isWrongNetwork = isConnected && chainId !== targetChainId;
+  const switchButtonLabel = targetChainName ? `Switch to ${targetChainName}` : "Switch to target chain";
+
+  useEffect(() => {
+    if (!isWrongNetwork) {
+      setNetworkMessage(null);
+    }
+  }, [isWrongNetwork]);
+
+  async function handleSwitchNetwork() {
+    try {
+      setIsSwitchingChain(true);
+      setNetworkMessage(null);
+
+      const provider = getInjectedEthereumProvider();
+
+      await switchToTargetChain(provider);
+
+      setNetworkMessage(`Switch request sent. Confirm ${targetChainLabel} in your wallet if prompted.`);
+    } catch (caught) {
+      setNetworkMessage(walletNetworkErrorMessage(caught));
+    } finally {
+      setIsSwitchingChain(false);
+    }
+  }
 
   if (!isConnected) {
     return (
@@ -47,10 +80,23 @@ export function WalletButton() {
       </div>
 
       {isWrongNetwork ? (
-        <p className="max-w-md rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-          Wallet connected, but not on the target chain ({targetChainLabel}). Read-only deployment view remains
-          available.
-        </p>
+        <div className="max-w-md rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+          <p>
+            Wallet connected, but not on the target chain ({targetChainLabel}). Read-only deployment view remains
+            available.
+          </p>
+
+          <button
+            type="button"
+            disabled={isSwitchingChain}
+            onClick={handleSwitchNetwork}
+            className="mt-3 inline-flex min-h-9 items-center justify-center rounded-md bg-amber-300 px-3 text-xs font-semibold text-slate-950 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSwitchingChain ? "Switching..." : switchButtonLabel}
+          </button>
+
+          {networkMessage ? <p className="mt-2 text-amber-50">{networkMessage}</p> : null}
+        </div>
       ) : (
         <p className="max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
           Wallet connected on {targetChainLabel}.
