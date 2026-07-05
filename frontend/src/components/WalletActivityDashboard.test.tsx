@@ -64,9 +64,10 @@ function activityResponse(
     wallet,
     count: auctions.length,
     discovery: {
-      strategy: "events",
-      limit: 25,
-      requestedLimit: 25
+      strategy: "event-scoped",
+      limit: 100,
+      requestedLimit: 100,
+      returnedIds: auctions.length
     },
     activity: buildWalletActivity(auctions, wallet, 2500)
   };
@@ -107,6 +108,7 @@ describe("WalletActivityDashboard", () => {
 
     expect(await screen.findByText(/No activity found for this wallet/)).toBeInTheDocument();
     expect(screen.getByText("Auctions created")).toBeInTheDocument();
+    expect(screen.getByText("Wallet events")).toBeInTheDocument();
   });
 
   it("shows next actions with links to auction detail pages", async () => {
@@ -130,6 +132,25 @@ describe("WalletActivityDashboard", () => {
 
     expect(actionLink).toHaveAttribute("href", "/auctions/1");
     expect(screen.getByText("Won")).toBeInTheDocument();
+  });
+
+  it("shows a bounded discovery warning", async () => {
+    mockAccount({ address: testAddresses.primaryBidder, chainId: 31337, isConnected: true });
+    mockActivityFetch({
+      ...activityResponse([], testAddresses.primaryBidder),
+      discovery: {
+        strategy: "bounded-fallback",
+        limit: 100,
+        requestedLimit: 100,
+        returnedIds: 100,
+        warning: "Wallet activity event scan failed; used bounded nextAuctionId fallback."
+      }
+    });
+
+    render(<WalletActivityDashboard />);
+
+    expect(await screen.findByText("Bounded fallback")).toBeInTheDocument();
+    expect(screen.getByText(/used bounded nextAuctionId fallback/)).toBeInTheDocument();
   });
 
   it("shows a wrong-network warning while keeping the activity read-only", async () => {
