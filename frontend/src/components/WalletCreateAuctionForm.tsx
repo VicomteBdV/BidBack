@@ -15,10 +15,18 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
+import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { validateCreateAuctionFields, parseCreateAuctionValues } from "@/lib/createAuctionValidation";
 import { fetchDeployment } from "@/lib/deployment";
 import { formatDurationSeconds, shortenAddress } from "@/lib/format";
+import {
+  awaitingSignatureState,
+  confirmedTransactionState,
+  failedTransactionState,
+  pendingTransactionState,
+  type WalletTransactionState
+} from "@/lib/walletTransaction";
 
 type CreateContext = {
   chainId: number;
@@ -155,8 +163,8 @@ export function WalletCreateAuctionForm() {
   const [isCreating, setIsCreating] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
-  const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | null>(null);
-  const [createTxHash, setCreateTxHash] = useState<`0x${string}` | null>(null);
+  const [approvalTxStatus, setApprovalTxStatus] = useState<WalletTransactionState | null>(null);
+  const [createTxStatus, setCreateTxStatus] = useState<WalletTransactionState | null>(null);
   const [createdAuctionId, setCreatedAuctionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -210,8 +218,8 @@ export function WalletCreateAuctionForm() {
     setOwner(null);
     setApprovedAddress(null);
     setApprovedForAll(null);
-    setApprovalTxHash(null);
-    setCreateTxHash(null);
+    setApprovalTxStatus(null);
+    setCreateTxStatus(null);
     setCreatedAuctionId(null);
   }, [address, chainId, nftContract, tokenId]);
 
@@ -344,9 +352,10 @@ export function WalletCreateAuctionForm() {
     try {
       setIsApproving(true);
       setMessage(null);
-      setApprovalTxHash(null);
+      setApprovalTxStatus(null);
 
       await checkOwnershipAndApproval();
+      setApprovalTxStatus(awaitingSignatureState("Confirm NFTVault approval in your wallet."));
 
       const parsed = parseCreateAuctionValues(values);
       const { publicClient, walletClient } = createBrowserClients(address);
@@ -358,11 +367,14 @@ export function WalletCreateAuctionForm() {
         args: [context.nftVault, parsed.tokenId]
       });
 
-      setApprovalTxHash(txHash);
+      setApprovalTxStatus(pendingTransactionState(txHash, "Approval transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       await checkOwnershipAndApproval("Approval confirmed. You can now create the auction.");
+      setApprovalTxStatus(confirmedTransactionState(txHash, "Approval confirmed. Approval status refreshed."));
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Approval failed."));
+      const failed = failedTransactionState(caught, "Approval failed.");
+      setApprovalTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setIsApproving(false);
     }
@@ -382,7 +394,7 @@ export function WalletCreateAuctionForm() {
     try {
       setIsCreating(true);
       setMessage(null);
-      setCreateTxHash(null);
+      setCreateTxStatus(null);
       setCreatedAuctionId(null);
 
       const approved = await checkOwnershipAndApproval();
@@ -400,6 +412,8 @@ export function WalletCreateAuctionForm() {
         functionName: "nextAuctionId"
       });
 
+      setCreateTxStatus(awaitingSignatureState("Confirm auction creation in your wallet."));
+
       const txHash = await walletClient.writeContract({
         address: context.auctionHouse,
         abi: auctionHouseAbi,
@@ -407,13 +421,21 @@ export function WalletCreateAuctionForm() {
         args: [parsed.nftContract, parsed.tokenId, parsed.startPrice, parsed.duration]
       });
 
-      setCreateTxHash(txHash);
+      setCreateTxStatus(pendingTransactionState(txHash, "Auction creation transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash: txHash });
 
       setCreatedAuctionId(expectedAuctionId.toString());
       setMessage(`Auction #${expectedAuctionId.toString()} created with wallet signature.`);
+      setCreateTxStatus(
+        confirmedTransactionState(
+          txHash,
+          `Auction #${expectedAuctionId.toString()} confirmed. Open the auction detail to continue.`
+        )
+      );
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Auction creation failed."));
+      const failed = failedTransactionState(caught, "Auction creation failed.");
+      setCreateTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setIsCreating(false);
     }
@@ -534,12 +556,12 @@ export function WalletCreateAuctionForm() {
         </div>
       </form>
 
-      {message ? <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
-
-      <div className="mt-4 grid gap-2 text-xs text-slate-500">
-        {approvalTxHash ? <div className="break-all font-mono">approval tx: {approvalTxHash}</div> : null}
-        {createTxHash ? <div className="break-all font-mono">create tx: {createTxHash}</div> : null}
+      <div className="mt-5 grid gap-3">
+        <WalletTransactionStatus title="NFT approval" status={approvalTxStatus} />
+        <WalletTransactionStatus title="Auction creation" status={createTxStatus} />
       </div>
+
+      {message ? <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
 
       {createdAuctionId ? (
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
