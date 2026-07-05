@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
+import { NftPreview } from "@/components/NftPreview";
 import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
 import type { AuctionsApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
@@ -138,16 +139,22 @@ export function AuctionList() {
                         {lifecycle.statusLabel}
                       </span>
                     </div>
-                    <div className="mt-2 text-xs text-slate-500">
-                      NFT <span className="font-mono text-slate-300">{shortenAddress(auction.nft)}</span> token{" "}
-                      <span className="font-mono text-slate-300">#{auction.tokenId}</span>
-                    </div>
                   </div>
 
                   <div className="text-left text-sm sm:text-right">
                     <div className="text-slate-500">Next action</div>
                     <div className="font-semibold text-cyan-100">{lifecycle.nextActionLabel}</div>
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <NftPreview
+                    metadata={auction.nftMetadata}
+                    contractAddress={auction.nft}
+                    tokenId={auction.tokenId}
+                    compact
+                    showLinks={false}
+                  />
                 </div>
 
                 <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-5">
