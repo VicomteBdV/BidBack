@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PublicClient } from "viem";
-import { readAllAuctions, normalizeAuctionListLimit } from "@/lib/server/auctionReader";
+import { readAllAuctions, readAuctionsByIds, normalizeAuctionListLimit } from "@/lib/server/auctionReader";
 import { localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
 function auctionTuple(auctionId: bigint) {
@@ -35,11 +35,13 @@ function auctionCreatedLog(auctionId: bigint, blockNumber: bigint, logIndex = 0)
 function createReaderClient({
   nextAuctionId,
   logs,
-  logsError
+  logsError,
+  tokenUri
 }: {
   nextAuctionId: bigint;
   logs?: ReturnType<typeof auctionCreatedLog>[];
   logsError?: Error;
+  tokenUri?: string;
 }) {
   const readContract = vi.fn(async (request: unknown) => {
     const { functionName, args } = request as { functionName?: string; args?: readonly unknown[] };
@@ -52,6 +54,19 @@ function createReaderClient({
       const auctionId = args?.[0];
       if (typeof auctionId !== "bigint") throw new Error("missing auctionId");
       return auctionTuple(auctionId);
+    }
+
+    if (functionName === "name") {
+      return "BidBack Demo";
+    }
+
+    if (functionName === "symbol") {
+      return "BID";
+    }
+
+    if (functionName === "tokenURI") {
+      if (tokenUri) return tokenUri;
+      throw new Error("tokenURI unavailable in test fixture");
     }
 
     throw new Error(`unexpected readContract call: ${String(functionName)}`);
@@ -101,6 +116,7 @@ describe("auctionReader auction discovery", () => {
         args: [2n]
       })
     );
+    expect(payload.auctions[0].nftMetadata?.status).toBe("unavailable");
   });
 
   it("falls back to bounded nextAuctionId discovery when event scanning fails", async () => {
@@ -135,6 +151,36 @@ describe("auctionReader auction discovery", () => {
     expect(payload.discovery.strategy).toBe("events");
     expect(payload.count).toBe(0);
     expect(payload.auctions).toEqual([]);
+  });
+
+  it("keeps read-only auction loading available when metadata fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("not-json", {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        })
+      )
+    );
+
+    const { client } = createReaderClient({
+      nextAuctionId: 2n,
+      tokenUri: "https://metadata.example/bad.json"
+    });
+
+    const auctions = await readAuctionsByIds([1n], {
+      client,
+      deployment: localDeploymentFixture,
+      includeNftMetadata: true
+    });
+
+    expect(auctions).toHaveLength(1);
+    expect(auctions[0].auctionId).toBe("1");
+    expect(auctions[0].nftMetadata?.status).toBe("fetch-failed");
+    expect(auctions[0].nftMetadata?.collectionName).toBe("BidBack Demo");
   });
 
   it("normalizes auction list limits", () => {
