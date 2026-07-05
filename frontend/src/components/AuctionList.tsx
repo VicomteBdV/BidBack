@@ -6,6 +6,8 @@ import type { AuctionsApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 
+const AUCTION_LIST_LIMIT = 25;
+
 export function AuctionList() {
   const [data, setData] = useState<AuctionsApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +17,7 @@ export function AuctionList() {
     try {
       setIsLoading(true);
 
-      const response = await fetch("/api/auctions", {
+      const response = await fetch(`/api/auctions?limit=${AUCTION_LIST_LIMIT}`, {
         cache: "no-store"
       });
 
@@ -45,7 +47,8 @@ export function AuctionList() {
         <div>
           <h2 className="text-lg font-semibold text-white">Auctions</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Read by Next.js server routes from Anvil at http://127.0.0.1:8545.
+            Read by Next.js server routes from the configured target RPC. Auction discovery uses on-chain
+            AuctionCreated events with a bounded fallback.
           </p>
         </div>
 
@@ -69,29 +72,43 @@ export function AuctionList() {
         </div>
       ) : null}
 
+      {!isLoading && data ? (
+        <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-4">
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-slate-500">Chain ID</div>
+            <div className="mt-1 font-mono text-cyan-200">{data.chainId}</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-slate-500">AuctionHouse</div>
+            <div className="mt-1 font-mono text-cyan-200">{shortenAddress(data.auctionHouse)}</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-slate-500">Loaded auctions</div>
+            <div className="mt-1 font-mono text-cyan-200">{data.count}</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-slate-500">Discovery</div>
+            <div className="mt-1 font-mono text-cyan-200">
+              {data.discovery.strategy === "events" ? "Events" : "Fallback"} / {data.discovery.limit}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {!isLoading && data?.discovery.warning ? (
+        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          {data.discovery.warning}
+        </div>
+      ) : null}
+
       {!isLoading && data && data.auctions.length === 0 ? (
         <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-300">
-          No auctions found yet. Once a local auction is created, it will appear here.
+          No auctions found yet. Once an auction is created on the target deployment, it will appear here.
         </div>
       ) : null}
 
       {!isLoading && data && data.auctions.length > 0 ? (
         <div className="mt-5 grid gap-4">
-          <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
-            <div className="rounded-md bg-slate-950 px-4 py-3">
-              <div className="text-slate-500">Chain ID</div>
-              <div className="mt-1 font-mono text-cyan-200">{data.chainId}</div>
-            </div>
-            <div className="rounded-md bg-slate-950 px-4 py-3">
-              <div className="text-slate-500">AuctionHouse</div>
-              <div className="mt-1 font-mono text-cyan-200">{shortenAddress(data.auctionHouse)}</div>
-            </div>
-            <div className="rounded-md bg-slate-950 px-4 py-3">
-              <div className="text-slate-500">Auction count</div>
-              <div className="mt-1 font-mono text-cyan-200">{data.count}</div>
-            </div>
-          </div>
-
           {data.auctions.map((auction) => (
             <Link
               key={auction.auctionId}
