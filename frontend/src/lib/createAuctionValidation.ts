@@ -16,15 +16,26 @@ export type ParsedCreateAuctionValues = {
   duration: bigint;
 };
 
+function validateTokenId(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return "Token ID is required.";
+  if (!/^\d+$/.test(trimmed)) return "Token ID must be a non-negative integer.";
+
+  return null;
+}
+
 export function validateCreateAuctionFields(
   values: CreateAuctionValues,
   options: { minAuctionDuration?: string | bigint | null; paused?: boolean } = {}
 ) {
-  if (!isAddress(values.nftContract)) return "Invalid NFT contract address.";
+  const nftContract = values.nftContract.trim();
 
-  if (!/^\d+$/.test(values.tokenId.trim()) || BigInt(values.tokenId.trim()) < 1n) {
-    return "Token ID must be a positive integer.";
-  }
+  if (!nftContract) return "NFT contract address is required.";
+  if (!isAddress(nftContract)) return "Invalid NFT contract address.";
+
+  const tokenIdError = validateTokenId(values.tokenId);
+  if (tokenIdError) return tokenIdError;
 
   if (!values.durationSeconds.trim() || !/^\d+$/.test(values.durationSeconds.trim())) {
     return "Duration must be a positive integer in seconds.";
@@ -70,7 +81,7 @@ export function parseCreateAuctionValues(values: CreateAuctionValues): ParsedCre
   }
 
   return {
-    nftContract: values.nftContract as Address,
+    nftContract: values.nftContract.trim() as Address,
     tokenId: BigInt(values.tokenId.trim()),
     startPrice: parseEther(values.startPriceEth.trim()),
     duration: BigInt(values.durationSeconds.trim())
