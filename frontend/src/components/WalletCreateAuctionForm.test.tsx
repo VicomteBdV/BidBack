@@ -56,23 +56,33 @@ function setupWalletCreateForm({
   approvedAddress?: `0x${string}`;
   approvedForAll?: boolean;
 } = {}) {
+  let currentApprovedAddress = approvedAddress;
+  let currentApprovedForAll = approvedForAll;
+
   const readContract = vi.fn(async (request: unknown) => {
     const { functionName } = request as { functionName?: string };
 
     if (functionName === "params") return paramsTuple();
     if (functionName === "paused") return false;
     if (functionName === "ownerOf") return owner;
-    if (functionName === "getApproved") return approvedAddress;
-    if (functionName === "isApprovedForAll") return approvedForAll;
+    if (functionName === "getApproved") return currentApprovedAddress;
+    if (functionName === "isApprovedForAll") return currentApprovedForAll;
     if (functionName === "nextAuctionId") return 1n;
 
     throw new Error(`Unexpected readContract call: ${String(functionName)}`);
   });
 
   const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
-  const writeContract = vi.fn(async () =>
-    "0x1111111111111111111111111111111111111111111111111111111111111111" as const
-  );
+  const writeContract = vi.fn(async (request: unknown) => {
+    const { functionName } = request as { functionName?: string };
+
+    if (functionName === "approve") {
+      currentApprovedAddress = testAddresses.nftVault;
+      currentApprovedForAll = false;
+    }
+
+    return "0x1111111111111111111111111111111111111111111111111111111111111111" as const;
+  });
 
   vi.mocked(createPublicClient).mockReturnValue({
     readContract,
@@ -177,6 +187,28 @@ describe("WalletCreateAuctionForm", () => {
     expect(screen.getByText("Approval required")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve NFTVault" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Create auction" })).toBeDisabled();
+  });
+
+  it("refreshes approval status after wallet approval confirmation", async () => {
+    const { waitForTransactionReceipt, writeContract } = setupWalletCreateForm({
+      owner: seller,
+      approvedAddress: zeroAddress,
+      approvedForAll: false
+    });
+
+    await waitForContext();
+
+    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+
+    expect(await screen.findByText("Wallet owns the token. Approve NFTVault before creating the auction.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve NFTVault" }));
+
+    expect(await screen.findByText("Approval confirmed. Approval status refreshed.")).toBeInTheDocument();
+    expect(screen.getByText("NFTVault approved")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create auction" })).toBeEnabled();
+    expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "approve" }));
+    expect(waitForTransactionReceipt).toHaveBeenCalled();
   });
 
   it("enables create auction when ownership and approval are valid", async () => {
