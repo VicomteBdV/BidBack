@@ -481,7 +481,7 @@ async function discoverAuctionIds({
       eventName: "AuctionCreated",
       fromBlock: 0n,
       toBlock: "latest"
-    })) as AuctionCreatedLog[];
+    })) as unknown as AuctionCreatedLog[];
 
     const ids = normalizeAuctionCreatedLogs(logs, nextAuctionId, limit);
 
