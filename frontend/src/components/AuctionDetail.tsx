@@ -7,6 +7,7 @@ import { AuctionSummary } from "@/components/AuctionSummary";
 import { ModeBadge } from "@/components/ModeBadge";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
+import { WalletFinalizePanel } from "@/components/WalletFinalizePanel";
 import type { AuctionDetailApiResponse, BidderEconomics } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
@@ -140,7 +141,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
         </p>
 
         <div className="mt-5 grid gap-5">
-          <WalletBidPanel auctionId={auction.auctionId} auctionState={auction.state} onBidComplete={loadAuction} />
+          <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
+          <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
           <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
         </div>
       </section>
