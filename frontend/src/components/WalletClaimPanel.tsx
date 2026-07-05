@@ -10,6 +10,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
@@ -25,6 +26,13 @@ import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, isZeroAddress, shortenAddress } from "@/lib/format";
 import type { SerializedAuction } from "@/lib/auctionTypes";
+import {
+  awaitingSignatureState,
+  confirmedTransactionState,
+  failedTransactionState,
+  pendingTransactionState,
+  type WalletTransactionState
+} from "@/lib/walletTransaction";
 
 type WindowWithInjectedEthereum = Window & {
   ethereum?: EIP1193Provider;
@@ -128,7 +136,7 @@ export function WalletClaimPanel({
   const [isLoadingClaimData, setIsLoadingClaimData] = useState(false);
   const [pendingAction, setPendingAction] = useState<ClaimAction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
@@ -176,7 +184,7 @@ export function WalletClaimPanel({
     setRewardClaimed(null);
     setSellerCredit(null);
     setProtocolFeeCredit(null);
-    setTxHash(null);
+    setTxStatus(null);
   }, [address, chainId, auction.auctionId]);
 
   function requireWalletContext() {
@@ -288,14 +296,14 @@ export function WalletClaimPanel({
   }, [address, auction.auctionId, deployment, wrongNetwork]);
 
   async function afterSuccessfulAction(successMessage: string, hash: `0x${string}`) {
-    setTxHash(hash);
     await onActionComplete();
 
     try {
       const next = await readWalletClaimData();
       applyClaimData(next);
+      setTxStatus(confirmedTransactionState(hash, `${successMessage} Wallet claim data refreshed.`));
     } catch {
-      // The action succeeded. Keep the success message even if a follow-up read fails.
+      setTxStatus(confirmedTransactionState(hash, `${successMessage} Refresh the auction if any value still looks stale.`));
     }
 
     setMessage(successMessage);
@@ -305,7 +313,7 @@ export function WalletClaimPanel({
     try {
       setPendingAction("claim-nft");
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const context = requireWalletContext();
 
@@ -318,6 +326,7 @@ export function WalletClaimPanel({
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
       await verifyWalletChain(provider);
+      setTxStatus(awaitingSignatureState("Confirm NFT claim in your wallet."));
 
       const hash = await walletClient.writeContract({
         address: context.deployment.contracts.auctionHouse,
@@ -326,10 +335,13 @@ export function WalletClaimPanel({
         args: [context.auctionId]
       });
 
+      setTxStatus(pendingTransactionState(hash, "NFT claim transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
       await afterSuccessfulAction("NFT claimed with wallet signature.", hash);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setPendingAction(null);
     }
@@ -339,7 +351,7 @@ export function WalletClaimPanel({
     try {
       setPendingAction("claim-refund");
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const context = requireWalletContext();
 
@@ -369,6 +381,8 @@ export function WalletClaimPanel({
       if (wasClaimed) throw new Error("Refund already claimed.");
       if (amount === 0n) throw new Error("No refund available.");
 
+      setTxStatus(awaitingSignatureState("Confirm refund claim in your wallet."));
+
       const hash = await walletClient.writeContract({
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
@@ -376,10 +390,13 @@ export function WalletClaimPanel({
         args: [context.auctionId]
       });
 
+      setTxStatus(pendingTransactionState(hash, "Refund claim transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
       await afterSuccessfulAction("Refund claimed with wallet signature.", hash);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setPendingAction(null);
     }
@@ -389,7 +406,7 @@ export function WalletClaimPanel({
     try {
       setPendingAction("claim-reward");
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const context = requireWalletContext();
 
@@ -419,6 +436,8 @@ export function WalletClaimPanel({
       if (wasClaimed) throw new Error("Reward already claimed.");
       if (entitlement === 0n) throw new Error("No reward available.");
 
+      setTxStatus(awaitingSignatureState("Confirm reward claim in your wallet."));
+
       const hash = await walletClient.writeContract({
         address: context.deployment.contracts.distributionVault,
         abi: distributionVaultAbi,
@@ -426,10 +445,13 @@ export function WalletClaimPanel({
         args: [context.auctionId]
       });
 
+      setTxStatus(pendingTransactionState(hash, "Reward claim transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
       await afterSuccessfulAction("Reward claimed with wallet signature.", hash);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setPendingAction(null);
     }
@@ -439,7 +461,7 @@ export function WalletClaimPanel({
     try {
       setPendingAction("withdraw-seller");
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const context = requireWalletContext();
 
@@ -460,16 +482,21 @@ export function WalletClaimPanel({
 
       if (credit === 0n) throw new Error("No seller proceeds.");
 
+      setTxStatus(awaitingSignatureState("Confirm seller proceeds withdrawal in your wallet."));
+
       const hash = await walletClient.writeContract({
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
         functionName: "withdrawSellerProceeds"
       });
 
+      setTxStatus(pendingTransactionState(hash, "Seller proceeds withdrawal submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
       await afterSuccessfulAction("Seller proceeds withdrawn with wallet signature.", hash);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setPendingAction(null);
     }
@@ -479,7 +506,7 @@ export function WalletClaimPanel({
     try {
       setPendingAction("withdraw-fees");
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const context = requireWalletContext();
 
@@ -502,16 +529,21 @@ export function WalletClaimPanel({
 
       if (credit === 0n) throw new Error("No protocol fees.");
 
+      setTxStatus(awaitingSignatureState("Confirm protocol fee withdrawal in your wallet."));
+
       const hash = await walletClient.writeContract({
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
         functionName: "withdrawProtocolFees"
       });
 
+      setTxStatus(pendingTransactionState(hash, "Protocol fee withdrawal submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
       await afterSuccessfulAction("Protocol fees withdrawn with wallet signature.", hash);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setPendingAction(null);
     }
@@ -676,9 +708,11 @@ export function WalletClaimPanel({
         />
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      <div className="mt-4">
+        <WalletTransactionStatus title="Wallet claim / withdrawal" status={txStatus} />
+      </div>
 
-      {txHash ? <div className="mt-3 break-all font-mono text-xs text-emerald-100/70">tx: {txHash}</div> : null}
+      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }
