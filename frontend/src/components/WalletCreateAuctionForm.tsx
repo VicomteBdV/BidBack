@@ -234,6 +234,13 @@ export function WalletCreateAuctionForm() {
   const hasApproval = Boolean(
     ownerMatches && context && (approvedForAll || sameAddress(approvedAddress, context.nftVault))
   );
+  const approvalStatus = !owner
+    ? "Check ownership first"
+    : !ownerMatches
+      ? "Owner mismatch"
+      : hasApproval
+        ? "NFTVault approved"
+        : "Approval required";
 
   const modeMessage = !isConnected
     ? "Connect a wallet to use wallet-signed mode."
@@ -459,7 +466,7 @@ export function WalletCreateAuctionForm() {
       <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
         <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
-        <InfoItem label="Approval status" value={hasApproval ? "NFTVault approved" : "Approval required"} />
+        <InfoItem label="Approval status" value={approvalStatus} />
       </div>
 
       {modeMessage ? (
