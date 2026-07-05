@@ -1,6 +1,15 @@
 export type AuctionStateValue = 0 | 1 | 2;
 export type DevBidderRole = "primary" | "secondary";
 
+export type AuctionDiscoveryStrategy = "events" | "nextAuctionIdFallback";
+
+export type AuctionDiscovery = {
+  strategy: AuctionDiscoveryStrategy;
+  limit: number;
+  requestedLimit: number;
+  warning?: string;
+};
+
 export type AuctionParamsSnapshot = {
   bidbackFeeBps: string;
   redistributionBps: string;
@@ -111,6 +120,7 @@ export type AuctionsApiResponse = {
   auctionHouse: `0x${string}`;
   nextAuctionId: string;
   count: number;
+  discovery: AuctionDiscovery;
   auctions: SerializedAuction[];
 };
 
