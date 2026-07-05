@@ -8,6 +8,7 @@ import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
 import { anvilChainId } from "@/lib/chains";
 import type {
   AuctionDetailApiResponse,
+  AuctionDiscovery,
   AuctionEconomics,
   AuctionParamsSnapshot,
   AuctionStateValue,
@@ -47,6 +48,28 @@ type DevAccountInfo = {
   configured: boolean;
 };
 
+type ReadAllAuctionsOptions = {
+  limit?: unknown;
+  client?: PublicClient;
+  deployment?: DeploymentFile;
+};
+
+type AuctionCreatedLog = {
+  args?: {
+    auctionId?: bigint;
+  };
+  blockNumber?: bigint | null;
+  logIndex?: number | bigint | null;
+};
+
+type AuctionDiscoveryResult = {
+  ids: bigint[];
+  discovery: AuctionDiscovery;
+};
+
+const DEFAULT_AUCTION_LIST_LIMIT = 25;
+const MAX_AUCTION_LIST_LIMIT = 100;
+
 export class AuctionNotFoundError extends Error {
   constructor(auctionId: string) {
     super(`Auction ${auctionId} not found`);
@@ -69,6 +92,20 @@ function parseChainId(value: string | undefined, fallback: number) {
   }
 
   return parsed;
+}
+
+export function normalizeAuctionListLimit(value: unknown) {
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_AUCTION_LIST_LIMIT;
+  }
+
+  const parsed = typeof value === "number" ? value : Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return DEFAULT_AUCTION_LIST_LIMIT;
+  }
+
+  return Math.min(parsed, MAX_AUCTION_LIST_LIMIT);
 }
 
 export const anvilRpcUrl = cleanEnv(process.env.ANVIL_RPC_URL) ?? "http://127.0.0.1:8545";
@@ -378,6 +415,109 @@ function serializeDistribution(raw: unknown): DistributionEconomics {
   };
 }
 
+function normalizeLogIndex(value: number | bigint | null | undefined, fallback: number) {
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "number") return value;
+  return fallback;
+}
+
+function normalizeAuctionCreatedLogs(logs: AuctionCreatedLog[], nextAuctionId: bigint, limit: number) {
+  const seen = new Set<string>();
+
+  return logs
+    .map((log, index) => ({
+      auctionId: log.args?.auctionId,
+      blockNumber: log.blockNumber ?? 0n,
+      logIndex: normalizeLogIndex(log.logIndex, index)
+    }))
+    .filter((entry): entry is { auctionId: bigint; blockNumber: bigint; logIndex: number } => {
+      return typeof entry.auctionId === "bigint" && entry.auctionId > 0n && entry.auctionId < nextAuctionId;
+    })
+    .sort((a, b) => {
+      if (a.blockNumber === b.blockNumber) return b.logIndex - a.logIndex;
+      return a.blockNumber > b.blockNumber ? -1 : 1;
+    })
+    .map((entry) => entry.auctionId)
+    .filter((auctionId) => {
+      const key = auctionId.toString();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function fallbackAuctionIdsFromNextId(nextAuctionId: bigint, limit: number) {
+  const ids: bigint[] = [];
+
+  if (nextAuctionId <= 1n) return ids;
+
+  for (let auctionId = nextAuctionId - 1n; auctionId >= 1n && ids.length < limit; auctionId -= 1n) {
+    ids.push(auctionId);
+
+    if (auctionId === 1n) break;
+  }
+
+  return ids;
+}
+
+async function discoverAuctionIds({
+  client,
+  deployment,
+  nextAuctionId,
+  limit,
+  requestedLimit
+}: {
+  client: PublicClient;
+  deployment: DeploymentFile;
+  nextAuctionId: bigint;
+  limit: number;
+  requestedLimit: number;
+}): Promise<AuctionDiscoveryResult> {
+  try {
+    const logs = (await client.getContractEvents({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      eventName: "AuctionCreated",
+      fromBlock: 0n,
+      toBlock: "latest"
+    })) as AuctionCreatedLog[];
+
+    const ids = normalizeAuctionCreatedLogs(logs, nextAuctionId, limit);
+
+    if (ids.length > 0 || nextAuctionId <= 1n) {
+      return {
+        ids,
+        discovery: {
+          strategy: "events",
+          limit,
+          requestedLimit
+        }
+      };
+    }
+
+    return {
+      ids: fallbackAuctionIdsFromNextId(nextAuctionId, limit),
+      discovery: {
+        strategy: "nextAuctionIdFallback",
+        limit,
+        requestedLimit,
+        warning: "No AuctionCreated logs were returned; used bounded nextAuctionId fallback."
+      }
+    };
+  } catch (error) {
+    return {
+      ids: fallbackAuctionIdsFromNextId(nextAuctionId, limit),
+      discovery: {
+        strategy: "nextAuctionIdFallback",
+        limit,
+        requestedLimit,
+        warning: `AuctionCreated event scan failed; used bounded nextAuctionId fallback: ${errorMessage(error)}`
+      }
+    };
+  }
+}
+
 async function readBidderEconomics({
   auctionId,
   bidder,
@@ -576,9 +716,11 @@ async function readAuctionEconomics(
   };
 }
 
-export async function readAllAuctions(): Promise<AuctionsApiResponse> {
-  const deployment = await readTargetDeployment();
-  const client = createTargetPublicClient();
+export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Promise<AuctionsApiResponse> {
+  const deployment = options.deployment ?? (await readTargetDeployment());
+  const client = options.client ?? createTargetPublicClient();
+  const requestedLimit = options.limit === undefined || options.limit === null || options.limit === "" ? DEFAULT_AUCTION_LIST_LIMIT : Number(options.limit);
+  const limit = normalizeAuctionListLimit(options.limit);
 
   const nextAuctionId = await client.readContract({
     address: deployment.contracts.auctionHouse,
@@ -586,24 +728,33 @@ export async function readAllAuctions(): Promise<AuctionsApiResponse> {
     functionName: "nextAuctionId"
   });
 
-  const auctions: SerializedAuction[] = [];
+  const discoveryResult = await discoverAuctionIds({
+    client,
+    deployment,
+    nextAuctionId,
+    limit,
+    requestedLimit: Number.isFinite(requestedLimit) ? requestedLimit : DEFAULT_AUCTION_LIST_LIMIT
+  });
 
-  for (let auctionId = 1n; auctionId < nextAuctionId; auctionId += 1n) {
-    const rawAuction = await client.readContract({
-      address: deployment.contracts.auctionHouse,
-      abi: auctionHouseAbi,
-      functionName: "getAuction",
-      args: [auctionId]
-    });
+  const auctions = await Promise.all(
+    discoveryResult.ids.map(async (auctionId) => {
+      const rawAuction = await client.readContract({
+        address: deployment.contracts.auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [auctionId]
+      });
 
-    auctions.push(serializeAuction(auctionId, rawAuction));
-  }
+      return serializeAuction(auctionId, rawAuction);
+    })
+  );
 
   return {
     chainId: deployment.chainId,
     auctionHouse: deployment.contracts.auctionHouse,
     nextAuctionId: nextAuctionId.toString(),
     count: auctions.length,
+    discovery: discoveryResult.discovery,
     auctions
   };
 }
