@@ -16,6 +16,7 @@ The current MVP supports:
 * Read-only auction detail page
 * Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
 * Read-only wallet activity dashboard for the connected wallet, including created auctions, active bids, won/lost auctions, claimable NFTs, refunds, rewards, seller proceeds, protocol fees, and next action links
+* Event-based wallet activity discovery using wallet-scoped `AuctionCreated`, `BidPlaced`, `AuctionFinalized`, and `NFTClaimed` logs, with a general event window and bounded fallback when needed
 * Read-only auction parameter snapshot display
 * Read-only auction fee recipient snapshot display
 * Explicit Foundry tests proving auction parameter snapshots remain stable after global parameter updates
@@ -37,7 +38,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, and wallet activity summaries
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, and wallet activity event discovery fallbacks
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -79,7 +80,9 @@ The auction list uses `AuctionCreated` events for discovery and falls back to a 
 
 The list and detail pages now show a read-only lifecycle status such as `Open`, `Ready to finalize`, `Finalized`, `Claimed`, or `Settled`, plus the next expected action when the available data is sufficient.
 
-The wallet activity dashboard uses the same bounded auction discovery plus wallet-specific read-only contract calls to surface the connected wallet's likely next actions. It is a usability layer, not a production indexer.
+The wallet activity dashboard first tries wallet-scoped `AuctionCreated`, `BidPlaced`, `AuctionFinalized`, and `NFTClaimed` events. If no wallet-scoped activity is found, it can use a bounded general `AuctionCreated` event window, then direct read-only contract calls to identify claimable balances, seller proceeds, protocol fee credits, and next actions for the connected wallet. If event reads fail, it falls back to a bounded newest-first `nextAuctionId` window.
+
+The dashboard exposes its discovery strategy as `event-scoped`, `general-event-window`, `bounded-fallback`, or `unavailable`, and displays a warning when the result is bounded. It is a usability layer for the MVP, not a production indexer.
 
 The browser does not need direct access to Anvil RPC for read-only data.
 
@@ -242,7 +245,8 @@ CI does not require:
 * No public testnet deployment has been executed yet.
 * No backend or persistent event indexer exists yet.
 * Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
-* The wallet activity dashboard scans the currently discovered auction window only; it is not a complete production history view.
+* The wallet activity dashboard uses wallet-scoped events, a bounded general event window, and a bounded fallback. It can miss historical activity outside the scanned window and is not a complete production history view.
+* Fee recipient activity is derived from the auction fee recipient snapshot and credit reads; without a persistent indexer or richer event schema, it is still bounded by the auctions discovered for the dashboard.
 * No external security audit has been completed yet.
 * No block explorer source verification workflow has been automated yet.
 * No production monitoring or alerting exists yet.
@@ -258,9 +262,3 @@ Recommended next steps:
 * Dry-run `script/DeployTestnet.s.sol` against the selected testnet RPC.
 * Broadcast only after human review of deployment variables and dry-run output.
 * Sync, validate, and verify the generated deployment JSON.
-* Run the manual post-deployment smoke test with a real testnet NFT.
-* Verify contracts on a block explorer.
-* Improve RPC and wallet configuration for wallet-signed flows.
-* Add a production-grade event indexer for scalable auction, bid, finalization, claim, withdrawal, and rule snapshot history.
-* Add post-deployment verification checks for auction-level snapshots where practical.
-* Plan external smart contract security review before production deployment.
