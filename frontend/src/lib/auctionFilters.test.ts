@@ -84,12 +84,13 @@ describe("auctionFilters", () => {
 
   it("filters claimable or withdrawable auctions when economics are available", () => {
     const result = run([
-      auctionFixture({ auctionId: "1", state: 2, stateLabel: "FINALIZED", finalized: true }),
+      auctionFixture({ auctionId: "1", state: 2, stateLabel: "FINALIZED", finalized: true, nftClaimed: true }),
       auctionFixture({
         auctionId: "2",
         state: 2,
         stateLabel: "FINALIZED",
         finalized: true,
+        nftClaimed: true,
         economics: {
           primaryBidder: {
             role: "primary",
@@ -149,7 +150,7 @@ describe("auctionFilters", () => {
           nftClaim: {
             claimant: testAddresses.secondBidder,
             claimantRole: "secondary",
-            canClaim: true
+            canClaim: false
           },
           hasLosingBidder: true
         }
