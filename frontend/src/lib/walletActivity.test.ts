@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedAuction } from "@/lib/auctionTypes";
 import { buildWalletActivity, type WalletActivityAuction, type WalletAuctionPosition } from "@/lib/walletActivity";
 import { testAddresses } from "@/test/fixtures";
 
 const zeroAddress = "0x0000000000000000000000000000000000000000" as const;
 
-function baseAuction(overrides: Partial<SerializedAuction> = {}): WalletActivityAuction {
+function baseAuction(overrides: Partial<WalletActivityAuction> = {}): WalletActivityAuction {
   return {
     auctionId: "1",
     seller: testAddresses.seller,
