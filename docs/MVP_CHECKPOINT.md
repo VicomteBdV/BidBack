@@ -13,6 +13,7 @@ The current MVP supports:
 * Local demo auction creation during deployment
 * Read-only deployment and auction views through Next.js server routes
 * Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
+* Auction browsing controls for search, status filtering, wallet-scoped filtering when a wallet is connected, sorting, and configurable loaded-list limits
 * Read-only auction detail page
 * Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
 * Opportunistic NFT metadata previews for auctions, using ERC-721 `name`, `symbol`, `tokenURI`, HTTP metadata, and simple IPFS gateway conversion when available
@@ -39,7 +40,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, and wallet activity event discovery fallbacks
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, auction browsing filters, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, and wallet activity event discovery fallbacks
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -69,6 +70,7 @@ It is used for:
 
 * Local deployment display
 * Auction list
+* Auction browsing controls
 * Auction detail
 * Auction lifecycle summary
 * NFT metadata previews
@@ -79,6 +81,8 @@ It is used for:
 * Technical details
 
 The auction list uses `AuctionCreated` events for discovery and falls back to a bounded newest-first `nextAuctionId` read if event scanning fails or returns no events for a deployment that already has auctions.
+
+The list applies client-side browsing controls to the currently loaded read-only auction window. Supported controls include text search across auction ID, NFT address, token ID, seller, highest bidder, winner-like fields, and NFT metadata; status filters for open, ready-to-finalize, finalized, claimable, settled, created-by-wallet, and involving-wallet views; and sorting by newest, oldest, ending soon, or highest bid / final price.
 
 The list and detail pages now show a read-only lifecycle status such as `Open`, `Ready to finalize`, `Finalized`, `Claimed`, or `Settled`, plus the next expected action when the available data is sufficient.
 
@@ -249,6 +253,8 @@ CI does not require:
 * No public testnet deployment has been executed yet.
 * No backend or persistent event indexer exists yet.
 * Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
+* Auction browsing filters and sorting apply only to the currently loaded bounded auction window, not to complete historical auction data.
+* The MVP does not implement production pagination, recently-updated ordering, or cross-window search yet.
 * NFT metadata previews depend on external `tokenURI` responses and are not production-grade NFT indexing.
 * NFT metadata can be missing, invalid, slow, mutable, or unavailable.
 * IPFS media depends on the configured gateway and can fail independently from the auction state.
