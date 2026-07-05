@@ -18,6 +18,7 @@ This smoke test validates:
 - NFT approval to `NFTVault`;
 - wallet-signed auction creation;
 - wallet-signed bidding;
+- wallet-signed action availability and disabled reasons;
 - finalization;
 - NFT claim;
 - refund claim;
@@ -121,6 +122,7 @@ Expected result:
 - the deployment console displays Base Sepolia;
 - the wallet can connect;
 - if the wallet is on the wrong chain, the UI proposes switching to Base Sepolia;
+- wallet-signed actions show clear disabled reasons before asking for a signature when an action is not currently possible;
 - local-dev actions remain unavailable.
 
 ---
@@ -226,7 +228,8 @@ Wait until the auction end time has passed.
 Expected result:
 
 - auction can be finalized;
-- no premature finalization is possible before expiry.
+- no premature finalization is possible before expiry;
+- wallet-signed bidding is blocked after the end time and the UI directs the user to refresh or finalize.
 
 ### Step 8 - Finalize Auction
 
@@ -249,7 +252,8 @@ Expected result:
 
 - winner can claim the NFT;
 - NFT is transferred from custody to the winner;
-- duplicate NFT claim is impossible.
+- duplicate NFT claim is impossible;
+- non-winner wallets see a clear disabled reason.
 
 ### Step 10 - Losing Bidder Claims Refund
 
@@ -259,7 +263,8 @@ Expected result:
 
 - losing bidder can claim refund;
 - refund amount is transferred;
-- duplicate refund claim is impossible.
+- duplicate refund claim is impossible;
+- wallets with no refund see a clear disabled reason.
 
 ### Step 11 - Losing Bidder Claims Reward, if Applicable
 
@@ -281,7 +286,8 @@ Expected result:
 
 - seller can withdraw proceeds;
 - proceeds are transferred;
-- duplicate withdrawal is impossible.
+- duplicate withdrawal is impossible;
+- non-seller wallets see a clear disabled reason.
 
 ### Step 13 - Fee Recipient Withdraws Protocol Fees
 
@@ -291,7 +297,8 @@ Expected result:
 
 - fee recipient can withdraw protocol fees;
 - fees were credited to the fee recipient snapshot of the auction;
-- duplicate withdrawal is impossible.
+- duplicate withdrawal is impossible;
+- non-fee-recipient wallets see a clear disabled reason.
 
 ---
 
@@ -322,8 +329,10 @@ Expected result:
 | Approval missing | NFTVault not approved | Use `Approve NFTVault` before creating the auction |
 | Create auction fails | Wrong approval, wrong owner, or invalid parameters | Re-check owner, approval and auction inputs |
 | Bid fails | Bid too low or wallet underfunded | Increase bid and check Base Sepolia ETH balance |
+| Bid button disabled after expiry | Auction reached end time | Refresh auction state and finalize instead of bidding |
 | Cannot finalize | Auction not expired | Wait until end time |
 | Reward is zero | Premium net too low or conditions not met | Use a larger second bid in a future test |
+| Claim or withdrawal disabled | Current wallet is not eligible or no amount is available | Read the disabled reason shown by the UI, then switch wallet or continue to the next step |
 | Fee withdrawal fails | Wrong wallet | Use the fee recipient snapshot wallet |
 | RPC errors | Public RPC rate limit or instability | Retry or use a more reliable RPC |
 | Local-dev actions visible | `ENABLE_LOCAL_DEV_ACTIONS` enabled | Set it to false or remove it outside Anvil |
