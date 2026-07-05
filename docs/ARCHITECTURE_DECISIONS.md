@@ -36,6 +36,7 @@ Current baseline:
 * read-only auction views through Next.js server routes;
 * event-based auction list discovery from `AuctionCreated` logs with a bounded newest-first `nextAuctionId` fallback;
 * read-only wallet activity dashboard using wallet-scoped auction events, a bounded general event window, and a bounded fallback;
+* opportunistic NFT metadata previews from ERC-721 `name`, `symbol`, `tokenURI`, HTTP metadata JSON, and simple IPFS gateway conversion;
 * read-only auction parameter snapshot display;
 * per-auction fee recipient snapshot display;
 * guarded local-dev actions under `/api/dev/*` for Codespaces testing;
@@ -499,6 +500,41 @@ Future work:
 
 ---
 
+## NFT Metadata Read Model
+
+The MVP now displays NFT previews when metadata is available, but this is intentionally opportunistic.
+
+Current MVP position:
+
+* server-side read-only routes call ERC-721 `name()`, `symbol()`, and `tokenURI(tokenId)`;
+* HTTP/HTTPS `tokenURI` values are fetched as JSON metadata;
+* simple `ipfs://<cid>` and `ipfs://ipfs/<cid>` values are converted through a configurable gateway;
+* metadata fields used by the UI are limited to `name`, `description`, `image`, and `external_url`;
+* image IPFS values are converted through the same gateway;
+* failed metadata reads never block auction reads;
+* metadata is rendered as escaped React text, never injected as HTML;
+* there is no persistent NFT metadata cache, media proxy, moderation layer, or production NFT indexer.
+
+This read model improves MVP usability but must not be treated as a source of economic truth.
+
+Known risks and limitations:
+
+* NFT metadata can be mutable, unavailable, malformed, slow, or malicious;
+* external images can fail independently from the auction state;
+* IPFS availability depends on gateway reliability;
+* unsupported token URI schemes are shown as unavailable;
+* no content validation or media safety pipeline exists yet;
+* no long-term metadata history or collection-level index exists yet.
+
+Future work:
+
+* decide whether production should use a managed NFT metadata service, a dedicated cache, or direct reads plus a media proxy;
+* add cache invalidation and refresh policy;
+* add content safety and image proxying before broader public usage;
+* avoid making bidding, settlement, or claim eligibility depend on off-chain metadata.
+
+---
+
 ## Production Trust Model
 
 Production users should be able to verify how custody, accounting, and rules work for a specific auction.
@@ -527,6 +563,7 @@ Areas that require additional production work:
 * monitoring for failed transactions and abnormal settlement states;
 * persistent event indexer for auction history and scalable reads;
 * backend persistence for UI convenience where appropriate;
+* production NFT metadata cache or media proxy if NFT previews become part of the public UX;
 * incident response process;
 * documented admin powers;
 * governance handoff documentation;
@@ -547,6 +584,7 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before public testnet with external users          |
 | Auction parameter snapshots       | Params, modules, and fee recipient are snapshotted, tested, and visible read-only                                      | Richer events, auction-level verification, richer indexer schema                           | User cannot inspect all rules, stale module confusion, incomplete verification         | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; verify before testnet    |
 | Indexing and persistence          | Event-based auction discovery plus wallet activity discovery with bounded fallbacks; no persistent indexer             | Event indexer, backend cache, hosted read API                                              | Missing history, RPC log range failures, scalability limits, stale data               | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
+| NFT metadata display              | Opportunistic direct tokenURI reads with HTTP/IPFS support; no cache or media proxy                                    | Metadata cache, media proxy, NFT metadata service, collection indexer                      | Broken media, malicious metadata, stale metadata, external availability                | frontend, future backend, docs                          | Before broader public UX                           |
 | Production trust and verification | JSON validation and expanded on-chain verification exist                                                              | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public testnet and production               |
 | Local-dev tooling boundary        | `/api/dev/*` guarded and local only                                                                                   | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
 | Final UI/UX model                 | Functional MVP UI, not final design                                                                                   | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                                          | frontend, copy, docs, user education                    | After core public testnet mechanics are validated  |
@@ -571,6 +609,7 @@ It already provides:
 * fee recipient snapshotting per auction;
 * read-only display of auction parameter snapshots;
 * read-only display of auction fee recipient snapshots;
+* read-only NFT metadata previews that do not affect settlement;
 * event-based auction list discovery with bounded fallback;
 * event-based wallet activity discovery with bounded fallbacks;
 * local and wallet-signed testing flows.
@@ -580,6 +619,7 @@ Areas likely to evolve before production:
 * bidding authorization model for lower-friction bids;
 * governance controls and ownership handoff;
 * persistent indexer and backend persistence for scalable reads;
+* NFT metadata caching, media proxying, and content safety;
 * first public testnet deployment execution and verification;
 * multi-wallet and network configuration;
 * production monitoring and incident response;
