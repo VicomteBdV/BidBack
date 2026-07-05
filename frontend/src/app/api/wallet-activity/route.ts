@@ -18,6 +18,17 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to read wallet activity";
 }
 
+function toDecimalString(value: unknown) {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number") return Math.trunc(value).toString();
+  if (typeof value === "string") return value;
+  return "0";
+}
+
+function toBoolean(value: unknown) {
+  return Boolean(value);
+}
+
 async function readAuctionFeeRecipient({
   auction,
   deployment,
@@ -26,20 +37,20 @@ async function readAuctionFeeRecipient({
   auction: SerializedAuction;
   deployment: DeploymentFile;
   client: PublicClient;
-}) {
+}): Promise<Address> {
   try {
-    return await client.readContract({
+    return (await client.readContract({
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
       functionName: "getAuctionFeeRecipient",
       args: [BigInt(auction.auctionId)]
-    });
+    })) as Address;
   } catch {
-    return await client.readContract({
+    return (await client.readContract({
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
       functionName: "feeRecipient"
-    });
+    })) as Address;
   }
 }
 
@@ -105,13 +116,13 @@ async function readWalletPosition({
     ]);
 
   return {
-    cap: cap.toString(),
-    refundableAmount: refundableAmount.toString(),
-    refundClaimed,
-    rewardEntitlement: rewardEntitlement.toString(),
-    rewardClaimed,
-    sellerCredit: sellerCredit.toString(),
-    protocolFeeCredit: protocolFeeCredit.toString(),
+    cap: toDecimalString(cap),
+    refundableAmount: toDecimalString(refundableAmount),
+    refundClaimed: toBoolean(refundClaimed),
+    rewardEntitlement: toDecimalString(rewardEntitlement),
+    rewardClaimed: toBoolean(rewardClaimed),
+    sellerCredit: toDecimalString(sellerCredit),
+    protocolFeeCredit: toDecimalString(protocolFeeCredit),
     auctionFeeRecipient,
     isAuctionFeeRecipient: wallet.toLowerCase() === auctionFeeRecipient.toLowerCase()
   };
