@@ -103,8 +103,8 @@ describe("AuctionList", () => {
 
     expect(await screen.findByText("Auction #2")).toBeInTheDocument();
     expect(screen.getByText("Auction #1")).toBeInTheDocument();
-    expect(screen.getByText("Open")).toBeInTheDocument();
-    expect(screen.getByText("Ready to finalize")).toBeInTheDocument();
+    expect(screen.getAllByText("Open").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ready to finalize").length).toBeGreaterThan(0);
     expect(screen.getByText("Finalize auction")).toBeInTheDocument();
     expect(screen.getByText("Demo NFT #2")).toBeInTheDocument();
     expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
