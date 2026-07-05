@@ -69,6 +69,7 @@ describe("AuctionDetail", () => {
     render(<AuctionDetail auctionId="1" />);
 
     expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Auction lifecycle" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Economic state" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local dev actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wallet-signed actions" })).toBeInTheDocument();
