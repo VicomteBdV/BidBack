@@ -232,10 +232,11 @@ describe("AuctionList", () => {
     mockAccount({ isConnected: false });
     mockAuctionListFetch(auctionsResponse([]));
 
-    render(<AuctionList />);
+    const firstRender = render(<AuctionList />);
 
     expect(await screen.findByText(/No auctions found yet/)).toBeInTheDocument();
 
+    firstRender.unmount();
     mockAuctionListFetch(auctionsResponse([auctionFixture()]));
     render(<AuctionList />);
 
