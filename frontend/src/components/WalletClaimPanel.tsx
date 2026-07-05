@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
@@ -13,6 +13,14 @@ import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import {
+  getClaimNftActionState,
+  getClaimRefundActionState,
+  getClaimRewardActionState,
+  getWithdrawProtocolFeesActionState,
+  getWithdrawSellerActionState,
+  sameAddress
+} from "@/lib/auctionActionState";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, isZeroAddress, shortenAddress } from "@/lib/format";
@@ -37,10 +45,6 @@ type WalletClaimData = {
   sellerCredit: bigint;
   protocolFeeCredit: bigint;
 };
-
-function sameAddress(a?: string | null, b?: string | null) {
-  return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
-}
 
 function walletErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object") {
@@ -440,6 +444,7 @@ export function WalletClaimPanel({
       const context = requireWalletContext();
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
+      if (!sameAddress(context.account, auction.seller)) throw new Error("Connect the seller wallet.");
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
       await verifyWalletChain(provider);
@@ -479,6 +484,9 @@ export function WalletClaimPanel({
       const context = requireWalletContext();
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
+      if (auction.auctionFeeRecipient && !sameAddress(context.account, auction.auctionFeeRecipient)) {
+        throw new Error("Connect the auction fee recipient wallet.");
+      }
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
       await verifyWalletChain(provider);
@@ -509,67 +517,55 @@ export function WalletClaimPanel({
     }
   }
 
-  function baseDisabledReason() {
-    if (!isConnected) return "Wallet not connected.";
-    if (wrongNetwork) return `Wallet connected, but not on the target chain (${targetChainLabel}).`;
-    if (deploymentError) return deploymentError;
-    if (!deployment) return "Deployment missing or stale.";
-    if (!auctionIdBigInt) return "Invalid auction ID.";
-    if (isLoadingClaimData) return "Wallet claim data is loading.";
-    if (pendingAction) return "Another wallet transaction is pending.";
-    return null;
-  }
+  const commonActionContext = {
+    isConnected,
+    wrongNetwork,
+    targetChainLabel,
+    deploymentLoaded: Boolean(deployment),
+    deploymentError,
+    auctionIdValid: Boolean(auctionIdBigInt),
+    loading: isLoadingClaimData,
+    pending: pendingAction !== null
+  };
 
-  function finalizedDisabledReason() {
-    const base = baseDisabledReason();
-    if (base) return base;
-    if (!auction.finalized) return "Auction is not finalized.";
-    return null;
-  }
+  const claimNftDisabledReason = getClaimNftActionState({
+    ...commonActionContext,
+    account: address,
+    claimant: expectedNftClaimant,
+    claimantRoleLabel: expectedNftClaimantLabel,
+    nftClaimed: auction.nftClaimed,
+    finalized: auction.finalized
+  }).disabledReason;
 
-  const claimNftDisabledReason = (() => {
-    const base = finalizedDisabledReason();
-    if (base) return base;
-    if (auction.nftClaimed) return "NFT already claimed.";
-    if (!sameAddress(address, expectedNftClaimant)) {
-      return `Connected wallet is not the NFT claimant. Expected ${expectedNftClaimantLabel}: ${shortenAddress(expectedNftClaimant)}.`;
-    }
-    return null;
-  })();
+  const claimRefundDisabledReason = getClaimRefundActionState({
+    ...commonActionContext,
+    refundableAmount,
+    refundClaimed,
+    finalized: auction.finalized
+  }).disabledReason;
 
-  const claimRefundDisabledReason = (() => {
-    const base = finalizedDisabledReason();
-    if (base) return base;
-    if (refundableAmount === null || refundClaimed === null) return "Refresh wallet claim data.";
-    if (refundClaimed) return "Refund already claimed.";
-    if (refundableAmount === 0n) return "No refund available.";
-    return null;
-  })();
+  const claimRewardDisabledReason = getClaimRewardActionState({
+    ...commonActionContext,
+    rewardEntitlement,
+    rewardClaimed,
+    finalized: auction.finalized
+  }).disabledReason;
 
-  const claimRewardDisabledReason = (() => {
-    const base = finalizedDisabledReason();
-    if (base) return base;
-    if (rewardEntitlement === null || rewardClaimed === null) return "Refresh wallet claim data.";
-    if (rewardClaimed) return "Reward already claimed.";
-    if (rewardEntitlement === 0n) return "No reward available.";
-    return null;
-  })();
+  const withdrawSellerDisabledReason = getWithdrawSellerActionState({
+    ...commonActionContext,
+    account: address,
+    seller: auction.seller,
+    sellerCredit,
+    finalized: auction.finalized
+  }).disabledReason;
 
-  const withdrawSellerDisabledReason = (() => {
-    const base = finalizedDisabledReason();
-    if (base) return base;
-    if (sellerCredit === null) return "Refresh wallet claim data.";
-    if (sellerCredit === 0n) return "No seller proceeds.";
-    return null;
-  })();
-
-  const withdrawFeesDisabledReason = (() => {
-    const base = finalizedDisabledReason();
-    if (base) return base;
-    if (protocolFeeCredit === null) return "Refresh wallet claim data.";
-    if (protocolFeeCredit === 0n) return "No protocol fees.";
-    return null;
-  })();
+  const withdrawFeesDisabledReason = getWithdrawProtocolFeesActionState({
+    ...commonActionContext,
+    account: address,
+    feeRecipient: auction.auctionFeeRecipient,
+    protocolFeeCredit,
+    finalized: auction.finalized
+  }).disabledReason;
 
   const statusMessage = !isConnected
     ? "Wallet not connected."
@@ -620,6 +616,8 @@ export function WalletClaimPanel({
         <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="NFT claimant" value={shortenAddress(expectedNftClaimant)} mono />
         <InfoItem label="NFT claimant role" value={expectedNftClaimantLabel} />
+        <InfoItem label="Seller wallet" value={shortenAddress(auction.seller)} mono />
+        <InfoItem label="Fee recipient" value={auction.auctionFeeRecipient ? shortenAddress(auction.auctionFeeRecipient) : "Not loaded"} mono />
         <InfoItem label="Refundable amount" value={refundableAmount === null ? "Not loaded" : formatEth(refundableAmount)} />
         <InfoItem label="Refund claimed" value={refundClaimed === null ? "Not loaded" : refundClaimed ? "Yes" : "No"} />
         <InfoItem label="Reward entitlement" value={rewardEntitlement === null ? "Not loaded" : formatEth(rewardEntitlement)} />
