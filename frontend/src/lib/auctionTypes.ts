@@ -10,6 +10,23 @@ export type AuctionDiscovery = {
   warning?: string;
 };
 
+export type NftMetadataStatus = "loaded" | "unavailable" | "fetch-failed" | "unsupported-token-uri" | "no-image";
+
+export type NftMetadata = {
+  contractAddress: `0x${string}`;
+  tokenId: string;
+  collectionName?: string;
+  collectionSymbol?: string;
+  tokenUri?: string;
+  tokenUriGatewayUrl?: string;
+  metadataName?: string;
+  description?: string;
+  imageUrl?: string;
+  externalUrl?: string;
+  status: NftMetadataStatus;
+  errorMessage?: string;
+};
+
 export type AuctionParamsSnapshot = {
   bidbackFeeBps: string;
   redistributionBps: string;
@@ -50,6 +67,7 @@ export type SerializedAuction = {
   bidCount: string;
   nftClaimed: boolean;
   finalized: boolean;
+  nftMetadata?: NftMetadata;
   paramsSnapshot?: AuctionParamsSnapshot;
   paramsSnapshotError?: string;
   auctionFeeRecipient?: `0x${string}`;
