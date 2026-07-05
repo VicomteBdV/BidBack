@@ -54,7 +54,10 @@ function walletPosition(overrides: Partial<WalletAuctionPosition> = {}): WalletA
   };
 }
 
-function activityResponse(auctions: WalletActivityAuction[], wallet = testAddresses.secondBidder): WalletActivityApiResponse {
+function activityResponse(
+  auctions: WalletActivityAuction[],
+  wallet: `0x${string}` = testAddresses.secondBidder
+): WalletActivityApiResponse {
   return {
     chainId: 31337,
     auctionHouse: testAddresses.auctionHouse,
