@@ -40,7 +40,7 @@ export function CreateAuctionFields({
             disabled={disabled}
             onChange={(event) => onTokenIdChange(event.target.value)}
             className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder="2"
+            placeholder="0"
             inputMode="numeric"
           />
         </label>
