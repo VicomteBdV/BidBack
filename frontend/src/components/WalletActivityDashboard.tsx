@@ -6,9 +6,16 @@ import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { formatEth, shortenAddress } from "@/lib/format";
-import type { WalletActivityApiResponse, WalletActivitySummary } from "@/lib/walletActivity";
+import type { WalletActivityApiResponse, WalletActivityDiscoveryStrategy, WalletActivitySummary } from "@/lib/walletActivity";
 
-const WALLET_ACTIVITY_LIMIT = 25;
+const WALLET_ACTIVITY_LIMIT = 100;
+
+const discoveryLabels: Record<WalletActivityDiscoveryStrategy, string> = {
+  "event-scoped": "Wallet events",
+  "general-event-window": "General event window",
+  "bounded-fallback": "Bounded fallback",
+  unavailable: "Unavailable"
+};
 
 type ActivityCard = {
   label: string;
@@ -138,7 +145,7 @@ export function WalletActivityDashboard() {
       ) : null}
 
       {isConnected ? (
-        <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-4">
           <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-xs text-slate-500">Connected wallet</div>
             <div className="mt-1 font-mono text-cyan-200">{shortenAddress(address)}</div>
@@ -148,8 +155,14 @@ export function WalletActivityDashboard() {
             <div className="mt-1 font-mono text-cyan-200">{targetChainLabel}</div>
           </div>
           <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Auctions scanned</div>
-            <div className="mt-1 font-mono text-cyan-200">{data?.count ?? 0} / {WALLET_ACTIVITY_LIMIT}</div>
+            <div className="text-xs text-slate-500">Discovery</div>
+            <div className="mt-1 font-mono text-cyan-200">
+              {data ? discoveryLabels[data.discovery.strategy] : "Not loaded"}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Auction IDs scanned</div>
+            <div className="mt-1 font-mono text-cyan-200">{data?.discovery.returnedIds ?? 0} / {data?.discovery.limit ?? WALLET_ACTIVITY_LIMIT}</div>
           </div>
         </div>
       ) : null}
@@ -157,6 +170,18 @@ export function WalletActivityDashboard() {
       {wrongNetwork ? (
         <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           Wallet connected, but not on the target chain ({targetChainLabel}). This panel remains read-only; switch network before signing wallet actions.
+        </div>
+      ) : null}
+
+      {data?.discovery.warning ? (
+        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          {data.discovery.warning}
+        </div>
+      ) : null}
+
+      {data ? (
+        <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-xs leading-5 text-slate-400">
+          This read model uses bounded on-chain event reads and direct contract reads. It is not a production indexer yet.
         </div>
       ) : null}
 
