@@ -10,12 +10,20 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { getFinalizeActionState } from "@/lib/auctionActionState";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatTimestamp, shortenAddress } from "@/lib/format";
+import {
+  awaitingSignatureState,
+  confirmedTransactionState,
+  failedTransactionState,
+  pendingTransactionState,
+  type WalletTransactionState
+} from "@/lib/walletTransaction";
 
 type WindowWithInjectedEthereum = Window & {
   ethereum?: EIP1193Provider;
@@ -95,7 +103,7 @@ export function WalletFinalizePanel({
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
   const [message, setMessage] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
@@ -142,7 +150,7 @@ export function WalletFinalizePanel({
   }, []);
 
   useEffect(() => {
-    setTxHash(null);
+    setTxStatus(null);
   }, [address, chainId, auction.auctionId]);
 
   const finalizeState = getFinalizeActionState({
@@ -178,7 +186,7 @@ export function WalletFinalizePanel({
     try {
       setIsFinalizing(true);
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const liveState = getFinalizeActionState({
         isConnected,
@@ -198,6 +206,7 @@ export function WalletFinalizePanel({
 
       const { provider, publicClient, walletClient } = createBrowserClients(address);
       await verifyWalletChain(provider);
+      setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));
 
       const hash = await walletClient.writeContract({
         address: deployment.contracts.auctionHouse,
@@ -206,12 +215,15 @@ export function WalletFinalizePanel({
         args: [auctionIdBigInt]
       });
 
-      setTxHash(hash);
+      setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
-      setMessage("Auction finalized with wallet signature.");
       await onFinalizeComplete();
+      setMessage("Auction finalized with wallet signature. Auction data refreshed.");
+      setTxStatus(confirmedTransactionState(hash, "Auction finalized. Economic state and claim data refreshed."));
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setIsFinalizing(false);
     }
@@ -266,9 +278,11 @@ export function WalletFinalizePanel({
         </button>
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      <div className="mt-4">
+        <WalletTransactionStatus title="Auction finalization" status={txStatus} />
+      </div>
 
-      {txHash ? <div className="mt-3 break-all font-mono text-xs text-sky-100/70">tx: {txHash}</div> : null}
+      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }
