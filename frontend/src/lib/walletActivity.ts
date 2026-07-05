@@ -1,5 +1,5 @@
 import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
-import type { AuctionDiscovery, SerializedAuction } from "@/lib/auctionTypes";
+import type { SerializedAuction } from "@/lib/auctionTypes";
 import { isZeroAddress } from "@/lib/format";
 
 export type WalletAuctionPosition = {
@@ -59,12 +59,26 @@ export type WalletActivityAction = {
   priority: number;
 };
 
+export type WalletActivityDiscoveryStrategy =
+  | "event-scoped"
+  | "general-event-window"
+  | "bounded-fallback"
+  | "unavailable";
+
+export type WalletActivityDiscovery = {
+  strategy: WalletActivityDiscoveryStrategy;
+  limit: number;
+  requestedLimit: number;
+  returnedIds: number;
+  warning?: string;
+};
+
 export type WalletActivityApiResponse = {
   chainId: number;
   auctionHouse: `0x${string}`;
   wallet: `0x${string}`;
   count: number;
-  discovery: AuctionDiscovery;
+  discovery: WalletActivityDiscovery;
   activity: WalletActivitySummary;
 };
 
