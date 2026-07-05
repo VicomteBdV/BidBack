@@ -15,7 +15,18 @@ const winner = "0x0000000000000000000000000000000000001002";
 const loser = "0x0000000000000000000000000000000000001003";
 const feeRecipient = "0x0000000000000000000000000000000000001004";
 
-function walletContext(overrides: Record<string, unknown> = {}) {
+type WalletActionContext = {
+  isConnected: boolean;
+  wrongNetwork: boolean;
+  targetChainLabel: string;
+  deploymentLoaded: boolean;
+  deploymentError: string | null;
+  auctionIdValid: boolean;
+  loading: boolean;
+  pending: boolean;
+};
+
+function walletContext(overrides: Partial<WalletActionContext> = {}): WalletActionContext {
   return {
     isConnected: true,
     wrongNetwork: false,
