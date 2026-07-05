@@ -1,5 +1,17 @@
 export const auctionHouseAbi = [
   {
+    type: "event",
+    name: "AuctionCreated",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "seller", type: "address", indexed: true },
+      { name: "nft", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: false },
+      { name: "startPrice", type: "uint256", indexed: false },
+      { name: "initialEndTime", type: "uint64", indexed: false }
+    ]
+  },
+  {
     type: "function",
     name: "nextAuctionId",
     stateMutability: "view",
