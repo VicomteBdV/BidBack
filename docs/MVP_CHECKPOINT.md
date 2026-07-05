@@ -14,6 +14,7 @@ The current MVP supports:
 * Read-only deployment and auction views through Next.js server routes
 * Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
 * Read-only auction detail page
+* Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
 * Read-only auction parameter snapshot display
 * Read-only auction fee recipient snapshot display
 * Explicit Foundry tests proving auction parameter snapshots remain stable after global parameter updates
@@ -35,7 +36,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, and wallet transaction feedback helpers
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, and auction lifecycle UI rules
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -66,12 +67,15 @@ It is used for:
 * Local deployment display
 * Auction list
 * Auction detail
+* Auction lifecycle summary
 * Auction rules snapshot
 * Auction fee recipient snapshot
 * Economic state
 * Technical details
 
 The auction list uses `AuctionCreated` events for discovery and falls back to a bounded newest-first `nextAuctionId` read if event scanning fails or returns no events for a deployment that already has auctions.
+
+The list and detail pages now show a read-only lifecycle status such as `Open`, `Ready to finalize`, `Finalized`, `Claimed`, or `Settled`, plus the next expected action when the available data is sufficient.
 
 The browser does not need direct access to Anvil RPC for read-only data.
 
