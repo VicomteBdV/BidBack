@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
 import { getBidActionState } from "@/lib/auctionActionState";
@@ -18,6 +19,13 @@ import type { SerializedAuction } from "@/lib/auctionTypes";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, shortenAddress } from "@/lib/format";
+import {
+  awaitingSignatureState,
+  confirmedTransactionState,
+  failedTransactionState,
+  pendingTransactionState,
+  type WalletTransactionState
+} from "@/lib/walletTransaction";
 
 type WindowWithInjectedEthereum = Window & {
   ethereum?: EIP1193Provider;
@@ -103,7 +111,7 @@ export function WalletBidPanel({
   const [isLoadingBidData, setIsLoadingBidData] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionOpen = auction.state === 0;
@@ -155,7 +163,7 @@ export function WalletBidPanel({
   useEffect(() => {
     setMinimumNextBid(null);
     setCurrentCap(null);
-    setTxHash(null);
+    setTxStatus(null);
   }, [address, chainId, auction.auctionId]);
 
   const bidActionState = getBidActionState({
@@ -245,7 +253,7 @@ export function WalletBidPanel({
     try {
       setIsPlacingBid(true);
       setMessage(null);
-      setTxHash(null);
+      setTxStatus(null);
 
       const { provider, publicClient, walletClient } = createBrowserClients(address);
 
@@ -288,6 +296,8 @@ export function WalletBidPanel({
         throw new Error(liveActionState.disabledReason ?? "Bid cap must be a valid ETH amount.");
       }
 
+      setTxStatus(awaitingSignatureState("Confirm wallet-signed bid in your wallet."));
+
       const hash = await walletClient.writeContract({
         address: deployment.contracts.auctionHouse,
         abi: auctionHouseAbi,
@@ -296,14 +306,22 @@ export function WalletBidPanel({
         value: liveActionState.valueToSend
       });
 
-      setTxHash(hash);
+      setTxStatus(pendingTransactionState(hash, "Bid transaction submitted. Waiting for confirmation."));
       await publicClient.waitForTransactionReceipt({ hash });
 
-      setMessage(`Wallet-signed bid placed. Value sent: ${formatEth(liveActionState.valueToSend)}.`);
       await onBidComplete();
       await readWalletBidData("Wallet bid data refreshed after successful bid.");
+      setMessage(`Wallet-signed bid placed. Value sent: ${formatEth(liveActionState.valueToSend)}.`);
+      setTxStatus(
+        confirmedTransactionState(
+          hash,
+          `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Auction data refreshed.`
+        )
+      );
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Transaction reverted."));
+      const failed = failedTransactionState(caught, "Transaction reverted.");
+      setTxStatus(failed);
+      setMessage(failed.message);
     } finally {
       setIsPlacingBid(false);
     }
@@ -401,9 +419,11 @@ export function WalletBidPanel({
         </div>
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      <div className="mt-4">
+        <WalletTransactionStatus title="Wallet bid" status={txStatus} />
+      </div>
 
-      {txHash ? <div className="mt-3 break-all font-mono text-xs text-cyan-100/70">tx: {txHash}</div> : null}
+      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }
