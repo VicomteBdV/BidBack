@@ -34,6 +34,7 @@ Current baseline:
 * modular Foundry contracts;
 * Next.js frontend under `frontend/`;
 * read-only auction views through Next.js server routes;
+* event-based auction list discovery from `AuctionCreated` logs with a bounded newest-first `nextAuctionId` fallback;
 * read-only auction parameter snapshot display;
 * per-auction fee recipient snapshot display;
 * guarded local-dev actions under `/api/dev/*` for Codespaces testing;
@@ -446,6 +447,38 @@ Future work:
 
 ---
 
+## Indexing and Read Scaling
+
+The current frontend can discover auctions without iterating over every possible auction ID.
+
+Current MVP position:
+
+* the auction list reads `AuctionCreated` logs from the configured deployment;
+* results are shown newest-first with a default limit;
+* if event scanning fails, the server route falls back to a bounded newest-first read from `nextAuctionId`;
+* the fallback is intentionally limited and is not a production-scale indexer;
+* no persistent database, hosted indexer, or historical cache exists yet.
+
+This is enough for local MVP and controlled smoke testing, but not enough for large public usage.
+
+Open questions:
+
+* What indexed schema should represent auctions, bids, finalization, claims, withdrawals, rule snapshots, and fee recipient snapshots?
+* Should the first indexer be a lightweight server cache, a dedicated database, or a third-party indexing service?
+* How should the UI surface stale indexer data versus fresh on-chain reads?
+* Which reads must always remain direct on-chain verification paths?
+* What pagination model should be exposed for large auction history?
+
+Future work:
+
+* add persistent event indexing for scalable auction history;
+* index `BidPlaced`, `AuctionExtended`, `AuctionEnded`, `AuctionFinalized`, and `NFTClaimed`;
+* index vault and distribution events once production event surfaces are finalized;
+* keep claimable balances and settlement-critical reads verifiable on-chain;
+* define monitoring around event ingestion gaps and RPC log range failures.
+
+---
+
 ## Production Trust Model
 
 Production users should be able to verify how custody, accounting, and rules work for a specific auction.
@@ -472,7 +505,7 @@ Areas that require additional production work:
 * explorer verification;
 * external smart contract audit;
 * monitoring for failed transactions and abnormal settlement states;
-* event indexer for auction history and scalable reads;
+* persistent event indexer for auction history and scalable reads;
 * backend persistence for UI convenience where appropriate;
 * incident response process;
 * documented admin powers;
@@ -493,7 +526,7 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | Redistribution computation model  | Deterministic on-chain SCR in MVP                                                                                     | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors                             | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data         |
 | Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before public testnet with external users          |
 | Auction parameter snapshots       | Params, modules, and fee recipient are snapshotted, tested, and visible read-only                                      | Richer events, auction-level verification, richer indexer schema                           | User cannot inspect all rules, stale module confusion, incomplete verification         | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; verify before testnet    |
-| Indexing and persistence          | Bounded read-only routes; no indexer                                                                                  | Event indexer, backend cache, hosted read API                                              | Missing history, scalability limits, stale data                                       | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
+| Indexing and persistence          | Event-based read-only auction discovery with bounded fallback; no persistent indexer                                   | Event indexer, backend cache, hosted read API                                              | Missing history, RPC log range failures, scalability limits, stale data               | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
 | Production trust and verification | JSON validation and expanded on-chain verification exist                                                              | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public testnet and production               |
 | Local-dev tooling boundary        | `/api/dev/*` guarded and local only                                                                                   | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
 | Final UI/UX model                 | Functional MVP UI, not final design                                                                                   | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                                          | frontend, copy, docs, user education                    | After core public testnet mechanics are validated  |
@@ -518,13 +551,14 @@ It already provides:
 * fee recipient snapshotting per auction;
 * read-only display of auction parameter snapshots;
 * read-only display of auction fee recipient snapshots;
+* event-based auction list discovery with bounded fallback;
 * local and wallet-signed testing flows.
 
 Areas likely to evolve before production:
 
 * bidding authorization model for lower-friction bids;
 * governance controls and ownership handoff;
-* indexer and backend persistence for scalable reads;
+* persistent indexer and backend persistence for scalable reads;
 * first public testnet deployment execution and verification;
 * multi-wallet and network configuration;
 * production monitoring and incident response;
