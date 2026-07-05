@@ -64,7 +64,16 @@ describe("AuctionList", () => {
         auctionFixture({
           auctionId: "2",
           highestBidder: testAddresses.primaryBidder,
-          highestBid: "1000000000000000000"
+          highestBid: "1000000000000000000",
+          nftMetadata: {
+            contractAddress: testAddresses.localNft,
+            tokenId: "1",
+            collectionName: "BidBack Demo Collection",
+            collectionSymbol: "BID",
+            metadataName: "Demo NFT #2",
+            imageUrl: "https://images.example/2.png",
+            status: "loaded"
+          }
         }),
         auctionFixture({
           auctionId: "1",
@@ -82,6 +91,18 @@ describe("AuctionList", () => {
     expect(screen.getByText("Open")).toBeInTheDocument();
     expect(screen.getByText("Ready to finalize")).toBeInTheDocument();
     expect(screen.getByText("Finalize auction")).toBeInTheDocument();
+    expect(screen.getByText("Demo NFT #2")).toBeInTheDocument();
+    expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
+  });
+
+  it("renders a fallback NFT preview when metadata is unavailable", async () => {
+    mockAuctionListFetch(auctionsResponse([auctionFixture()]));
+
+    render(<AuctionList />);
+
+    expect(await screen.findByText("Token #1")).toBeInTheDocument();
+    expect(screen.getByText("Unknown collection")).toBeInTheDocument();
+    expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
   });
 
   it("renders a clear empty state", async () => {
