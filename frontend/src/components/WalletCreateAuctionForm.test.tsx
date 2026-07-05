@@ -31,6 +31,14 @@ function paramsTuple() {
   };
 }
 
+function mockConnectedAccount() {
+  return {
+    address: seller,
+    chainId: 31337,
+    isConnected: true
+  } as unknown as ReturnType<typeof useAccount>;
+}
+
 function setupWalletCreateForm({
   owner = seller,
   approvedAddress = zeroAddress,
@@ -67,11 +75,7 @@ function setupWalletCreateForm({
     writeContract
   } as unknown as ReturnType<typeof createWalletClient>);
 
-  vi.mocked(useAccount).mockReturnValue({
-    address: seller,
-    chainId: 31337,
-    isConnected: true
-  } as ReturnType<typeof useAccount>);
+  vi.mocked(useAccount).mockReturnValue(mockConnectedAccount());
 
   vi.stubGlobal(
     "fetch",
