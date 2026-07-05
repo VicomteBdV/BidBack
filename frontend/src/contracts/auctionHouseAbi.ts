@@ -12,6 +12,34 @@ export const auctionHouseAbi = [
     ]
   },
   {
+    type: "event",
+    name: "BidPlaced",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "bidder", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "AuctionFinalized",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "winner", type: "address", indexed: true },
+      { name: "finalPrice", type: "uint256", indexed: false },
+      { name: "feeAmount", type: "uint256", indexed: false },
+      { name: "distributionAmount", type: "uint256", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "NFTClaimed",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "claimant", type: "address", indexed: true }
+    ]
+  },
+  {
     type: "function",
     name: "nextAuctionId",
     stateMutability: "view",
