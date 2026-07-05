@@ -31,8 +31,10 @@ The current MVP supports:
 * Local-dev create auction from the UI
 * Wallet-signed create auction panel
 * Wallet-signed bid panel
+* Wallet-signed finalization panel
 * Wallet-signed claims / withdrawals panel
-* Frontend Vitest tests for critical guards, UI separation, and read-only auction discovery fallback behavior
+* Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, and wallet-signed lifecycle action-state rules
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -111,6 +113,8 @@ They do not call:
 ```
 
 They require MetaMask to access the target RPC.
+
+The detail page now blocks impossible wallet-signed actions with explicit reasons before asking the user to sign, including wrong network, expired bidding window, auction not finalized, NFT already claimed, missing refund/reward, wrong claimant wallet, wrong seller wallet, and wrong auction fee recipient wallet.
 
 If MetaMask cannot reach Anvil through Codespaces port forwarding, use local-dev mode for MVP testing or expose Anvil through a reliable localhost or public testnet RPC.
 
