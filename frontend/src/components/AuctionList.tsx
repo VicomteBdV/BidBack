@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
 import type { AuctionsApiResponse } from "@/lib/auctionTypes";
