@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   createPublicClient,
   createWalletClient,
   custom,
   formatEther,
-  parseEther,
   type Address,
   type EIP1193Provider
 } from "viem";
@@ -14,6 +13,8 @@ import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { getBidActionState } from "@/lib/auctionActionState";
+import type { SerializedAuction } from "@/lib/auctionTypes";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, shortenAddress } from "@/lib/format";
@@ -81,27 +82,11 @@ async function verifyWalletChain(provider: EIP1193Provider) {
   }
 }
 
-function parseBidCapEth(value: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed || trimmed.startsWith("-")) {
-    throw new Error("Bid cap must be a valid ETH amount.");
-  }
-
-  try {
-    return parseEther(trimmed);
-  } catch {
-    throw new Error("Bid cap must be a valid ETH amount.");
-  }
-}
-
 export function WalletBidPanel({
-  auctionId,
-  auctionState,
+  auction,
   onBidComplete
 }: {
-  auctionId: string;
-  auctionState: number;
+  auction: SerializedAuction;
   onBidComplete: () => Promise<void>;
 }) {
   const { address, chainId, isConnected } = useAccount();
@@ -113,6 +98,7 @@ export function WalletBidPanel({
   const [minimumNextBid, setMinimumNextBid] = useState<bigint | null>(null);
   const [currentCap, setCurrentCap] = useState<bigint | null>(null);
   const [bidCapEth, setBidCapEth] = useState("");
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
 
   const [isLoadingBidData, setIsLoadingBidData] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
@@ -120,12 +106,20 @@ export function WalletBidPanel({
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
-  const auctionOpen = auctionState === 0;
+  const auctionOpen = auction.state === 0;
 
   const auctionIdBigInt = useMemo(() => {
-    if (!/^\d+$/.test(auctionId)) return null;
-    return BigInt(auctionId);
-  }, [auctionId]);
+    if (!/^\d+$/.test(auction.auctionId)) return null;
+    return BigInt(auction.auctionId);
+  }, [auction.auctionId]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNowSeconds(Math.floor(Date.now() / 1000));
+    }, 10_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -162,51 +156,24 @@ export function WalletBidPanel({
     setMinimumNextBid(null);
     setCurrentCap(null);
     setTxHash(null);
-  }, [address, chainId, auctionId]);
+  }, [address, chainId, auction.auctionId]);
 
-  const parsedBidCap = useMemo(() => {
-    try {
-      return bidCapEth.trim() ? parseBidCapEth(bidCapEth) : null;
-    } catch {
-      return null;
-    }
-  }, [bidCapEth]);
-
-  const valueToSend =
-    parsedBidCap !== null && currentCap !== null && parsedBidCap > currentCap ? parsedBidCap - currentCap : 0n;
-
-  const bidValidationError = useMemo(() => {
-    if (!auctionOpen) return "Auction is not OPEN.";
-    if (!isConnected) return "Wallet not connected.";
-    if (wrongNetwork) return `Wallet connected, but not on the target chain (${targetChainLabel}).`;
-    if (deploymentError) return deploymentError;
-    if (!deployment) return "Deployment missing or stale.";
-    if (!auctionIdBigInt) return "Invalid auction ID.";
-    if (minimumNextBid === null || currentCap === null) return "Load wallet bid data before placing a bid.";
-
-    let bidCap: bigint;
-
-    try {
-      bidCap = parseBidCapEth(bidCapEth);
-    } catch (caught) {
-      return caught instanceof Error ? caught.message : "Bid cap must be a valid ETH amount.";
-    }
-
-    if (bidCap < minimumNextBid) return "Bid cap must be at least minimumNextBid.";
-    if (bidCap <= currentCap) return "Bid cap must be greater than your current cap.";
-
-    return null;
-  }, [
-    auctionIdBigInt,
-    auctionOpen,
-    bidCapEth,
-    currentCap,
-    deployment,
-    deploymentError,
+  const bidActionState = getBidActionState({
     isConnected,
+    wrongNetwork,
+    targetChainLabel,
+    deploymentLoaded: Boolean(deployment),
+    deploymentError,
+    auctionIdValid: Boolean(auctionIdBigInt),
+    loading: isLoadingBidData,
+    pending: isPlacingBid,
+    auctionState: auction.state,
+    endTime: auction.endTime,
+    nowSeconds,
     minimumNextBid,
-    wrongNetwork
-  ]);
+    currentCap,
+    bidCapEth
+  });
 
   async function readWalletBidData(successMessage?: string) {
     if (!address) throw new Error("Wallet not connected.");
@@ -257,7 +224,7 @@ export function WalletBidPanel({
       setMessage(walletErrorMessage(caught, "Unable to load wallet bid data."));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, auctionId, auctionOpen, deployment, wrongNetwork]);
+  }, [address, auction.auctionId, auctionOpen, deployment, wrongNetwork]);
 
   async function placeWalletBid() {
     if (!address) {
@@ -280,7 +247,6 @@ export function WalletBidPanel({
       setMessage(null);
       setTxHash(null);
 
-      const newCap = parseBidCapEth(bidCapEth);
       const { provider, publicClient, walletClient } = createBrowserClients(address);
 
       await verifyWalletChain(provider);
@@ -303,28 +269,37 @@ export function WalletBidPanel({
       setMinimumNextBid(minimumRequired);
       setCurrentCap(walletCap);
 
-      if (newCap < minimumRequired) {
-        throw new Error("Bid cap must be at least minimumNextBid.");
-      }
+      const liveActionState = getBidActionState({
+        isConnected,
+        wrongNetwork,
+        targetChainLabel,
+        deploymentLoaded: true,
+        deploymentError: null,
+        auctionIdValid: true,
+        auctionState: auction.state,
+        endTime: auction.endTime,
+        nowSeconds: Math.floor(Date.now() / 1000),
+        minimumNextBid: minimumRequired,
+        currentCap: walletCap,
+        bidCapEth
+      });
 
-      if (newCap <= walletCap) {
-        throw new Error("Bid cap must be greater than your current cap.");
+      if (liveActionState.disabledReason || liveActionState.parsedBidCap === null) {
+        throw new Error(liveActionState.disabledReason ?? "Bid cap must be a valid ETH amount.");
       }
-
-      const value = newCap - walletCap;
 
       const hash = await walletClient.writeContract({
         address: deployment.contracts.auctionHouse,
         abi: auctionHouseAbi,
         functionName: "placeBid",
-        args: [auctionIdBigInt, newCap],
-        value
+        args: [auctionIdBigInt, liveActionState.parsedBidCap],
+        value: liveActionState.valueToSend
       });
 
       setTxHash(hash);
       await publicClient.waitForTransactionReceipt({ hash });
 
-      setMessage(`Wallet-signed bid placed. Value sent: ${formatEth(value)}.`);
+      setMessage(`Wallet-signed bid placed. Value sent: ${formatEth(liveActionState.valueToSend)}.`);
       await onBidComplete();
       await readWalletBidData("Wallet bid data refreshed after successful bid.");
     } catch (caught) {
@@ -383,7 +358,7 @@ export function WalletBidPanel({
         <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
         <InfoItem label="Minimum required bid" value={minimumNextBid === null ? "Not loaded" : formatEth(minimumNextBid)} />
         <InfoItem label="Current wallet cap" value={currentCap === null ? "Not loaded" : formatEth(currentCap)} />
-        <InfoItem label="Value that will be sent" value={formatEth(valueToSend)} />
+        <InfoItem label="Value that will be sent" value={formatEth(bidActionState.valueToSend)} />
       </div>
 
       <div className="mt-4 grid gap-3">
@@ -399,9 +374,9 @@ export function WalletBidPanel({
           />
         </label>
 
-        {bidValidationError ? (
+        {bidActionState.disabledReason ? (
           <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-            {bidValidationError}
+            {bidActionState.disabledReason}
           </div>
         ) : null}
 
@@ -417,7 +392,7 @@ export function WalletBidPanel({
 
           <button
             type="button"
-            disabled={Boolean(bidValidationError) || isLoadingBidData || isPlacingBid}
+            disabled={Boolean(bidActionState.disabledReason)}
             onClick={placeWalletBid}
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
