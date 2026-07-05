@@ -34,7 +34,8 @@ The current MVP supports:
 * Wallet-signed finalization panel
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, and wallet-signed lifecycle action-state rules
+* Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, and wallet transaction feedback helpers
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -115,6 +116,8 @@ They do not call:
 They require MetaMask to access the target RPC.
 
 The detail page now blocks impossible wallet-signed actions with explicit reasons before asking the user to sign, including wrong network, expired bidding window, auction not finalized, NFT already claimed, missing refund/reward, wrong claimant wallet, wrong seller wallet, and wrong auction fee recipient wallet.
+
+Wallet-signed transactions show a dedicated transaction status for signature prompts, pending confirmations, confirmed transactions, user rejection, and failures. When `NEXT_PUBLIC_BLOCK_EXPLORER_URL` is configured, transaction hashes link to the target explorer. After confirmation, the UI refreshes the relevant auction, approval, bid, claim, or withdrawal data where the current read-only routes allow it.
 
 If MetaMask cannot reach Anvil through Codespaces port forwarding, use local-dev mode for MVP testing or expose Anvil through a reliable localhost or public testnet RPC.
 
@@ -250,6 +253,5 @@ Recommended next steps:
 * Verify contracts on a block explorer.
 * Improve RPC and wallet configuration for wallet-signed flows.
 * Add a production-grade event indexer for scalable auction, bid, finalization, claim, withdrawal, and rule snapshot history.
-* Harden transaction error UX.
 * Add post-deployment verification checks for auction-level snapshots where practical.
 * Plan external smart contract security review before production deployment.
