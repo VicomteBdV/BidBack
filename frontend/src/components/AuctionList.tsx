@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AuctionStateBadge } from "@/components/AuctionStateBadge";
+import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
 import type { AuctionsApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
-import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 
 const AUCTION_LIST_LIMIT = 25;
+
+const lifecycleToneClasses: Record<AuctionLifecycleTone, string> = {
+  success: "border-emerald-400/40 bg-emerald-400/10 text-emerald-100",
+  warning: "border-amber-400/40 bg-amber-400/10 text-amber-100",
+  info: "border-cyan-400/40 bg-cyan-400/10 text-cyan-100",
+  complete: "border-violet-400/40 bg-violet-400/10 text-violet-100",
+  neutral: "border-slate-500/40 bg-slate-500/10 text-slate-200"
+};
 
 export function AuctionList() {
   const [data, setData] = useState<AuctionsApiResponse | null>(null);
@@ -103,56 +112,72 @@ export function AuctionList() {
 
       {!isLoading && data && data.auctions.length === 0 ? (
         <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-300">
-          No auctions found yet. Once an auction is created on the target deployment, it will appear here.
+          No auctions found yet. Create an auction from the UI or deploy a demo auction locally, then refresh this list.
         </div>
       ) : null}
 
       {!isLoading && data && data.auctions.length > 0 ? (
         <div className="mt-5 grid gap-4">
-          {data.auctions.map((auction) => (
-            <Link
-              key={auction.auctionId}
-              href={`/auctions/${auction.auctionId}`}
-              className="block rounded-lg border border-slate-800 bg-slate-950 p-4 transition hover:border-cyan-500/60"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-base font-semibold text-white">Auction #{auction.auctionId}</h3>
-                    <AuctionStateBadge state={auction.state} />
+          {data.auctions.map((auction) => {
+            const lifecycle = getAuctionLifecycle(auction);
+
+            return (
+              <Link
+                key={auction.auctionId}
+                href={`/auctions/${auction.auctionId}`}
+                className="block rounded-lg border border-slate-800 bg-slate-950 p-4 transition hover:border-cyan-500/60"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-base font-semibold text-white">Auction #{auction.auctionId}</h3>
+                      <AuctionStateBadge state={auction.state} />
+                      <span
+                        className={`inline-flex min-h-7 items-center rounded-md border px-2.5 text-xs font-semibold ${lifecycleToneClasses[lifecycle.statusTone]}`}
+                      >
+                        {lifecycle.statusLabel}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">
+                      NFT <span className="font-mono text-slate-300">{shortenAddress(auction.nft)}</span> token{" "}
+                      <span className="font-mono text-slate-300">#{auction.tokenId}</span>
+                    </div>
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    NFT <span className="font-mono text-slate-300">{shortenAddress(auction.nft)}</span> token{" "}
-                    <span className="font-mono text-slate-300">#{auction.tokenId}</span>
+
+                  <div className="text-left text-sm sm:text-right">
+                    <div className="text-slate-500">Next action</div>
+                    <div className="font-semibold text-cyan-100">{lifecycle.nextActionLabel}</div>
                   </div>
                 </div>
 
-                <div className="text-left text-sm sm:text-right">
-                  <div className="text-slate-500">Highest bid</div>
-                  <div className="font-mono text-cyan-200">{formatEth(auction.highestBid)}</div>
+                <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-5">
+                  <div>
+                    <div className="text-slate-500">Seller</div>
+                    <div className="font-mono">{shortenAddress(auction.seller)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Start price</div>
+                    <div className="font-mono">{formatEth(auction.startPrice)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Highest bid</div>
+                    <div className="font-mono">{formatEth(auction.highestBid)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Highest bidder</div>
+                    <div className="font-mono">{formatAddressOrNone(auction.highestBidder)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Time</div>
+                    <div>{lifecycle.timeStatusLabel}</div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <div className="text-slate-500">Seller</div>
-                  <div className="font-mono">{shortenAddress(auction.seller)}</div>
-                </div>
-                <div>
-                  <div className="text-slate-500">Start price</div>
-                  <div className="font-mono">{formatEth(auction.startPrice)}</div>
-                </div>
-                <div>
-                  <div className="text-slate-500">Highest bidder</div>
-                  <div className="font-mono">{formatAddressOrNone(auction.highestBidder)}</div>
-                </div>
-                <div>
-                  <div className="text-slate-500">End time</div>
-                  <div>{formatTimestamp(auction.endTime)}</div>
-                </div>
-              </div>
-            </Link>
-          ))}
+                <div className="mt-3 text-xs leading-5 text-slate-500">{lifecycle.nextActionReason}</div>
+                <div className="mt-1 text-xs text-slate-600">End time: {formatTimestamp(auction.endTime)}</div>
+              </Link>
+            );
+          })}
         </div>
       ) : null}
     </section>
