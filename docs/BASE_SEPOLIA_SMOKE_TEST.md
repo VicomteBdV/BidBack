@@ -17,6 +17,7 @@ This smoke test validates:
 - external ERC-721 ownership detection;
 - NFT approval to `NFTVault`;
 - wallet-signed auction creation;
+- auction lifecycle summary in list and detail views;
 - wallet-signed bidding;
 - wallet-signed action availability and disabled reasons;
 - wallet-signed transaction feedback, transaction hash display, and explorer links when configured;
@@ -122,6 +123,8 @@ Expected result:
 
 - the frontend loads the `84532.json` deployment file;
 - the deployment console displays Base Sepolia;
+- auction list cards show a readable lifecycle status and next action;
+- auction detail shows the `Auction lifecycle` section before rules/economics/actions;
 - the wallet can connect;
 - if the wallet is on the wrong chain, the UI proposes switching to Base Sepolia;
 - wallet-signed actions show clear disabled reasons before asking for a signature when an action is not currently possible;
@@ -200,6 +203,7 @@ Expected result:
 - transaction succeeds;
 - transaction hash is visible;
 - auction appears in the UI;
+- auction lifecycle status is `Open` and next action points to bidding;
 - NFT is transferred into custody;
 - auction status is open;
 - parameter snapshot is visible;
@@ -239,6 +243,7 @@ Wait until the auction end time has passed.
 
 Expected result:
 
+- auction list/detail lifecycle status becomes `Ready to finalize` after refresh;
 - auction can be finalized;
 - no premature finalization is possible before expiry;
 - wallet-signed bidding is blocked after the end time and the UI directs the user to refresh or finalize.
@@ -252,6 +257,7 @@ Expected result:
 - finalization transaction succeeds;
 - transaction hash is visible;
 - auction detail refreshes after confirmation;
+- lifecycle phase becomes claims and withdrawals;
 - auction status becomes finalized;
 - final price is fixed;
 - seller proceeds are credited;
