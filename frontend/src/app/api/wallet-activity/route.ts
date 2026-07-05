@@ -4,7 +4,16 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { createTargetPublicClient, readAllAuctions, readTargetDeployment, type DeploymentFile } from "@/lib/server/auctionReader";
+import {
+  discoverWalletActivityAuctionIds,
+  normalizeWalletActivityEventLimit
+} from "@/lib/server/auctionEventReader";
+import {
+  createTargetPublicClient,
+  readAuctionsByIds,
+  readTargetDeployment,
+  type DeploymentFile
+} from "@/lib/server/auctionReader";
 import { buildWalletActivity, type WalletActivityAuction, type WalletAuctionPosition } from "@/lib/walletActivity";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +25,13 @@ function errorMessage(error: unknown) {
   }
 
   return error instanceof Error ? error.message : "Unable to read wallet activity";
+}
+
+function requestedLimit(value: string | null) {
+  if (value === null || value === "") return normalizeWalletActivityEventLimit(value);
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : normalizeWalletActivityEventLimit(value);
 }
 
 function toDecimalString(value: unknown) {
@@ -160,6 +176,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const walletParam = searchParams.get("wallet");
+    const limitParam = searchParams.get("limit");
 
     if (!walletParam || !isAddress(walletParam)) {
       return NextResponse.json(
@@ -175,22 +192,35 @@ export async function GET(request: Request) {
     const wallet = walletParam as Address;
     const deployment = await readTargetDeployment();
     const client = createTargetPublicClient();
-    const auctionsPayload = await readAllAuctions({
-      limit: searchParams.get("limit"),
+    const limit = normalizeWalletActivityEventLimit(limitParam);
+    const nextAuctionId = (await client.readContract({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "nextAuctionId"
+    })) as bigint;
+
+    const discoveryResult = await discoverWalletActivityAuctionIds({
+      client,
+      deployment,
+      nextAuctionId,
+      wallet,
+      limit,
+      requestedLimit: requestedLimit(limitParam)
+    });
+    const baseAuctions = await readAuctionsByIds(discoveryResult.ids, {
       client,
       deployment
     });
-
     const auctions = await Promise.all(
-      auctionsPayload.auctions.map((auction) => enrichAuctionForWallet({ auction, wallet, deployment, client }))
+      baseAuctions.map((auction) => enrichAuctionForWallet({ auction, wallet, deployment, client }))
     );
 
     return NextResponse.json({
-      chainId: auctionsPayload.chainId,
-      auctionHouse: auctionsPayload.auctionHouse,
+      chainId: deployment.chainId,
+      auctionHouse: deployment.contracts.auctionHouse,
       wallet,
       count: auctions.length,
-      discovery: auctionsPayload.discovery,
+      discovery: discoveryResult.discovery,
       activity: buildWalletActivity(auctions, wallet)
     });
   } catch (error) {
