@@ -16,6 +16,7 @@ import type {
   BidderEconomics,
   DevBidderRole,
   DistributionEconomics,
+  NftMetadata,
   SerializedAuction,
   SettlementEconomics
 } from "@/lib/auctionTypes";
@@ -26,6 +27,7 @@ import {
   type DeploymentContracts
 } from "@/lib/contracts";
 import { formatAuctionState, ZERO_ADDRESS } from "@/lib/format";
+import { readNftMetadata } from "@/lib/server/nftMetadataReader";
 
 export type DeploymentFile = {
   chainId: number;
@@ -57,6 +59,7 @@ type ReadAllAuctionsOptions = {
 type ReadAuctionsByIdsOptions = {
   client?: PublicClient;
   deployment?: DeploymentFile;
+  includeNftMetadata?: boolean;
 };
 
 type AuctionCreatedLog = {
@@ -374,6 +377,31 @@ function serializeAuction(auctionId: bigint, raw: unknown): SerializedAuction {
     nftClaimed: Boolean(getField(raw, "nftClaimed", 13)),
     finalized: state === 2
   };
+}
+
+async function enrichAuctionsWithNftMetadata(auctions: SerializedAuction[], client: PublicClient) {
+  const metadataCache = new Map<string, Promise<NftMetadata>>();
+
+  return Promise.all(
+    auctions.map(async (auction) => {
+      const cacheKey = `${auction.nft.toLowerCase()}:${auction.tokenId}`;
+      let metadata = metadataCache.get(cacheKey);
+
+      if (!metadata) {
+        metadata = readNftMetadata({
+          client,
+          nft: auction.nft,
+          tokenId: auction.tokenId
+        });
+        metadataCache.set(cacheKey, metadata);
+      }
+
+      return {
+        ...auction,
+        nftMetadata: await metadata
+      };
+    })
+  );
 }
 
 function serializeAuctionParams(raw: unknown): AuctionParamsSnapshot {
@@ -725,7 +753,7 @@ export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAucti
   const deployment = options.deployment ?? (await readTargetDeployment());
   const client = options.client ?? createTargetPublicClient();
 
-  return Promise.all(
+  const auctions = await Promise.all(
     auctionIds.map(async (auctionId) => {
       const rawAuction = await client.readContract({
         address: deployment.contracts.auctionHouse,
@@ -737,6 +765,12 @@ export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAucti
       return serializeAuction(auctionId, rawAuction);
     })
   );
+
+  if (!options.includeNftMetadata) {
+    return auctions;
+  }
+
+  return enrichAuctionsWithNftMetadata(auctions, client);
 }
 
 export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Promise<AuctionsApiResponse> {
@@ -761,7 +795,8 @@ export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Pro
 
   const auctions = await readAuctionsByIds(discoveryResult.ids, {
     client,
-    deployment
+    deployment,
+    includeNftMetadata: true
   });
 
   return {
@@ -802,6 +837,12 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
   });
 
   const auction = serializeAuction(auctionId, rawAuction);
+
+  auction.nftMetadata = await readNftMetadata({
+    client,
+    nft: auction.nft,
+    tokenId: auction.tokenId
+  });
 
   try {
     const rawParams = await client.readContract({
