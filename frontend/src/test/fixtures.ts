@@ -51,6 +51,19 @@ export const auctionDetailFixture = {
     bidCount: "2",
     nftClaimed: false,
     finalized: false,
+    nftMetadata: {
+      contractAddress: testAddresses.localNft,
+      tokenId: "1",
+      collectionName: "BidBack Demo Collection",
+      collectionSymbol: "BID",
+      tokenUri: "https://metadata.example/token/1.json",
+      tokenUriGatewayUrl: "https://metadata.example/token/1.json",
+      metadataName: "BidBack Demo NFT #1",
+      description: "A deterministic NFT metadata preview fixture.",
+      imageUrl: "https://images.example/token/1.png",
+      externalUrl: "https://example.com/token/1",
+      status: "loaded"
+    },
     economics: {
       primaryBidder: {
         role: "primary",
