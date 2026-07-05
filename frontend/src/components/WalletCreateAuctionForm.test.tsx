@@ -17,7 +17,7 @@ vi.mock("viem", async () => {
     ...actual,
     createPublicClient: vi.fn(),
     createWalletClient: vi.fn(),
-    custom: vi.fn((provider) => provider)
+    custom: vi.fn((provider: unknown) => provider)
   };
 });
 
