@@ -1,9 +1,8 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useAccount } from "wagmi";
 import { describe, expect, it, vi } from "vitest";
 import { WalletActivityDashboard } from "@/components/WalletActivityDashboard";
-import type { SerializedAuction } from "@/lib/auctionTypes";
 import { buildWalletActivity, type WalletActivityApiResponse, type WalletActivityAuction, type WalletAuctionPosition } from "@/lib/walletActivity";
 import { testAddresses } from "@/test/fixtures";
 
@@ -37,7 +36,7 @@ function baseAuction(overrides: Partial<WalletActivityAuction> = {}): WalletActi
     nftClaimed: false,
     finalized: false,
     ...overrides
-  } satisfies SerializedAuction;
+  };
 }
 
 function walletPosition(overrides: Partial<WalletAuctionPosition> = {}): WalletAuctionPosition {
