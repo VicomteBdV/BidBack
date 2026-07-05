@@ -21,6 +21,14 @@ vi.mock("@/components/WalletBidPanel", () => ({
   )
 }));
 
+vi.mock("@/components/WalletFinalizePanel", () => ({
+  WalletFinalizePanel: () => (
+    <section>
+      <h3>Wallet-signed finalization</h3>
+    </section>
+  )
+}));
+
 vi.mock("@/components/WalletClaimPanel", () => ({
   WalletClaimPanel: () => (
     <section>
