@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AuctionList } from "@/components/AuctionList";
 import { ModuleAddresses } from "@/components/ModuleAddresses";
+import { WalletActivityDashboard } from "@/components/WalletActivityDashboard";
 import { WalletButton } from "@/components/WalletButton";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 
@@ -63,6 +64,7 @@ export default function Home() {
         </section>
 
         <ModuleAddresses />
+        <WalletActivityDashboard />
         <AuctionList />
       </div>
     </main>
