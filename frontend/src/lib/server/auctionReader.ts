@@ -54,6 +54,11 @@ type ReadAllAuctionsOptions = {
   deployment?: DeploymentFile;
 };
 
+type ReadAuctionsByIdsOptions = {
+  client?: PublicClient;
+  deployment?: DeploymentFile;
+};
+
 type AuctionCreatedLog = {
   args?: {
     auctionId?: bigint;
@@ -716,6 +721,24 @@ async function readAuctionEconomics(
   };
 }
 
+export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAuctionsByIdsOptions = {}) {
+  const deployment = options.deployment ?? (await readTargetDeployment());
+  const client = options.client ?? createTargetPublicClient();
+
+  return Promise.all(
+    auctionIds.map(async (auctionId) => {
+      const rawAuction = await client.readContract({
+        address: deployment.contracts.auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [auctionId]
+      });
+
+      return serializeAuction(auctionId, rawAuction);
+    })
+  );
+}
+
 export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Promise<AuctionsApiResponse> {
   const deployment = options.deployment ?? (await readTargetDeployment());
   const client = options.client ?? createTargetPublicClient();
@@ -736,18 +759,10 @@ export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Pro
     requestedLimit: Number.isFinite(requestedLimit) ? requestedLimit : DEFAULT_AUCTION_LIST_LIMIT
   });
 
-  const auctions = await Promise.all(
-    discoveryResult.ids.map(async (auctionId) => {
-      const rawAuction = await client.readContract({
-        address: deployment.contracts.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "getAuction",
-        args: [auctionId]
-      });
-
-      return serializeAuction(auctionId, rawAuction);
-    })
-  );
+  const auctions = await readAuctionsByIds(discoveryResult.ids, {
+    client,
+    deployment
+  });
 
   return {
     chainId: deployment.chainId,
