@@ -6,6 +6,7 @@ import { AuctionLifecyclePanel } from "@/components/AuctionLifecyclePanel";
 import { AuctionRulesSnapshot } from "@/components/AuctionRulesSnapshot";
 import { AuctionSummary } from "@/components/AuctionSummary";
 import { ModeBadge } from "@/components/ModeBadge";
+import { NftPreview } from "@/components/NftPreview";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import { WalletFinalizePanel } from "@/components/WalletFinalizePanel";
@@ -88,6 +89,19 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       </div>
 
       <AuctionSummary auction={auction} />
+
+      <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-semibold text-white">NFT preview</h2>
+          <ModeBadge variant="read-only" />
+        </div>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          Opportunistic NFT metadata loaded from ERC-721 name, symbol, tokenURI, and external metadata JSON when available.
+        </p>
+        <div className="mt-5">
+          <NftPreview metadata={auction.nftMetadata} contractAddress={auction.nft} tokenId={auction.tokenId} />
+        </div>
+      </section>
 
       <AuctionLifecyclePanel auction={auction} />
 
@@ -176,6 +190,7 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
           <DetailItem label="Bid count" value={auction.bidCount} mono />
           <DetailItem label="Finalized" value={auction.finalized ? "Yes" : "No"} />
           <DetailItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
+          {auction.nftMetadata?.tokenUri ? <DetailItem label="NFT tokenURI" value={auction.nftMetadata.tokenUri} /> : null}
           {auction.auctionFeeRecipient ? (
             <DetailItem label="Auction fee recipient snapshot" value={auction.auctionFeeRecipient} mono />
           ) : null}
