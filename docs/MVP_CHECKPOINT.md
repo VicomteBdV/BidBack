@@ -15,6 +15,7 @@ The current MVP supports:
 * Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
 * Read-only auction detail page
 * Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
+* Read-only wallet activity dashboard for the connected wallet, including created auctions, active bids, won/lost auctions, claimable NFTs, refunds, rewards, seller proceeds, protocol fees, and next action links
 * Read-only auction parameter snapshot display
 * Read-only auction fee recipient snapshot display
 * Explicit Foundry tests proving auction parameter snapshots remain stable after global parameter updates
@@ -36,7 +37,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, and auction lifecycle UI rules
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, and wallet activity summaries
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -68,6 +69,7 @@ It is used for:
 * Auction list
 * Auction detail
 * Auction lifecycle summary
+* Wallet activity dashboard
 * Auction rules snapshot
 * Auction fee recipient snapshot
 * Economic state
@@ -76,6 +78,8 @@ It is used for:
 The auction list uses `AuctionCreated` events for discovery and falls back to a bounded newest-first `nextAuctionId` read if event scanning fails or returns no events for a deployment that already has auctions.
 
 The list and detail pages now show a read-only lifecycle status such as `Open`, `Ready to finalize`, `Finalized`, `Claimed`, or `Settled`, plus the next expected action when the available data is sufficient.
+
+The wallet activity dashboard uses the same bounded auction discovery plus wallet-specific read-only contract calls to surface the connected wallet's likely next actions. It is a usability layer, not a production indexer.
 
 The browser does not need direct access to Anvil RPC for read-only data.
 
@@ -238,6 +242,7 @@ CI does not require:
 * No public testnet deployment has been executed yet.
 * No backend or persistent event indexer exists yet.
 * Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
+* The wallet activity dashboard scans the currently discovered auction window only; it is not a complete production history view.
 * No external security audit has been completed yet.
 * No block explorer source verification workflow has been automated yet.
 * No production monitoring or alerting exists yet.
