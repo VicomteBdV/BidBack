@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const walletSignedComponents = [
   "WalletBidPanel.tsx",
+  "WalletFinalizePanel.tsx",
   "WalletClaimPanel.tsx",
   "WalletCreateAuctionForm.tsx"
 ];
