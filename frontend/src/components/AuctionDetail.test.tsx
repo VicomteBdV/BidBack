@@ -69,10 +69,17 @@ describe("AuctionDetail", () => {
     render(<AuctionDetail auctionId="1" />);
 
     expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "NFT preview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Auction lifecycle" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Economic state" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local dev actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wallet-signed actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Technical details" })).toBeInTheDocument();
+    expect(screen.getByText("BidBack Demo NFT #1")).toBeInTheDocument();
+    expect(screen.getByText("BidBack Demo Collection (BID)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open tokenURI" })).toHaveAttribute(
+      "href",
+      "https://metadata.example/token/1.json"
+    );
   });
 });
