@@ -12,6 +12,7 @@ The current MVP supports:
 * Modular smart contract deployment through Foundry
 * Local demo auction creation during deployment
 * Read-only deployment and auction views through Next.js server routes
+* Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
 * Read-only auction detail page
 * Read-only auction parameter snapshot display
 * Read-only auction fee recipient snapshot display
@@ -31,7 +32,7 @@ The current MVP supports:
 * Wallet-signed create auction panel
 * Wallet-signed bid panel
 * Wallet-signed claims / withdrawals panel
-* Frontend Vitest tests for critical guards and UI separation
+* Frontend Vitest tests for critical guards, UI separation, and read-only auction discovery fallback behavior
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -66,6 +67,8 @@ It is used for:
 * Auction fee recipient snapshot
 * Economic state
 * Technical details
+
+The auction list uses `AuctionCreated` events for discovery and falls back to a bounded newest-first `nextAuctionId` read if event scanning fails or returns no events for a deployment that already has auctions.
 
 The browser does not need direct access to Anvil RPC for read-only data.
 
@@ -222,7 +225,8 @@ CI does not require:
 * Local-dev actions use known Anvil test private keys.
 * Local-dev actions are not production architecture.
 * No public testnet deployment has been executed yet.
-* No backend or event indexer persistence is available yet.
+* No backend or persistent event indexer exists yet.
+* Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
 * No external security audit has been completed yet.
 * No block explorer source verification workflow has been automated yet.
 * No production monitoring or alerting exists yet.
@@ -241,7 +245,7 @@ Recommended next steps:
 * Run the manual post-deployment smoke test with a real testnet NFT.
 * Verify contracts on a block explorer.
 * Improve RPC and wallet configuration for wallet-signed flows.
-* Add event indexing for auctions, bids, finalization, claims, withdrawals, and auction rule snapshots.
+* Add a production-grade event indexer for scalable auction, bid, finalization, claim, withdrawal, and rule snapshot history.
 * Harden transaction error UX.
 * Add post-deployment verification checks for auction-level snapshots where practical.
 * Plan external smart contract security review before production deployment.
