@@ -19,6 +19,8 @@ This smoke test validates:
 - wallet-signed auction creation;
 - wallet-signed bidding;
 - wallet-signed action availability and disabled reasons;
+- wallet-signed transaction feedback, transaction hash display, and explorer links when configured;
+- post-confirmation data refresh after wallet-signed transactions;
 - finalization;
 - NFT claim;
 - refund claim;
@@ -123,6 +125,8 @@ Expected result:
 - the wallet can connect;
 - if the wallet is on the wrong chain, the UI proposes switching to Base Sepolia;
 - wallet-signed actions show clear disabled reasons before asking for a signature when an action is not currently possible;
+- wallet-signed transactions show waiting, pending, confirmed, rejected, or failed status;
+- transaction hashes are visible, and link to the configured explorer when `NEXT_PUBLIC_BLOCK_EXPLORER_URL` is set;
 - local-dev actions remain unavailable.
 
 ---
@@ -173,8 +177,11 @@ If the NFT is not approved:
 
 Expected result:
 
+- transaction status moves from wallet signature to pending to confirmed;
+- transaction hash is visible;
 - `getApproved(tokenId)` equals NFTVault, or;
 - `isApprovedForAll(owner, NFTVault)` is true;
+- approval status is refreshed after confirmation;
 - create auction action becomes available.
 
 ### Step 4 - Seller Creates Auction
@@ -191,6 +198,7 @@ Create an auction with test parameters.
 Expected result:
 
 - transaction succeeds;
+- transaction hash is visible;
 - auction appears in the UI;
 - NFT is transferred into custody;
 - auction status is open;
@@ -206,6 +214,8 @@ Expected result:
 - wallet is on Base Sepolia;
 - bidder #1 can place a valid bid;
 - transaction succeeds;
+- transaction hash is visible;
+- auction data refreshes after confirmation;
 - bidder #1 becomes highest bidder;
 - bidder cap / exposure is updated.
 
@@ -217,6 +227,8 @@ Expected result:
 
 - bidder #2 can place a higher valid bid;
 - transaction succeeds;
+- transaction hash is visible;
+- auction data refreshes after confirmation;
 - bidder #2 becomes highest bidder;
 - bidder #1 becomes outbid;
 - auction state remains consistent.
@@ -238,6 +250,8 @@ Use any eligible wallet if finalization is permissionless, or the expected walle
 Expected result:
 
 - finalization transaction succeeds;
+- transaction hash is visible;
+- auction detail refreshes after confirmation;
 - auction status becomes finalized;
 - final price is fixed;
 - seller proceeds are credited;
@@ -251,6 +265,8 @@ Use the winner wallet.
 Expected result:
 
 - winner can claim the NFT;
+- transaction hash is visible;
+- auction detail refreshes after confirmation;
 - NFT is transferred from custody to the winner;
 - duplicate NFT claim is impossible;
 - non-winner wallets see a clear disabled reason.
@@ -262,6 +278,8 @@ Use the losing bidder wallet.
 Expected result:
 
 - losing bidder can claim refund;
+- transaction hash is visible;
+- wallet claim data refreshes after confirmation;
 - refund amount is transferred;
 - duplicate refund claim is impossible;
 - wallets with no refund see a clear disabled reason.
@@ -273,6 +291,8 @@ Use the losing bidder wallet.
 Expected result:
 
 - reward claim succeeds if reward entitlement is greater than zero;
+- transaction hash is visible;
+- wallet claim data refreshes after confirmation;
 - if no reward is available, the UI should make this clear;
 - duplicate reward claim is impossible.
 
@@ -285,6 +305,8 @@ Use the seller wallet.
 Expected result:
 
 - seller can withdraw proceeds;
+- transaction hash is visible;
+- wallet claim data refreshes after confirmation;
 - proceeds are transferred;
 - duplicate withdrawal is impossible;
 - non-seller wallets see a clear disabled reason.
@@ -296,6 +318,8 @@ Use the fee recipient wallet.
 Expected result:
 
 - fee recipient can withdraw protocol fees;
+- transaction hash is visible;
+- wallet claim data refreshes after confirmation;
 - fees were credited to the fee recipient snapshot of the auction;
 - duplicate withdrawal is impossible;
 - non-fee-recipient wallets see a clear disabled reason.
@@ -328,6 +352,7 @@ Expected result:
 | Token ID rejected | Empty, negative, or decimal token ID | Use a non-negative integer; `0` is valid |
 | Approval missing | NFTVault not approved | Use `Approve NFTVault` before creating the auction |
 | Create auction fails | Wrong approval, wrong owner, or invalid parameters | Re-check owner, approval and auction inputs |
+| Transaction rejected | User rejected the wallet request | Retry only if the displayed action and wallet prompt are expected |
 | Bid fails | Bid too low or wallet underfunded | Increase bid and check Base Sepolia ETH balance |
 | Bid button disabled after expiry | Auction reached end time | Refresh auction state and finalize instead of bidding |
 | Cannot finalize | Auction not expired | Wait until end time |
