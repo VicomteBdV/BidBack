@@ -25,6 +25,12 @@ const seller = testAddresses.seller;
 const otherOwner = testAddresses.secondBidder;
 const zeroAddress = "0x0000000000000000000000000000000000000000" as const;
 
+type MinimalConnectedAccount = {
+  address: `0x${string}`;
+  chainId: number;
+  isConnected: true;
+};
+
 function paramsTuple() {
   return {
     minAuctionDuration: 1n
@@ -32,11 +38,13 @@ function paramsTuple() {
 }
 
 function mockConnectedAccount() {
-  return {
+  const account: MinimalConnectedAccount = {
     address: seller,
     chainId: 31337,
     isConnected: true
-  } as unknown as ReturnType<typeof useAccount>;
+  };
+
+  return account as unknown as ReturnType<typeof useAccount>;
 }
 
 function setupWalletCreateForm({
