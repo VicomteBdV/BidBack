@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { AuctionDevActions } from "@/components/AuctionDevActions";
+import { AuctionEconomicsPanel } from "@/components/AuctionEconomicsPanel";
 import { AuctionHistoryPanel } from "@/components/AuctionHistoryPanel";
 import { AuctionLifecyclePanel } from "@/components/AuctionLifecyclePanel";
 import { AuctionRulesSnapshot } from "@/components/AuctionRulesSnapshot";
@@ -105,6 +106,8 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       </section>
 
       <AuctionLifecyclePanel auction={auction} />
+
+      <AuctionEconomicsPanel auction={auction} />
 
       <AuctionHistoryPanel auction={auction} />
 
