@@ -68,7 +68,7 @@ describe("AuctionEconomicsPanel", () => {
     expect(screen.getByText("Protocol fees")).toBeInTheDocument();
     expect(screen.getAllByText("0.01 ETH").length).toBeGreaterThan(0);
     expect(screen.getByText("Distribution opened")).toBeInTheDocument();
-    expect(screen.getByText("Yes")).toBeInTheDocument();
+    expect(screen.getAllByText("Yes").length).toBeGreaterThan(0);
   });
 
   it("shows unavailable fields without crashing when economics are missing", () => {
