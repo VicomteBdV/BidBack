@@ -18,6 +18,7 @@ This smoke test validates:
 - NFT approval to `NFTVault`;
 - wallet-signed auction creation;
 - auction lifecycle summary in list and detail views;
+- read-only economic transparency / settlement breakdown in auction detail views;
 - wallet-signed bidding;
 - wallet-signed action availability and disabled reasons;
 - wallet-signed transaction feedback, transaction hash display, and explorer links when configured;
@@ -125,6 +126,7 @@ Expected result:
 - the deployment console displays Base Sepolia;
 - auction list cards show a readable lifecycle status and next action;
 - auction detail shows the `Auction lifecycle` section before rules/economics/actions;
+- auction detail shows the `Economic transparency / Settlement breakdown` section;
 - the wallet can connect;
 - if the wallet is on the wrong chain, the UI proposes switching to Base Sepolia;
 - wallet-signed actions show clear disabled reasons before asking for a signature when an action is not currently possible;
@@ -207,7 +209,8 @@ Expected result:
 - NFT is transferred into custody;
 - auction status is open;
 - parameter snapshot is visible;
-- fee recipient snapshot is visible.
+- fee recipient snapshot is visible;
+- economic transparency shows the current highest bid and pending settlement values without promising rewards.
 
 ### Step 5 - Bidder #1 Places a Bid
 
@@ -262,7 +265,8 @@ Expected result:
 - final price is fixed;
 - seller proceeds are credited;
 - protocol fees are credited to the fee recipient snapshot;
-- refunds / rewards are available where applicable.
+- refunds / rewards are available where applicable;
+- economic transparency shows final price, seller proceeds, protocol fees, redistribution status, and visible refund/reward amounts when available.
 
 ### Step 9 - Winner Claims NFT
 
@@ -342,6 +346,7 @@ Expected result:
 | Losing bidder | Refund claimed |
 | Reward | Claimed if applicable |
 | Protocol fees | Withdrawn by fee recipient |
+| Settlement breakdown | Final price, proceeds, fees, visible refunds/rewards, and redistribution status are readable |
 | Double claims | Rejected |
 | Local-dev actions | Not used |
 | Server-side private keys | Not used |
@@ -365,6 +370,7 @@ Expected result:
 | Reward is zero | Premium net too low or conditions not met | Use a larger second bid in a future test |
 | Claim or withdrawal disabled | Current wallet is not eligible or no amount is available | Read the disabled reason shown by the UI, then switch wallet or continue to the next step |
 | Fee withdrawal fails | Wrong wallet | Use the fee recipient snapshot wallet |
+| Some economic fields show unavailable | RPC read failed or the MVP read model does not expose that field yet | Refresh and verify settlement-critical values directly on-chain if needed |
 | RPC errors | Public RPC rate limit or instability | Retry or use a more reliable RPC |
 | Local-dev actions visible | `ENABLE_LOCAL_DEV_ACTIONS` enabled | Set it to false or remove it outside Anvil |
 
@@ -381,6 +387,7 @@ Expected result:
 | First bid | Bidder #1 | | | |
 | Second bid | Bidder #2 | | | |
 | Finalize auction | | | | |
+| Review settlement breakdown | N/A | N/A | | |
 | Claim NFT | Winner | | | |
 | Claim refund | Losing bidder | | | |
 | Claim reward | Losing bidder | | | |
