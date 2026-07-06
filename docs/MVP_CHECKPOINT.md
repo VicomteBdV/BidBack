@@ -15,6 +15,7 @@ The current MVP supports:
 * Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
 * Auction browsing controls for search, status filtering, wallet-scoped filtering when a wallet is connected, sorting, and configurable loaded-list limits
 * Read-only auction detail page
+* Consolidated auction detail structure organized around overview, primary actions, lifecycle, economics, history, rules, and technical details
 * Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
 * Opportunistic NFT metadata previews for auctions, using ERC-721 `name`, `symbol`, `tokenURI`, HTTP metadata, and simple IPFS gateway conversion when available
 * Read-only wallet activity dashboard for the connected wallet, including created auctions, active bids, won/lost auctions, claimable NFTs, refunds, rewards, seller proceeds, protocol fees, and next action links
@@ -41,7 +42,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, auction browsing filters, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, wallet activity event discovery fallbacks, and read-only auction economic summaries
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, auction browsing filters, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, wallet activity event discovery fallbacks, read-only auction economic summaries, and shared UI primitives
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -74,14 +75,13 @@ It is used for:
 * Local deployment display
 * Auction list
 * Auction browsing controls
-* Auction detail
+* Auction detail overview
 * Auction lifecycle summary
 * NFT metadata previews
 * Wallet activity dashboard
 * Auction rules snapshot
 * Auction fee recipient snapshot
 * Economic transparency / settlement breakdown
-* Economic state
 * Technical details
 
 The auction list uses `AuctionCreated` events for discovery and falls back to a bounded newest-first `nextAuctionId` read if event scanning fails or returns no events for a deployment that already has auctions.
@@ -89,6 +89,8 @@ The auction list uses `AuctionCreated` events for discovery and falls back to a 
 The list applies client-side browsing controls to the currently loaded read-only auction window. Supported controls include text search across auction ID, NFT address, token ID, seller, highest bidder, winner-like fields, and NFT metadata; status filters for open, ready-to-finalize, finalized, claimable, settled, created-by-wallet, and involving-wallet views; and sorting by newest, oldest, ending soon, or highest bid / final price.
 
 The list and detail pages now show a read-only lifecycle status such as `Open`, `Ready to finalize`, `Finalized`, `Claimed`, or `Settled`, plus the next expected action when the available data is sufficient.
+
+The auction detail page groups information in a user-first order: auction overview with NFT preview, wallet-signed actions, local-dev actions, lifecycle summary, economic transparency, bid history, rules snapshot, and technical details.
 
 The auction detail page also shows a read-only economic transparency panel. It summarizes known, pending, not-applicable, and unavailable settlement values without sending transactions and without promising any reward outcome.
 
@@ -268,6 +270,7 @@ CI does not require:
 * The wallet activity dashboard uses wallet-scoped events, a bounded general event window, and a bounded fallback. It can miss historical activity outside the scanned window and is not a complete production history view.
 * Fee recipient activity is derived from the auction fee recipient snapshot and credit reads; without a persistent indexer or richer event schema, it is still bounded by the auctions discovered for the dashboard.
 * The economic transparency panel uses direct read-only values already exposed by the MVP detail model. It is not a complete production accounting report and does not replace a future event indexer.
+* The consolidated UI improves hierarchy but is still an MVP interface, not a final premium marketplace design.
 * No external security audit has been completed yet.
 * No block explorer source verification workflow has been automated yet.
 * No production monitoring or alerting exists yet.
