@@ -225,7 +225,7 @@ export function WalletActivityDashboard() {
             </EmptyState>
           ) : (
             <EmptyState className="mt-5">
-              No activity found for this wallet in the currently scanned auctions.
+              No activity found for this wallet in the currently scanned auctions. Create an auction with a test ERC-721 NFT or place a bid, then refresh this panel.
             </EmptyState>
           )}
 
