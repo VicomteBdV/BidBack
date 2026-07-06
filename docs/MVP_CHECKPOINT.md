@@ -14,6 +14,7 @@ The current MVP supports:
 * Read-only deployment and auction views through Next.js server routes
 * Event-based auction list discovery through `AuctionCreated` logs with a bounded `nextAuctionId` fallback
 * Auction browsing controls for search, status filtering, wallet-scoped filtering when a wallet is connected, sorting, and configurable loaded-list limits
+* MVP onboarding panel explaining BidBack, the auction flow, and controlled testnet constraints
 * Read-only auction detail page
 * Consolidated auction detail structure organized around overview, primary actions, lifecycle, economics, history, rules, and technical details
 * Read-only auction lifecycle summary with current phase, next action, timing, winner, claimant, and visible claimable / withdrawable items
@@ -42,7 +43,7 @@ The current MVP supports:
 * Wallet-signed claims / withdrawals panel
 * Wallet-signed lifecycle action guards for expired auctions, finalized auctions, claimable funds, claimant wallets, seller proceeds, and auction fee recipient withdrawals
 * Wallet-signed transaction feedback for signature prompts, pending transactions, confirmations, rejected requests, failures, transaction hashes, and explorer links when configured
-* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, auction browsing filters, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, wallet activity event discovery fallbacks, read-only auction economic summaries, and shared UI primitives
+* Frontend Vitest tests for critical guards, UI separation, read-only auction discovery fallback behavior, auction browsing filters, NFT metadata fallbacks, wallet-signed lifecycle action-state rules, wallet transaction feedback helpers, auction lifecycle UI rules, wallet activity summaries, wallet activity event discovery fallbacks, read-only auction economic summaries, shared UI primitives, and MVP onboarding copy
 * Controlled public testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Testnet deployment JSON sync through `npm run testnet:sync -- <chainId>`
 * Deployment JSON validation through `npm run validate:deployment -- <chainId>`
@@ -57,6 +58,8 @@ Auction economic and operational parameters are copied into an auction-specific 
 The protocol fee recipient is also copied into an auction-specific snapshot at creation time. `feeRecipient()` remains the current global configuration for future auctions, while existing auctions continue to settle protocol fees to the fee recipient captured during `createAuction`.
 
 The auction detail page now exposes a read-only `Economic transparency / Settlement breakdown` panel. It is a verification aid for current highest bid, final price, seller proceeds, protocol fees, visible refunds, visible rewards, redistribution status, fee recipient snapshot, and key auction parameter snapshot values. It is not a yield view and not a production accounting indexer. Details are documented in `docs/AUCTION_ECONOMIC_TRANSPARENCY.md`.
+
+The homepage now includes a short MVP onboarding layer. It explains the ERC-721 auction flow, separates refunds from rewards, states that rewards are conditional and can be zero, and reminds testers that the current app is a controlled MVP/testnet interface rather than a production product.
 
 No public testnet deployment has been executed yet. The repository is prepared for a controlled public testnet deployment, but the deployment must still be reviewed, broadcast, verified, and smoke-tested manually.
 
@@ -75,6 +78,7 @@ It is used for:
 * Local deployment display
 * Auction list
 * Auction browsing controls
+* MVP onboarding and testnet disclaimers
 * Auction detail overview
 * Auction lifecycle summary
 * NFT metadata previews
@@ -271,6 +275,7 @@ CI does not require:
 * Fee recipient activity is derived from the auction fee recipient snapshot and credit reads; without a persistent indexer or richer event schema, it is still bounded by the auctions discovered for the dashboard.
 * The economic transparency panel uses direct read-only values already exposed by the MVP detail model. It is not a complete production accounting report and does not replace a future event indexer.
 * The consolidated UI improves hierarchy but is still an MVP interface, not a final premium marketplace design.
+* The onboarding layer improves first-run comprehension but is not a full marketing site, legal disclosure pack, or production user education flow.
 * No external security audit has been completed yet.
 * No block explorer source verification workflow has been automated yet.
 * No production monitoring or alerting exists yet.
