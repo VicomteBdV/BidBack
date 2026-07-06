@@ -153,7 +153,9 @@ export function AuctionHistoryPanel({ auction }: { auction: SerializedAuction })
           <div className="mt-3 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">Loading bid history...</div>
         ) : null}
         {history && history.bids.length === 0 ? (
-          <div className="mt-3 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">No bids have been recorded for this auction yet.</div>
+          <div className="mt-3 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
+            No bids have been recorded for this auction yet. Bid history will appear after the first valid bid.
+          </div>
         ) : null}
         {history && history.bids.length > 0 ? (
           <div className="mt-3 overflow-x-auto rounded-md border border-slate-800">
