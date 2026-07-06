@@ -49,6 +49,67 @@ export type AuctionParamsSnapshot = {
   iiCap: string;
 };
 
+export type AuctionHistorySource = "bid-records-and-events" | "bid-records-only" | "events-only" | "unavailable";
+
+export type AuctionHistoryEventKind =
+  | "auction-created"
+  | "bid-placed"
+  | "auction-extended"
+  | "auction-ended"
+  | "auction-finalized"
+  | "nft-claimed"
+  | "refund-claimed"
+  | "distribution-opened"
+  | "reward-claimed";
+
+export type AuctionHistoryEvent = {
+  id: string;
+  kind: AuctionHistoryEventKind;
+  label: string;
+  actor?: `0x${string}`;
+  amount?: string;
+  transactionHash?: `0x${string}`;
+  blockNumber?: string;
+  logIndex?: number;
+  timestamp?: string;
+  details?: string;
+};
+
+export type AuctionBidHistoryEntry = {
+  index: string;
+  bidder: `0x${string}`;
+  amount: string;
+  timestamp: string;
+  transactionHash?: `0x${string}`;
+  blockNumber?: string;
+  logIndex?: number;
+};
+
+export type AuctionTransparencySummary = {
+  seller: `0x${string}`;
+  highestBidder: `0x${string}`;
+  highestBid: string;
+  finalPrice: string;
+  sellerProceeds: string;
+  protocolFees: string;
+  distributionReserve: string;
+  totalAssignedRewards: string;
+  totalClaimedRewards: string;
+  visibleRefundableAmount: string;
+  visibleRewardEntitlement: string;
+  nftClaimed: boolean;
+};
+
+export type AuctionHistory = {
+  auctionId: string;
+  source: AuctionHistorySource;
+  partial: boolean;
+  warnings: string[];
+  bids: AuctionBidHistoryEntry[];
+  events: AuctionHistoryEvent[];
+  transparency: AuctionTransparencySummary;
+};
+
 export type SerializedAuction = {
   auctionId: string;
   seller: `0x${string}`;
@@ -73,6 +134,8 @@ export type SerializedAuction = {
   auctionFeeRecipient?: `0x${string}`;
   auctionFeeRecipientError?: string;
   economics?: AuctionEconomics;
+  history?: AuctionHistory;
+  historyError?: string;
 };
 
 export type BidderEconomics = {
