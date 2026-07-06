@@ -210,3 +210,10 @@ export type AuctionDetailApiResponse = {
   auctionHouse: `0x${string}`;
   auction: SerializedAuction;
 };
+
+export type AuctionHistoryApiResponse = {
+  chainId: number;
+  auctionHouse: `0x${string}`;
+  auctionId: string;
+  history: AuctionHistory;
+};
