@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { NftPreview } from "@/components/NftPreview";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
 import type { AuctionsApiResponse } from "@/lib/auctionTypes";
 import {
@@ -261,15 +262,15 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data && data.auctions.length === 0 ? (
-        <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-300">
+        <EmptyState className="mt-5">
           No auctions found yet. Create an auction from the UI or deploy a demo auction locally, then refresh this list.
-        </div>
+        </EmptyState>
       ) : null}
 
       {!isLoading && data && data.auctions.length > 0 && filteredAuctions.length === 0 ? (
-        <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-300">
+        <EmptyState className="mt-5">
           No auctions match the current search, status, and sort controls. Clear filters or increase the loaded limit.
-        </div>
+        </EmptyState>
       ) : null}
 
       {!isLoading && data && filteredAuctions.length > 0 ? (
