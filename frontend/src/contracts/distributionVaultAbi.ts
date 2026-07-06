@@ -1,5 +1,22 @@
 export const distributionVaultAbi = [
   {
+    type: "event",
+    name: "DistributionOpened",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "totalAssigned", type: "uint256", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "DistributionClaimed",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "claimant", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false }
+    ]
+  },
+  {
     type: "function",
     name: "distributions",
     stateMutability: "view",
