@@ -43,6 +43,23 @@ function mockAuctionDetailFetch() {
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
 
+      if (url.includes("/api/auctions/1/history")) {
+        return new Response(
+          JSON.stringify({
+            chainId: auctionDetailFixture.chainId,
+            auctionHouse: auctionDetailFixture.auctionHouse,
+            auctionId: auctionDetailFixture.auction.auctionId,
+            history: auctionDetailFixture.auction.history
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
       if (url.includes("/api/auctions/1")) {
         return new Response(JSON.stringify(auctionDetailFixture), {
           status: 200,
@@ -71,6 +88,7 @@ describe("AuctionDetail", () => {
     expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "NFT preview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Auction lifecycle" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Economic state" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local dev actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wallet-signed actions" })).toBeInTheDocument();
