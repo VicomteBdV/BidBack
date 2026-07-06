@@ -263,7 +263,7 @@ export function AuctionList() {
 
       {!isLoading && data && data.auctions.length === 0 ? (
         <EmptyState className="mt-5">
-          No auctions found yet. Create an auction from the UI or deploy a demo auction locally, then refresh this list.
+          No auctions found yet. Create an auction with a test ERC-721 NFT, or run the local demo deployment and refresh this list.
         </EmptyState>
       ) : null}
 
