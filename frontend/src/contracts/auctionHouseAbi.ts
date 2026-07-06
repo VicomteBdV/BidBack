@@ -22,6 +22,20 @@ export const auctionHouseAbi = [
   },
   {
     type: "event",
+    name: "AuctionExtended",
+    inputs: [
+      { name: "auctionId", type: "uint256", indexed: true },
+      { name: "newEndTime", type: "uint64", indexed: false },
+      { name: "extensionsUsed", type: "uint8", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "AuctionEnded",
+    inputs: [{ name: "auctionId", type: "uint256", indexed: true }]
+  },
+  {
+    type: "event",
     name: "AuctionFinalized",
     inputs: [
       { name: "auctionId", type: "uint256", indexed: true },
