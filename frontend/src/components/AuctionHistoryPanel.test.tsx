@@ -58,7 +58,11 @@ describe("AuctionHistoryPanel", () => {
 
     render(<AuctionHistoryPanel auction={{ ...auctionDetailFixture.auction, history: undefined }} />);
 
-    expect(await screen.findByText("No bids have been recorded for this auction yet.")).toBeInTheDocument();
+    expect(
+  await screen.findByText(
+    "No bids have been recorded for this auction yet. Bid history will appear after the first valid bid.",
+  ),
+).toBeInTheDocument();
     expect(screen.getByText(/No matching logs were returned by the RPC/)).toBeInTheDocument();
   });
 
