@@ -88,6 +88,7 @@ describe("AuctionDetail", () => {
     expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "NFT preview" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Auction lifecycle" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Economic transparency / Settlement breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Economic state" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local dev actions" })).toBeInTheDocument();
