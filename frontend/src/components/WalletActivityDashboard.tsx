@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { formatEth, shortenAddress } from "@/lib/format";
 import type { WalletActivityApiResponse, WalletActivityDiscoveryStrategy, WalletActivitySummary } from "@/lib/walletActivity";
@@ -124,7 +125,7 @@ export function WalletActivityDashboard() {
             <ModeBadge variant="read-only" />
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Wallet-specific read-only summary of auctions, claimable amounts, withdrawals, and next actions.
+            Wallet-specific read-only summary of immediate actions first, then auctions and historical context.
           </p>
         </div>
 
@@ -139,9 +140,9 @@ export function WalletActivityDashboard() {
       </div>
 
       {!isConnected ? (
-        <div className="mt-5 rounded-md border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-300">
+        <EmptyState className="mt-5">
           Connect a wallet to see auctions and actions related to your address. The read-only deployment and auction list remain available without a wallet.
-        </div>
+        </EmptyState>
       ) : null}
 
       {isConnected ? (
@@ -197,6 +198,37 @@ export function WalletActivityDashboard() {
 
       {data ? (
         <>
+          {data.activity.nextActions.length > 0 ? (
+            <div className="mt-5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-4 py-4">
+              <h3 className="text-sm font-semibold text-white">Actions available now</h3>
+              <div className="mt-3 grid gap-3">
+                {data.activity.nextActions.map((action) => (
+                  <Link
+                    key={`${action.kind}-${action.auctionId}`}
+                    href={action.href}
+                    className="rounded-md border border-slate-800 bg-slate-900 px-4 py-3 transition hover:border-cyan-500/60"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-semibold text-cyan-100">{action.label}</div>
+                        <div className="mt-1 text-sm leading-6 text-slate-400">{action.description}</div>
+                      </div>
+                      {action.amount ? <div className="font-mono text-sm text-slate-200">{formatEth(action.amount)}</div> : null}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : data.activity.hasActivity ? (
+            <EmptyState className="mt-5" title="No immediate action">
+              Activity found, but no immediate wallet action is currently available.
+            </EmptyState>
+          ) : (
+            <EmptyState className="mt-5">
+              No activity found for this wallet in the currently scanned auctions.
+            </EmptyState>
+          )}
+
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
             {cards.map((card) => (
               <div key={card.label} className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
@@ -217,37 +249,6 @@ export function WalletActivityDashboard() {
               </ul>
             </div>
           ) : null}
-
-          {data.activity.nextActions.length > 0 ? (
-            <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-4">
-              <h3 className="text-sm font-semibold text-white">Next actions</h3>
-              <div className="mt-3 grid gap-3">
-                {data.activity.nextActions.map((action) => (
-                  <Link
-                    key={`${action.kind}-${action.auctionId}`}
-                    href={action.href}
-                    className="rounded-md border border-slate-800 bg-slate-900 px-4 py-3 transition hover:border-cyan-500/60"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="font-semibold text-cyan-100">{action.label}</div>
-                        <div className="mt-1 text-sm leading-6 text-slate-400">{action.description}</div>
-                      </div>
-                      {action.amount ? <div className="font-mono text-sm text-slate-200">{formatEth(action.amount)}</div> : null}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : data.activity.hasActivity ? (
-            <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
-              Activity found, but no immediate wallet action is currently available.
-            </div>
-          ) : (
-            <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
-              No activity found for this wallet in the currently scanned auctions.
-            </div>
-          )}
         </>
       ) : null}
     </section>
