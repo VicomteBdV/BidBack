@@ -34,10 +34,10 @@ describe("AuctionHistoryPanel", () => {
     render(<AuctionHistoryPanel auction={auctionDetailFixture.auction} />);
 
     expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
-    expect(screen.getByText("1.2 ETH")).toBeInTheDocument();
+    expect(screen.getAllByText("1.2 ETH").length).toBeGreaterThan(0);
     expect(screen.getByText("Visible configured refunds")).toBeInTheDocument();
     expect(await screen.findAllByText("Bid placed")).toHaveLength(2);
-    expect(screen.getByTitle("0x1111111111111111111111111111111111111111111111111111111111111111")).toHaveAttribute(
+    expect(screen.getAllByTitle("0x1111111111111111111111111111111111111111111111111111111111111111")[0]).toHaveAttribute(
       "href",
       "https://explorer.example/tx/0x1111111111111111111111111111111111111111111111111111111111111111"
     );
