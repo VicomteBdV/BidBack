@@ -5,6 +5,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { buildAuctionEconomicSummary } from "@/lib/auctionEconomics";
 import { anvilChainId } from "@/lib/chains";
 import type {
   AuctionDetailApiResponse,
@@ -868,7 +869,17 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     auction.auctionFeeRecipientError = `Unable to read auction fee recipient snapshot: ${errorMessage(error)}`;
   }
 
-  auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
+  const economicWarnings: string[] = [];
+
+  try {
+    auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
+  } catch (error) {
+    economicWarnings.push(`Unable to read detailed auction economics: ${errorMessage(error)}`);
+  }
+
+  auction.economicSummary = buildAuctionEconomicSummary(auction, {
+    extraWarnings: economicWarnings
+  });
 
   return {
     chainId: deployment.chainId,
