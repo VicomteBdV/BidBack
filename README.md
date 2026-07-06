@@ -124,6 +124,12 @@ Future post-deployment verification steps are documented in:
 docs/POST_DEPLOYMENT_VERIFICATION.md
 ```
 
+Auction economic transparency and settlement breakdown limits are documented in:
+
+```text
+docs/AUCTION_ECONOMIC_TRANSPARENCY.md
+```
+
 Open product and technical architecture decisions are tracked in:
 
 ```text
