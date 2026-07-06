@@ -13,6 +13,7 @@ This is not a production launch checklist. The deployment remains a controlled p
 This smoke test validates:
 
 - Base Sepolia deployment loading;
+- MVP onboarding and testnet disclaimers are visible before wallet actions;
 - wallet connection on the correct chain;
 - external ERC-721 ownership detection;
 - NFT approval to `NFTVault`;
@@ -124,6 +125,8 @@ Expected result:
 
 - the frontend loads the `84532.json` deployment file;
 - the deployment console displays Base Sepolia;
+- the homepage shows the MVP onboarding panel and concise testnet disclaimers;
+- the onboarding copy states that refunds are separate from rewards and rewards are not guaranteed;
 - auction list cards show a readable lifecycle status and next action;
 - auction detail shows the `Auction lifecycle` section before rules/economics/actions;
 - auction detail shows the `Economic transparency / Settlement breakdown` section;
@@ -404,6 +407,7 @@ Proceed only if:
 
 - Base Sepolia deployment verification passes;
 - frontend loads `84532.json`;
+- onboarding and disclaimers are visible;
 - wallet network switching works;
 - seller owns a real ERC-721 testnet NFT;
 - seller and bidders are funded;
