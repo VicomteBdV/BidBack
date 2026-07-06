@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuctionList } from "@/components/AuctionList";
+import { BidBackIntro } from "@/components/BidBackIntro";
 import { ModuleAddresses } from "@/components/ModuleAddresses";
 import { WalletActivityDashboard } from "@/components/WalletActivityDashboard";
 import { WalletButton } from "@/components/WalletButton";
@@ -14,10 +15,9 @@ export default function Home() {
         <header className="flex flex-col gap-5 border-b border-slate-800 pb-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">BidBack MVP</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Deployment console</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-white">Auction demo console</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Anvil 31337 remains the default local environment. Future deployments can be loaded from
-              frontend/public/deployments/&lt;chainId&gt;.json.
+              Test the full BidBack auction lifecycle with read-only auction views, wallet-signed actions, and clear settlement checks.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:items-start">
@@ -30,6 +30,8 @@ export default function Home() {
             <WalletButton />
           </div>
         </header>
+
+        <BidBackIntro />
 
         <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
@@ -55,10 +57,11 @@ export default function Home() {
           </div>
 
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-            <h2 className="text-lg font-semibold text-white">Frontend status</h2>
+            <h2 className="text-lg font-semibold text-white">Demo readiness</h2>
             <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
               <p>The deployment view remains available even when MetaMask cannot read the Codespaces Anvil RPC.</p>
               <p>Local-dev actions stay restricted to Anvil 31337. Wallet-signed actions target the configured chain.</p>
+              <p>Outside local Anvil, keep ENABLE_LOCAL_DEV_ACTIONS disabled and use only testnet assets.</p>
             </div>
           </div>
         </section>
