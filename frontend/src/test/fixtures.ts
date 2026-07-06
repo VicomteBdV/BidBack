@@ -64,6 +64,82 @@ export const auctionDetailFixture = {
       externalUrl: "https://example.com/token/1",
       status: "loaded"
     },
+    history: {
+      auctionId: "1",
+      source: "bid-records-and-events",
+      partial: false,
+      warnings: [],
+      bids: [
+        {
+          index: "0",
+          bidder: testAddresses.primaryBidder,
+          amount: "1000000000000000000",
+          timestamp: "1780000100",
+          transactionHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
+          blockNumber: "101",
+          logIndex: 0
+        },
+        {
+          index: "1",
+          bidder: testAddresses.secondBidder,
+          amount: "1200000000000000000",
+          timestamp: "1780000200",
+          transactionHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
+          blockNumber: "102",
+          logIndex: 0
+        }
+      ],
+      events: [
+        {
+          id: "auction-created:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:100:0:0",
+          kind: "auction-created",
+          label: "Auction created",
+          actor: testAddresses.seller,
+          amount: "1000000000000000000",
+          transactionHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          blockNumber: "100",
+          logIndex: 0,
+          timestamp: "1780000000",
+          details: "Token 1 was listed."
+        },
+        {
+          id: "bid-placed:0x1111111111111111111111111111111111111111111111111111111111111111:101:0:1",
+          kind: "bid-placed",
+          label: "Bid placed",
+          actor: testAddresses.primaryBidder,
+          amount: "1000000000000000000",
+          transactionHash: "0x1111111111111111111111111111111111111111111111111111111111111111",
+          blockNumber: "101",
+          logIndex: 0,
+          timestamp: "1780000100"
+        },
+        {
+          id: "bid-placed:0x2222222222222222222222222222222222222222222222222222222222222222:102:0:2",
+          kind: "bid-placed",
+          label: "Bid placed",
+          actor: testAddresses.secondBidder,
+          amount: "1200000000000000000",
+          transactionHash: "0x2222222222222222222222222222222222222222222222222222222222222222",
+          blockNumber: "102",
+          logIndex: 0,
+          timestamp: "1780000200"
+        }
+      ],
+      transparency: {
+        seller: testAddresses.seller,
+        highestBidder: testAddresses.secondBidder,
+        highestBid: "1200000000000000000",
+        finalPrice: "0",
+        sellerProceeds: "0",
+        protocolFees: "0",
+        distributionReserve: "0",
+        totalAssignedRewards: "0",
+        totalClaimedRewards: "0",
+        visibleRefundableAmount: "1000000000000000000",
+        visibleRewardEntitlement: "10000000000000000",
+        nftClaimed: false
+      }
+    },
     economics: {
       primaryBidder: {
         role: "primary",
