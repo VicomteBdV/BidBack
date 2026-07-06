@@ -49,6 +49,59 @@ export type AuctionParamsSnapshot = {
   iiCap: string;
 };
 
+export type AuctionEconomicValueStatus = "known" | "pending" | "not-applicable" | "unavailable";
+
+export type AuctionEconomicAmount = {
+  status: AuctionEconomicValueStatus;
+  value?: string;
+  note?: string;
+};
+
+export type AuctionEconomicAddress = {
+  status: AuctionEconomicValueStatus;
+  value?: `0x${string}`;
+  note?: string;
+};
+
+export type AuctionEconomicParameterSnapshot = {
+  bidbackFeeBps: string;
+  redistributionBps: string;
+  minPremiumNet: string;
+  minParticipants: string;
+  perUserRewardCapBps: string;
+  minBidIncrementBps: string;
+};
+
+export type AuctionSettlementBreakdown = {
+  isFinalized: boolean;
+  isDistributionAvailable: boolean;
+  currentHighestBid: AuctionEconomicAmount;
+  finalPrice: AuctionEconomicAmount;
+  sellerProceeds: AuctionEconomicAmount;
+  protocolFees: AuctionEconomicAmount;
+  sellerCredit: AuctionEconomicAmount;
+  protocolFeeCredit: AuctionEconomicAmount;
+  refundsAvailable: AuctionEconomicAmount;
+  rewardsAvailable: AuctionEconomicAmount;
+  redistributionAvailable: AuctionEconomicAmount;
+  distributionReserve: AuctionEconomicAmount;
+  totalAssignedRewards: AuctionEconomicAmount;
+  totalClaimedRewards: AuctionEconomicAmount;
+  feeRecipient: AuctionEconomicAddress;
+  seller: AuctionEconomicAddress;
+  winner: AuctionEconomicAddress;
+  nftClaimant: AuctionEconomicAddress;
+};
+
+export type AuctionEconomicsSummary = {
+  auctionId: string;
+  settlement: AuctionSettlementBreakdown;
+  parameters: AuctionEconomicParameterSnapshot | null;
+  warnings: string[];
+  unavailableFields: string[];
+  notes: string[];
+};
+
 export type AuctionHistorySource = "bid-records-and-events" | "bid-records-only" | "events-only" | "unavailable";
 
 export type AuctionHistoryEventKind =
@@ -134,6 +187,7 @@ export type SerializedAuction = {
   auctionFeeRecipient?: `0x${string}`;
   auctionFeeRecipientError?: string;
   economics?: AuctionEconomics;
+  economicSummary?: AuctionEconomicsSummary;
   history?: AuctionHistory;
   historyError?: string;
 };
