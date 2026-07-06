@@ -40,6 +40,7 @@ Current baseline:
 * opportunistic NFT metadata previews from ERC-721 `name`, `symbol`, `tokenURI`, HTTP metadata JSON, and simple IPFS gateway conversion;
 * read-only auction parameter snapshot display;
 * per-auction fee recipient snapshot display;
+* read-only auction economic transparency / settlement breakdown display;
 * guarded local-dev actions under `/api/dev/*` for Codespaces testing;
 * wallet-signed create, bid, claim, and withdrawal panels;
 * on-chain NFT custody through `NFTVault`;
@@ -464,6 +465,7 @@ Current MVP position:
 * if wallet-scoped logs do not identify any auction, the dashboard can scan a bounded general `AuctionCreated` event window and then filter the resulting auctions through direct on-chain reads for wallet balances, seller state, fee recipient snapshots, and next actions;
 * if event reads fail, the dashboard falls back to a bounded newest-first `nextAuctionId` window;
 * the dashboard exposes its discovery strategy as `event-scoped`, `general-event-window`, `bounded-fallback`, or `unavailable`;
+* the auction detail read model builds a JSON-safe economic summary for current highest bid, final price, proceeds, fees, visible refunds, visible rewards, redistribution status, and snapshot values when available;
 * bounded dashboard results display a UI warning so users do not confuse the MVP read model with complete production history;
 * no persistent database, hosted indexer, or historical cache exists yet.
 
@@ -484,6 +486,7 @@ Known limits of the MVP event read model:
 * `recently updated` sorting is not exposed because the current read model does not provide a reliable last-updated timestamp per auction;
 * fee recipient activity is inferred from discovered auctions, fee recipient snapshots, and credit reads, not from a dedicated per-auction fee withdrawal index;
 * seller proceeds and protocol fee withdrawals still need a production indexer or richer event schema for complete historical reporting;
+* the economic transparency panel is a direct-read MVP verification aid, not full historical accounting;
 * the frontend should continue to verify settlement-critical values through direct on-chain reads.
 
 Open questions:
@@ -560,6 +563,8 @@ The product should make these elements inspectable:
 * fee recipient used for a given auction;
 * module addresses used for a given auction.
 
+The MVP now exposes a first read-only economic transparency panel for several of these values when the current getter coverage and read model can retrieve them. This panel is useful for local and controlled testnet verification, but it does not replace production reporting, a scalable indexer, or direct settlement-critical on-chain reads.
+
 Areas that require additional production work:
 
 * explorer verification;
@@ -613,6 +618,7 @@ It already provides:
 * fee recipient snapshotting per auction;
 * read-only display of auction parameter snapshots;
 * read-only display of auction fee recipient snapshots;
+* read-only economic transparency / settlement breakdown display;
 * read-only NFT metadata previews that do not affect settlement;
 * client-side auction browsing controls over the currently loaded read-only window;
 * event-based auction list discovery with bounded fallback;
