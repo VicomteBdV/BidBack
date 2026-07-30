@@ -33,4 +33,17 @@ describe("shared UI components", () => {
     expect(screen.getByText("Nothing to do")).toBeInTheDocument();
     expect(screen.getByText("No immediate wallet action is currently available.")).toBeInTheDocument();
   });
+
+  it("keeps shared actions and values in native accessible elements", () => {
+    render(
+      <SectionCard title="Keyboard actions" actions={<a href="/auctions">View auctions</a>}>
+        <InfoRow label="Contract" value="0x1234567890" mono />
+      </SectionCard>
+    );
+
+    const link = screen.getByRole("link", { name: "View auctions" });
+    link.focus();
+    expect(link).toHaveFocus();
+    expect(screen.getByText("0x1234567890")).toBeInTheDocument();
+  });
 });

@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { NftPreview } from "@/components/NftPreview";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
 import type { AuctionsApiResponse } from "@/lib/auctionTypes";
 import {
@@ -104,7 +105,7 @@ export function AuctionList() {
   const metadataUnavailableCount = data?.auctions.filter((auction) => auction.nftMetadata?.status !== "loaded").length ?? 0;
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">Auctions</h2>
@@ -118,20 +119,35 @@ export function AuctionList() {
           type="button"
           onClick={loadAuctions}
           disabled={isLoading}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isLoading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">Loading auctions...</div>
+        <StateNotice tone="loading" title="Loading auctions" className="mt-5">
+          Reading the currently configured on-chain discovery window.
+        </StateNotice>
       ) : null}
 
       {!isLoading && error ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice
+          tone="error"
+          title="Auctions could not be loaded"
+          className="mt-5"
+          action={
+            <button
+              type="button"
+              onClick={loadAuctions}
+              className="inline-flex min-h-9 items-center justify-center rounded-md border border-rose-200/50 px-3 text-xs font-semibold text-white transition hover:border-white"
+            >
+              Try again
+            </button>
+          }
+        >
           {error}
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isLoading && data ? (
@@ -142,7 +158,7 @@ export function AuctionList() {
           </div>
           <div className="rounded-md bg-slate-950 px-4 py-3">
             <div className="text-slate-500">AuctionHouse</div>
-            <div className="mt-1 font-mono text-cyan-200">{shortenAddress(data.auctionHouse)}</div>
+            <div className="mt-1 font-mono text-cyan-200" title={data.auctionHouse}>{shortenAddress(data.auctionHouse)}</div>
           </div>
           <div className="rounded-md bg-slate-950 px-4 py-3">
             <div className="text-slate-500">Loaded / shown auctions</div>
@@ -165,6 +181,7 @@ export function AuctionList() {
             <label className="grid gap-2 text-sm">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
               <input
+                type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Auction ID, NFT, token, seller, bidder, metadata..."
@@ -244,21 +261,21 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data?.discovery.warning ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Auction discovery is limited" className="mt-5">
           {data.discovery.warning}
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isLoading && data && data.count > 0 && data.count >= data.discovery.limit ? (
-        <div className="mt-5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm leading-6 text-cyan-100">
+        <StateNotice tone="info" title="Bounded auction window" className="mt-5">
           This list is bounded to {data.discovery.limit} loaded auctions. Increase the limit for a wider MVP window; production browsing will need an indexer.
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isLoading && data && metadataUnavailableCount > 0 ? (
-        <div className="mt-5 rounded-md border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
+        <StateNotice tone="info" title="Some NFT metadata is unavailable" className="mt-5">
           {metadataUnavailableCount} loaded auction{metadataUnavailableCount === 1 ? " has" : "s have"} missing or unavailable NFT metadata. The auction remains available.
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isLoading && data && data.auctions.length === 0 ? (
@@ -282,7 +299,7 @@ export function AuctionList() {
               <Link
                 key={auction.auctionId}
                 href={`/auctions/${auction.auctionId}`}
-                className="block rounded-lg border border-slate-800 bg-slate-950 p-4 transition hover:border-cyan-500/60"
+                className="block min-w-0 rounded-lg border border-slate-800 bg-slate-950 p-4 transition hover:border-cyan-500/60"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -316,7 +333,7 @@ export function AuctionList() {
                 <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-5">
                   <div>
                     <div className="text-slate-500">Seller</div>
-                    <div className="font-mono">{shortenAddress(auction.seller)}</div>
+                    <div className="break-all font-mono" title={auction.seller}>{shortenAddress(auction.seller)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500">Start price</div>
@@ -328,7 +345,7 @@ export function AuctionList() {
                   </div>
                   <div>
                     <div className="text-slate-500">Highest bidder</div>
-                    <div className="font-mono">{formatAddressOrNone(auction.highestBidder)}</div>
+                    <div className="break-all font-mono" title={auction.highestBidder}>{formatAddressOrNone(auction.highestBidder)}</div>
                   </div>
                   <div>
                     <div className="text-slate-500">Time</div>

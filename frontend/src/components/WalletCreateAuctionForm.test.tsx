@@ -37,10 +37,10 @@ function paramsTuple() {
   };
 }
 
-function mockConnectedAccount() {
+function mockConnectedAccount(chainId = 31337) {
   const account: MinimalConnectedAccount = {
     address: seller,
-    chainId: 31337,
+    chainId,
     isConnected: true
   };
 
@@ -50,11 +50,13 @@ function mockConnectedAccount() {
 function setupWalletCreateForm({
   owner = seller,
   approvedAddress = zeroAddress,
-  approvedForAll = false
+  approvedForAll = false,
+  chainId = 31337
 }: {
   owner?: `0x${string}`;
   approvedAddress?: `0x${string}`;
   approvedForAll?: boolean;
+  chainId?: number;
 } = {}) {
   let currentApprovedAddress = approvedAddress;
   let currentApprovedForAll = approvedForAll;
@@ -93,7 +95,7 @@ function setupWalletCreateForm({
     writeContract
   } as unknown as ReturnType<typeof createWalletClient>);
 
-  vi.mocked(useAccount).mockReturnValue(mockConnectedAccount());
+  vi.mocked(useAccount).mockReturnValue(mockConnectedAccount(chainId));
 
   vi.stubGlobal(
     "fetch",
@@ -132,6 +134,30 @@ async function waitForContext() {
 }
 
 describe("WalletCreateAuctionForm", () => {
+  it("associates a field validation error with its labelled input", async () => {
+    setupWalletCreateForm();
+    await waitForContext();
+
+    const nftContract = screen.getByLabelText("NFT contract");
+    fireEvent.change(nftContract, { target: { value: "not-an-address" } });
+
+    expect(nftContract).toHaveAttribute("aria-invalid", "true");
+    const errorId = nftContract.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById(errorId!)).toHaveTextContent("Invalid NFT contract address");
+  });
+
+  it("explains the expected network while preserving disabled wallet actions", async () => {
+    setupWalletCreateForm({ chainId: 1 });
+
+    expect((await screen.findAllByText(/not on the target chain/)).length).toBeGreaterThan(0);
+    const checkButton = screen.getByRole("button", { name: "Check ownership and approval" });
+    expect(checkButton).toBeDisabled();
+    const reasonId = checkButton.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId!)).toHaveTextContent("not on the target chain");
+  });
+
   it("checks ownership and approval for token ID 0", async () => {
     const { readContract } = setupWalletCreateForm({
       owner: seller,

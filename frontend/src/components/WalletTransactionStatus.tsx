@@ -41,10 +41,14 @@ export function WalletTransactionStatus({
 
   const explorerTxUrl = buildExplorerTxUrl(status.txHash, explorerUrl);
   const shortHash = status.txHash ? shortenTxHash(status.txHash) : null;
+  const isError = status.phase === "failed" || status.phase === "rejected";
 
   return (
     <div
       data-testid="wallet-transaction-status"
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
+      aria-atomic="true"
       className={`rounded-md border px-4 py-3 text-sm leading-6 ${toneClasses(status.phase)}`}
     >
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -60,11 +64,13 @@ export function WalletTransactionStatus({
               target="_blank"
               rel="noreferrer"
               className="break-all font-mono text-xs underline underline-offset-4"
+              title={status.txHash ?? undefined}
+              aria-label={`Open ${title.toLowerCase()} transaction ${shortHash} in the block explorer (opens in a new tab)`}
             >
               {shortHash}
             </a>
           ) : (
-            <span className="break-all font-mono text-xs">{shortHash}</span>
+            <span className="break-all font-mono text-xs" title={status.txHash ?? undefined}>{shortHash}</span>
           )
         ) : null}
       </div>

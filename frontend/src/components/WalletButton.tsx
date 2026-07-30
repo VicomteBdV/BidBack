@@ -21,6 +21,11 @@ export function WalletButton() {
   const connector = connectors[0];
   const isWrongNetwork = isConnected && chainId !== targetChainId;
   const switchButtonLabel = targetChainName ? `Switch to ${targetChainName}` : "Switch to target chain";
+  const connectUnavailableMessage = !connector
+    ? "No compatible browser wallet connector was found."
+    : isPending
+      ? "Waiting for the wallet connection request."
+      : null;
 
   useEffect(() => {
     if (!isWrongNetwork) {
@@ -47,16 +52,22 @@ export function WalletButton() {
 
   if (!isConnected) {
     return (
-      <div className="flex flex-col gap-2 sm:items-end">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
         <button
           type="button"
           disabled={!connector || isPending}
+          aria-describedby={connectUnavailableMessage ? "wallet-connect-unavailable" : "wallet-connect-read-only-note"}
           onClick={() => connector && connect({ connector })}
-          className="inline-flex min-h-10 items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isPending ? "Connecting..." : "Connect wallet"}
         </button>
-        <p className="max-w-sm text-xs text-slate-400">
+        {connectUnavailableMessage ? (
+          <p id="wallet-connect-unavailable" className="max-w-sm text-xs text-amber-100">
+            {connectUnavailableMessage}
+          </p>
+        ) : null}
+        <p id="wallet-connect-read-only-note" className="max-w-sm text-xs text-slate-400">
           Wallet connection is optional for the read-only deployment view.
         </p>
       </div>
@@ -64,10 +75,10 @@ export function WalletButton() {
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:items-end">
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:items-end">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
-          <span className="font-mono">{shortenAddress(address)}</span>
+          <span className="break-all font-mono" title={address}>{shortenAddress(address)}</span>
         </div>
 
         <button
@@ -95,7 +106,7 @@ export function WalletButton() {
             {isSwitchingChain ? "Switching..." : switchButtonLabel}
           </button>
 
-          {networkMessage ? <p className="mt-2 text-amber-50">{networkMessage}</p> : null}
+          {networkMessage ? <p role="status" aria-live="polite" className="mt-2 text-amber-50">{networkMessage}</p> : null}
         </div>
       ) : (
         <p className="max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">

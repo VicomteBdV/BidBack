@@ -111,6 +111,25 @@ describe("WalletActivityDashboard", () => {
     expect(screen.getByText("Wallet events")).toBeInTheDocument();
   });
 
+  it("distinguishes an unavailable activity read from an empty wallet", async () => {
+    mockAccount({ address: testAddresses.primaryBidder, chainId: 31337, isConnected: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: "RPC activity read unavailable" }), {
+          status: 503,
+          headers: { "content-type": "application/json" }
+        })
+      )
+    );
+
+    render(<WalletActivityDashboard />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Wallet activity could not be loaded");
+    expect(screen.queryByText(/No activity found for this wallet/)).not.toBeInTheDocument();
+  });
+
   it("shows next actions with links to auction detail pages", async () => {
     mockAccount({ address: testAddresses.secondBidder, chainId: 31337, isConnected: true });
     mockActivityFetch(

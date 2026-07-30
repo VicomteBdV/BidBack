@@ -10,6 +10,7 @@ import {
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { anvilChainId, targetChainId, targetChainLabel } from "@/lib/chains";
 import { shortenAddress } from "@/lib/format";
+import { StateNotice } from "@/components/ui/StateNotice";
 
 export function ModuleAddresses() {
   const [deployment, setDeployment] = useState<Deployment | null>(null);
@@ -58,7 +59,7 @@ export function ModuleAddresses() {
   const statusLabel = deployment?.chainId === anvilChainId ? "Local deployment loaded" : "Deployment loaded";
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">Read-only deployment</h2>
@@ -80,15 +81,15 @@ export function ModuleAddresses() {
       </div>
 
       {isLoading ? (
-        <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
-          Loading deployment...
-        </div>
+        <StateNotice tone="loading" title="Loading deployment" className="mt-5">
+          Reading the deployment file for the configured target chain.
+        </StateNotice>
       ) : null}
 
       {!isLoading && error ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Deployment could not be loaded" className="mt-5">
           {error}
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isLoading && deployment ? (
@@ -146,9 +147,9 @@ export function ModuleAddresses() {
 function ContractAddressItem({ contractKey, address }: { contractKey: ContractKey; address: `0x${string}` }) {
   return (
     <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <span className="text-sm font-medium text-slate-200">{contractLabels[contractKey]}</span>
-        <span className="font-mono text-sm text-cyan-200">{shortenAddress(address)}</span>
+        <span className="break-all font-mono text-sm text-cyan-200" title={address}>{shortenAddress(address)}</span>
       </div>
       <div className="mt-2 break-all font-mono text-xs text-slate-500">{address}</div>
     </div>

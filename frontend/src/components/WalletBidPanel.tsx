@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
@@ -45,13 +46,13 @@ function walletErrorMessage(error: unknown, fallback: string) {
 
 function getInjectedEthereum(): EIP1193Provider {
   if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with MetaMask.");
+    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
   }
 
   const provider = (window as WindowWithInjectedEthereum).ethereum;
 
   if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock MetaMask.");
+    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
   }
 
   return provider;
@@ -81,7 +82,7 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     walletChainId = await provider.request({ method: "eth_chainId" });
   } catch (error) {
     throw new Error(
-      `Wallet-signed bidding requires MetaMask access to the target RPC. ${walletErrorMessage(error, "")}`
+      `Wallet-signed bidding requires your wallet to access the target RPC. ${walletErrorMessage(error, "")}`
     );
   }
 
@@ -336,37 +337,37 @@ export function WalletBidPanel({
         : null;
 
   return (
-    <section className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isLoadingBidData || isPlacingBid} className="min-w-0 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-base font-semibold text-white">Wallet-signed bid</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-cyan-100/80">
-        MetaMask signs AuctionHouse.placeBid directly. No server private key is used and no /api/dev route is called.
+        Your wallet signs AuctionHouse.placeBid directly. No server private key is used and no /api/dev route is called.
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed bidding requires MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
-        Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+        Wallet-signed bidding requires your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
+        Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
         reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (
-        <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
-          Loading deployment data...
-        </div>
+        <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
+          Preparing wallet-signed bid reads.
+        </StateNotice>
       ) : null}
 
       {deploymentError ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Bid deployment data is unavailable" className="mt-4">
           {deploymentError}
-        </div>
+        </StateNotice>
       ) : null}
 
       {statusMessage ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Wallet bid unavailable" className="mt-4">
           {statusMessage}
-        </div>
+        </StateNotice>
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
@@ -380,22 +381,27 @@ export function WalletBidPanel({
       </div>
 
       <div className="mt-4 grid gap-3">
-        <label className="grid gap-2">
+        <label className="grid gap-2" htmlFor="wallet-bid-cap">
           <span className="text-sm font-medium text-slate-200">Bid cap in ETH</span>
           <input
+            id="wallet-bid-cap"
             value={bidCapEth}
             disabled={isLoadingBidData || isPlacingBid}
+            aria-describedby={bidActionState.disabledReason ? "wallet-bid-disabled-reason" : "wallet-bid-help"}
             onChange={(event) => setBidCapEth(event.target.value)}
             className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
             placeholder={minimumNextBid === null ? "Load minimum bid" : formatEther(minimumNextBid)}
             inputMode="decimal"
           />
         </label>
+        <p id="wallet-bid-help" className="text-xs leading-5 text-cyan-100/70">
+          Enter the total cap. For a step-up bid, only the difference from the current wallet cap is sent.
+        </p>
 
         {bidActionState.disabledReason ? (
-          <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <StateNotice id="wallet-bid-disabled-reason" tone="warning" title="Bid action unavailable">
             {bidActionState.disabledReason}
-          </div>
+          </StateNotice>
         ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -403,7 +409,7 @@ export function WalletBidPanel({
             type="button"
             disabled={!isConnected || wrongNetwork || !auctionOpen || !deployment || isLoadingBidData || isPlacingBid}
             onClick={() => readWalletBidData().catch((caught) => setMessage(walletErrorMessage(caught, "Unable to load wallet bid data.")))}
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {isLoadingBidData ? "Loading..." : "Refresh wallet bid data"}
           </button>
@@ -412,7 +418,8 @@ export function WalletBidPanel({
             type="button"
             disabled={Boolean(bidActionState.disabledReason)}
             onClick={placeWalletBid}
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-describedby={bidActionState.disabledReason ? "wallet-bid-disabled-reason" : undefined}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {isPlacingBid ? "Placing bid..." : "Place wallet-signed bid"}
           </button>
@@ -423,7 +430,7 @@ export function WalletBidPanel({
         <WalletTransactionStatus title="Wallet bid" status={txStatus} />
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }

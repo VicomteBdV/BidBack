@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AuctionDetail } from "@/components/AuctionDetail";
 import { auctionDetailFixture } from "@/test/fixtures";
@@ -96,5 +96,44 @@ describe("AuctionDetail", () => {
     expect(screen.getByText("Metadata preview never affects auction settlement.")).toBeInTheDocument();
     expect(screen.getByText("BidBack Demo NFT #1")).toBeInTheDocument();
     expect(screen.getByText("BidBack Demo Collection (BID)")).toBeInTheDocument();
+  });
+
+  it("keeps read-only panels visible when a refresh fails", async () => {
+    let detailReads = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes("/history")) {
+          return new Response(JSON.stringify({ history: auctionDetailFixture.auction.history }), {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          });
+        }
+
+        detailReads += 1;
+        if (detailReads === 1) {
+          return new Response(JSON.stringify(auctionDetailFixture), {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          });
+        }
+
+        return new Response(JSON.stringify({ error: "RPC refresh unavailable" }), {
+          status: 503,
+          headers: { "content-type": "application/json" }
+        });
+      })
+    );
+
+    render(<AuctionDetail auctionId="1" />);
+    expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh auction" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Auction refresh failed");
+    expect(screen.getByRole("heading", { name: "Economic transparency / Settlement breakdown" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
   });
 });

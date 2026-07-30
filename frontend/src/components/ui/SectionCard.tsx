@@ -32,18 +32,18 @@ export function SectionCard({
   const Heading = headingLevel === 3 ? "h3" : "h2";
 
   return (
-    <section className={`rounded-lg border p-5 ${toneClasses[tone]} ${className}`}>
+    <section className={`min-w-0 rounded-lg border p-4 sm:p-5 ${toneClasses[tone]} ${className}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <Heading className={headingLevel === 3 ? "text-base font-semibold text-white" : "text-xl font-semibold text-white"}>
+            <Heading className={`${headingLevel === 3 ? "text-base" : "text-xl"} break-words font-semibold text-white`}>
               {title}
             </Heading>
             {badges}
           </div>
           {description ? <div className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{description}</div> : null}
         </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
+        {actions ? <div className="w-full min-w-0 sm:w-auto sm:shrink-0">{actions}</div> : null}
       </div>
 
       {children ? <div className={bodyClassName}>{children}</div> : null}

@@ -194,6 +194,7 @@ export function CreateAuctionForm() {
 
       <form onSubmit={submitCreateAuction} className="mt-6 grid gap-5">
         <CreateAuctionFields
+          idPrefix="local-create"
           nftContract={nftContract}
           tokenId={tokenId}
           startPriceEth={startPriceEth}

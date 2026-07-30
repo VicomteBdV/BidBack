@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { formatEth, shortenAddress } from "@/lib/format";
 import type { WalletActivityApiResponse, WalletActivityDiscoveryStrategy, WalletActivitySummary } from "@/lib/walletActivity";
@@ -117,7 +118,7 @@ export function WalletActivityDashboard() {
   const cards = useMemo(() => (data ? cardItems(data.activity) : []), [data]);
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
@@ -133,7 +134,7 @@ export function WalletActivityDashboard() {
           type="button"
           onClick={loadActivity}
           disabled={!isConnected || isLoading}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isLoading ? "Loading..." : "Refresh activity"}
         </button>
@@ -169,15 +170,15 @@ export function WalletActivityDashboard() {
       ) : null}
 
       {wrongNetwork ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Wallet is on a different network" className="mt-5">
           Wallet connected, but not on the target chain ({targetChainLabel}). This panel remains read-only; switch network before signing wallet actions.
-        </div>
+        </StateNotice>
       ) : null}
 
       {data?.discovery.warning ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Wallet activity is bounded" className="mt-5">
           {data.discovery.warning}
-        </div>
+        </StateNotice>
       ) : null}
 
       {data ? (
@@ -187,13 +188,15 @@ export function WalletActivityDashboard() {
       ) : null}
 
       {error ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Wallet activity could not be loaded" className="mt-5">
           {error}
-        </div>
+        </StateNotice>
       ) : null}
 
       {isConnected && isLoading ? (
-        <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">Loading wallet activity...</div>
+        <StateNotice tone="loading" title="Loading wallet activity" className="mt-5">
+          Reading bounded wallet-related events and direct contract values.
+        </StateNotice>
       ) : null}
 
       {data ? (
@@ -206,14 +209,14 @@ export function WalletActivityDashboard() {
                   <Link
                     key={`${action.kind}-${action.auctionId}`}
                     href={action.href}
-                    className="rounded-md border border-slate-800 bg-slate-900 px-4 py-3 transition hover:border-cyan-500/60"
+                    className="min-w-0 rounded-md border border-slate-800 bg-slate-900 px-4 py-3 transition hover:border-cyan-500/60"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="font-semibold text-cyan-100">{action.label}</div>
                         <div className="mt-1 text-sm leading-6 text-slate-400">{action.description}</div>
                       </div>
-                      {action.amount ? <div className="font-mono text-sm text-slate-200">{formatEth(action.amount)}</div> : null}
+                      {action.amount ? <div className="break-all font-mono text-sm text-slate-200">{formatEth(action.amount)}</div> : null}
                     </div>
                   </Link>
                 ))}

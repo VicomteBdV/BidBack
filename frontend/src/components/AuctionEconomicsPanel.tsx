@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { ModeBadge } from "@/components/ModeBadge";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { buildAuctionEconomicSummary } from "@/lib/auctionEconomics";
 import type { AuctionEconomicAddress, AuctionEconomicAmount, AuctionEconomicsSummary, SerializedAuction } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth } from "@/lib/format";
@@ -22,7 +23,7 @@ export function AuctionEconomicsPanel({ auction }: { auction: SerializedAuction 
   const summary = useMemo(() => auction.economicSummary ?? buildAuctionEconomicSummary(auction), [auction]);
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl font-semibold text-white">Economic transparency / Settlement breakdown</h2>
         <ModeBadge variant="read-only" />
@@ -75,21 +76,21 @@ export function AuctionEconomicsPanel({ auction }: { auction: SerializedAuction 
           </div>
         </div>
       ) : (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Parameter snapshot unavailable" className="mt-5">
           Auction economic parameter snapshot is unavailable.
-        </div>
+        </StateNotice>
       )}
 
       {summary.warnings.length > 0 ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+        <StateNotice tone="warning" title="Settlement data notice" className="mt-5">
           {summary.warnings.join(" ")}
-        </div>
+        </StateNotice>
       ) : null}
 
       {summary.unavailableFields.length > 0 ? (
-        <div className="mt-5 rounded-md border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
+        <StateNotice tone="info" title="Some settlement fields are unavailable" className="mt-5">
           Unavailable fields: <span className="font-mono text-slate-100">{summary.unavailableFields.join(", ")}</span>
-        </div>
+        </StateNotice>
       ) : null}
 
       <div className="mt-5 grid gap-2 text-sm leading-6 text-slate-400">
@@ -107,12 +108,12 @@ function AmountCard({ label, amount }: { label: string; amount: AuctionEconomicA
   const value = amount.value !== undefined ? formatEth(amount.value) : statusLabels[amount.status];
 
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs text-slate-500">{label}</div>
         <StatusBadge status={amount.status} />
       </div>
-      <div className="mt-2 break-all font-mono text-sm text-slate-200">{value}</div>
+      <div className="mt-2 break-all font-mono text-sm text-slate-200" title={amount.value}>{value}</div>
       {amount.note ? <div className="mt-2 text-xs leading-5 text-slate-500">{amount.note}</div> : null}
     </div>
   );
@@ -122,12 +123,12 @@ function AddressCard({ label, address }: { label: string; address: AuctionEconom
   const value = address.value ? formatAddressOrNone(address.value) : statusLabels[address.status];
 
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs text-slate-500">{label}</div>
         <StatusBadge status={address.status} />
       </div>
-      <div className="mt-2 break-all font-mono text-sm text-slate-200">{value}</div>
+      <div className="mt-2 break-all font-mono text-sm text-slate-200" title={address.value}>{value}</div>
       {address.note ? <div className="mt-2 text-xs leading-5 text-slate-500">{address.note}</div> : null}
     </div>
   );

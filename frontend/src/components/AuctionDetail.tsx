@@ -12,7 +12,9 @@ import { WalletBidPanel } from "@/components/WalletBidPanel";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import { WalletFinalizePanel } from "@/components/WalletFinalizePanel";
 import { InfoRow } from "@/components/ui/InfoRow";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionCard } from "@/components/ui/SectionCard";
+import { StateNotice } from "@/components/ui/StateNotice";
 import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
@@ -38,7 +40,6 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
       setData(payload as AuctionDetailApiResponse);
       setError(null);
     } catch (caught) {
-      setData(null);
       setError(caught instanceof Error ? caught.message : "Unable to read auction");
     } finally {
       setIsLoading(false);
@@ -49,28 +50,44 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
     loadAuction();
   }, [loadAuction]);
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
-      <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-        <div className="rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">Loading auction...</div>
+      <section aria-busy="true" className="rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+        <StateNotice tone="loading" title="Loading auction">
+          Reading auction details and settlement data from the configured RPC.
+        </StateNotice>
       </section>
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
-      <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-        <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+      <section className="rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+        <StateNotice
+          tone="error"
+          title="Auction could not be loaded"
+          action={
+            <button
+              type="button"
+              onClick={loadAuction}
+              className="inline-flex min-h-9 items-center justify-center rounded-md border border-rose-200/50 px-3 text-xs font-semibold text-white transition hover:border-white"
+            >
+              Try again
+            </button>
+          }
+        >
           {error}
-        </div>
+        </StateNotice>
       </section>
     );
   }
 
   if (!data) {
     return (
-      <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-        <div className="rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">Auction not found.</div>
+      <section className="rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+        <EmptyState title="Auction not found">
+          No read-only auction data is available for this identifier.
+        </EmptyState>
       </section>
     );
   }
@@ -79,16 +96,26 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
   const economics = auction.economics;
 
   return (
-    <div className="grid gap-5">
-      <div className="flex justify-end">
+    <div aria-busy={isLoading} className="min-w-0 grid gap-5">
+      <div className="flex flex-col gap-3 sm:items-end">
         <button
           type="button"
           onClick={loadAuction}
           disabled={isLoading}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
-          Refresh auction
+          {isLoading ? "Refreshing auction..." : "Refresh auction"}
         </button>
+        {isLoading ? (
+          <StateNotice tone="loading" title="Refreshing auction" className="w-full sm:max-w-md">
+            Existing read-only data remains visible while the refresh completes.
+          </StateNotice>
+        ) : null}
+        {error ? (
+          <StateNotice tone="error" title="Auction refresh failed" className="w-full sm:max-w-md">
+            {error} Existing read-only data remains available below.
+          </StateNotice>
+        ) : null}
       </div>
 
       <AuctionSummary auction={auction} />

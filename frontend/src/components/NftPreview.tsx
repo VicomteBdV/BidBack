@@ -42,29 +42,32 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
   }, [metadata?.collectionName, metadata?.collectionSymbol]);
 
   const canShowImage = Boolean(imageUrl && !imageFailed);
+  const imageFallbackLabel = imageFailed ? "Image unavailable" : metadata?.status === "loaded" ? "No image" : "NFT preview";
   const tokenUriLink = isHttpUrl(metadata?.tokenUriGatewayUrl) ? metadata?.tokenUriGatewayUrl : undefined;
   const externalLink = isHttpUrl(metadata?.externalUrl) ? metadata?.externalUrl : undefined;
 
   return (
-    <div className={`rounded-lg border border-slate-800 bg-slate-950 ${compact ? "p-3" : "p-4"}`}>
-      <div className={`grid gap-4 ${compact ? "grid-cols-[72px_minmax(0,1fr)]" : "sm:grid-cols-[160px_minmax(0,1fr)]"}`}>
+    <div className={`min-w-0 rounded-lg border border-slate-800 bg-slate-950 ${compact ? "p-3" : "p-4"}`}>
+      <div className={`grid min-w-0 gap-4 ${compact ? "grid-cols-[64px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]" : "sm:grid-cols-[160px_minmax(0,1fr)]"}`}>
         <div
           className={`flex aspect-square items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-slate-900 ${
-            compact ? "h-[72px] w-[72px]" : "w-full"
+            compact ? "h-16 w-16 sm:h-[72px] sm:w-[72px]" : "w-full"
           }`}
         >
           {canShowImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imageUrl}
-              alt={title}
+              alt={`NFT preview: ${title}`}
               className="h-full w-full object-cover"
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="px-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">NFT</div>
+            <div className="px-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              {imageFallbackLabel}
+            </div>
           )}
         </div>
 
@@ -91,7 +94,7 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
           <div className={`grid gap-2 text-xs text-slate-500 ${compact ? "mt-2" : "mt-4 sm:grid-cols-2"}`}>
             <div>
               <div>Contract</div>
-              <div className="mt-1 break-all font-mono text-slate-300">{shortenAddress(contractAddress)}</div>
+              <div className="mt-1 break-all font-mono text-slate-300" title={contractAddress}>{shortenAddress(contractAddress)}</div>
             </div>
             <div>
               <div>Token ID</div>
@@ -113,6 +116,7 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex min-h-8 items-center rounded-md border border-slate-700 px-3 font-semibold text-cyan-100 transition hover:border-cyan-400/60"
+                  aria-label={`Open token metadata for ${title} in a new tab`}
                 >
                   Open tokenURI
                 </a>
@@ -123,6 +127,7 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex min-h-8 items-center rounded-md border border-slate-700 px-3 font-semibold text-cyan-100 transition hover:border-cyan-400/60"
+                  aria-label={`Open the external NFT page for ${title} in a new tab`}
                 >
                   External link
                 </a>

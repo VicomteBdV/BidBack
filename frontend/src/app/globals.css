@@ -16,6 +16,10 @@ body {
   min-height: 100%;
 }
 
+html {
+  overflow-wrap: break-word;
+}
+
 body {
   background: #020617;
 }
@@ -25,4 +29,16 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #22d3ee;
+  outline-offset: 2px;
 }

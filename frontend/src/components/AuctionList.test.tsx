@@ -72,6 +72,34 @@ function auctionLinks() {
 }
 
 describe("AuctionList", () => {
+  it("announces the loading state without an empty screen", () => {
+    mockAccount({ isConnected: false });
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+
+    render(<AuctionList />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading auctions");
+  });
+
+  it("renders an actionable read error distinct from an empty list", async () => {
+    mockAccount({ isConnected: false });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: "RPC unavailable" }), {
+          status: 503,
+          headers: { "content-type": "application/json" }
+        })
+      )
+    );
+
+    render(<AuctionList />);
+
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("Auctions could not be loaded");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
   it("renders readable lifecycle status, NFT previews, and result counters", async () => {
     mockAccount({ isConnected: false });
     mockAuctionListFetch(
@@ -110,6 +138,7 @@ describe("AuctionList", () => {
     expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
     expect(screen.getByText(/Showing 2 of 2 loaded auctions/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveClass("w-full", "sm:w-auto");
   });
 
   it("filters by Open, Ready to finalize, and Finalized status", async () => {
@@ -178,21 +207,21 @@ describe("AuctionList", () => {
 
     expect(await screen.findByText("Auction #7")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
       target: { value: "golden" }
     });
 
     expect(screen.getByText("Auction #7")).toBeInTheDocument();
     expect(screen.queryByText("Auction #1")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
       target: { value: "auction #1" }
     });
 
     expect(screen.getByText("Auction #1")).toBeInTheDocument();
     expect(screen.queryByText("Auction #7")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
       target: { value: "0000009999" }
     });
 
@@ -242,11 +271,12 @@ describe("AuctionList", () => {
 
     expect(await screen.findByText("Auction #1")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search" }), {
       target: { value: "does not exist" }
     });
 
     expect(screen.getByText(/No auctions match the current search/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
   });
 
   it("allows wallet-scoped filters when a wallet is connected", async () => {

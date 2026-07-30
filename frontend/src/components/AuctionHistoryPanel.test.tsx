@@ -72,6 +72,7 @@ describe("AuctionHistoryPanel", () => {
     render(<AuctionHistoryPanel auction={{ ...auctionDetailFixture.auction, history: undefined }} />);
 
     expect(await screen.findByText(/RPC log range unavailable/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Auction history could not be refreshed");
     expect(screen.getByText("Highest bid")).toBeInTheDocument();
     expect(screen.getByText("Seller proceeds")).toBeInTheDocument();
   });

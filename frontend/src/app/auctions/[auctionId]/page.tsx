@@ -7,9 +7,9 @@ export default async function AuctionPage({ params }: { params: Promise<{ auctio
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-6 sm:px-8">
+      <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
         <header className="flex flex-col gap-5 border-b border-slate-800 pb-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <Link href="/" className="text-sm font-medium text-cyan-300 transition hover:text-cyan-200">
               Back to auctions
             </Link>

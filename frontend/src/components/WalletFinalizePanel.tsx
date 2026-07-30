@@ -10,6 +10,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { getFinalizeActionState } from "@/lib/auctionActionState";
@@ -43,13 +44,13 @@ function walletErrorMessage(error: unknown, fallback: string) {
 
 function getInjectedEthereum(): EIP1193Provider {
   if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with MetaMask.");
+    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
   }
 
   const provider = (window as WindowWithInjectedEthereum).ethereum;
 
   if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock MetaMask.");
+    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
   }
 
   return provider;
@@ -79,7 +80,7 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     walletChainId = await provider.request({ method: "eth_chainId" });
   } catch (error) {
     throw new Error(
-      `Wallet-signed finalization requires MetaMask access to the target RPC. ${walletErrorMessage(error, "")}`
+      `Wallet-signed finalization requires your wallet to access the target RPC. ${walletErrorMessage(error, "")}`
     );
   }
 
@@ -230,26 +231,26 @@ export function WalletFinalizePanel({
   }
 
   return (
-    <section className="rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isFinalizing} className="min-w-0 rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-base font-semibold text-white">Wallet-signed finalization</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/80">
-        MetaMask signs AuctionHouse.finalizeAuction directly after the auction end time. No server private key is used
+        Your wallet signs AuctionHouse.finalizeAuction directly after the auction end time. No server private key is used
         and no /api/dev route is called.
       </p>
 
       {isDeploymentLoading ? (
-        <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
-          Loading deployment data...
-        </div>
+        <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
+          Preparing the wallet-signed finalization check.
+        </StateNotice>
       ) : null}
 
       {deploymentError ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Finalization deployment data is unavailable" className="mt-4">
           {deploymentError}
-        </div>
+        </StateNotice>
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
@@ -262,17 +263,18 @@ export function WalletFinalizePanel({
       </div>
 
       {finalizeState.disabledReason ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice id="wallet-finalize-disabled-reason" tone="warning" title="Finalization unavailable" className="mt-4">
           {finalizeState.disabledReason}
-        </div>
+        </StateNotice>
       ) : null}
 
       <div className="mt-4">
         <button
           type="button"
           disabled={Boolean(finalizeState.disabledReason)}
+          aria-describedby={finalizeState.disabledReason ? "wallet-finalize-disabled-reason" : undefined}
           onClick={finalizeAuction}
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           {isFinalizing ? "Finalizing..." : "Finalize auction"}
         </button>
@@ -282,7 +284,7 @@ export function WalletFinalizePanel({
         <WalletTransactionStatus title="Auction finalization" status={txStatus} />
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }

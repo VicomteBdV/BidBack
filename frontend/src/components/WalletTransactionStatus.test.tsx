@@ -23,8 +23,11 @@ describe("WalletTransactionStatus", () => {
     expect(screen.getByText("Transaction pending")).toBeInTheDocument();
     expect(screen.getByText("Transaction submitted. Waiting for confirmation.")).toBeInTheDocument();
 
-    const link = screen.getByRole("link", { name: "0x11111111...11111111" });
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    const link = screen.getByRole("link", { name: /Open bid transaction 0x11111111...11111111/ });
     expect(link).toHaveAttribute("href", `https://sepolia.basescan.org/tx/${txHash}`);
+    expect(link).toHaveAttribute("title", txHash);
   });
 
   it("renders a transaction hash without link when no explorer is configured", () => {
@@ -41,6 +44,7 @@ describe("WalletTransactionStatus", () => {
     );
 
     expect(screen.getByText("Transaction confirmed")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.getByText("0x11111111...11111111")).toBeInTheDocument();
   });
@@ -57,5 +61,6 @@ describe("WalletTransactionStatus", () => {
 
     expect(screen.getByText("Transaction rejected")).toBeInTheDocument();
     expect(screen.getByText("Transaction rejected in wallet.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
   });
 });

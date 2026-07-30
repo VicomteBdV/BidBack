@@ -10,6 +10,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
@@ -68,13 +69,13 @@ function walletErrorMessage(error: unknown, fallback: string) {
 
 function getInjectedEthereum(): EIP1193Provider {
   if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with MetaMask.");
+    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
   }
 
   const provider = (window as WindowWithInjectedEthereum).ethereum;
 
   if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock MetaMask.");
+    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
   }
 
   return provider;
@@ -104,7 +105,7 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     walletChainId = await provider.request({ method: "eth_chainId" });
   } catch (error) {
     throw new Error(
-      `Wallet-signed claims require MetaMask access to the target RPC. ${walletErrorMessage(error, "")}`
+      `Wallet-signed claims require your wallet to access the target RPC. ${walletErrorMessage(error, "")}`
     );
   }
 
@@ -608,38 +609,38 @@ export function WalletClaimPanel({
         : null;
 
   return (
-    <section className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isLoadingClaimData || pendingAction !== null} className="min-w-0 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-base font-semibold text-white">Wallet-signed claims / withdrawals</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-100/80">
-        Pull-based post-finalization actions signed in MetaMask. No server private key is used and no /api/dev route is
+        Pull-based post-finalization actions signed in your wallet. No server private key is used and no /api/dev route is
         called.
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed claims require MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
-        Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+        Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
+        Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
         reliable localhost/testnet RPC.
       </div>
 
       {isDeploymentLoading ? (
-        <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
-          Loading deployment data...
-        </div>
+        <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
+          Preparing wallet-signed claim and withdrawal reads.
+        </StateNotice>
       ) : null}
 
       {deploymentError ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Claim deployment data is unavailable" className="mt-4">
           {deploymentError}
-        </div>
+        </StateNotice>
       ) : null}
 
       {statusMessage ? (
-        <div className="mt-4 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Wallet actions unavailable" className="mt-4">
           {statusMessage}
-        </div>
+        </StateNotice>
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
@@ -665,7 +666,7 @@ export function WalletClaimPanel({
           type="button"
           disabled={!isConnected || wrongNetwork || !deployment || isLoadingClaimData || pendingAction !== null}
           onClick={() => loadWalletClaimData().catch((caught) => setMessage(walletErrorMessage(caught, "Unable to load wallet claim data.")))}
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           {isLoadingClaimData ? "Loading..." : "Refresh wallet claim data"}
         </button>
@@ -712,7 +713,7 @@ export function WalletClaimPanel({
         <WalletTransactionStatus title="Wallet claim / withdrawal" status={txStatus} />
       </div>
 
-      {message ? <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
     </section>
   );
 }
@@ -728,17 +729,20 @@ function ActionButton({
   disabledReason: string | null;
   onClick: () => void;
 }) {
+  const reasonId = `wallet-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-disabled-reason`;
+
   return (
     <div>
       <button
         type="button"
         disabled={Boolean(disabledReason)}
+        aria-describedby={disabledReason ? reasonId : undefined}
         onClick={onClick}
         className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? "Working..." : label}
       </button>
-      {disabledReason ? <p className="mt-1 text-xs text-emerald-100/70">{disabledReason}</p> : null}
+      {disabledReason ? <p id={reasonId} className="mt-1 text-xs text-emerald-100/70">{disabledReason}</p> : null}
     </div>
   );
 }

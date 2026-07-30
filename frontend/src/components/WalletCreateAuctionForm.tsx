@@ -15,9 +15,15 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
+import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
-import { validateCreateAuctionFields, parseCreateAuctionValues } from "@/lib/createAuctionValidation";
+import {
+  getCreateAuctionValidationIssue,
+  validateCreateAuctionFields,
+  parseCreateAuctionValues,
+  type CreateAuctionFieldName
+} from "@/lib/createAuctionValidation";
 import { fetchDeployment } from "@/lib/deployment";
 import { formatDurationSeconds, shortenAddress } from "@/lib/format";
 import {
@@ -62,13 +68,13 @@ function walletErrorMessage(error: unknown, fallback: string) {
 
 function getInjectedEthereum(): EIP1193Provider {
   if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with MetaMask.");
+    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
   }
 
   const provider = (window as WindowWithInjectedEthereum).ethereum;
 
   if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock MetaMask.");
+    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
   }
 
   return provider;
@@ -110,7 +116,7 @@ async function verifyWalletChain(provider: EIP1193Provider) {
     walletChainId = await provider.request({ method: "eth_chainId" });
   } catch (error) {
     throw new Error(
-      `Wallet RPC unreachable. Wallet-signed mode requires MetaMask access to the target RPC. ${walletErrorMessage(
+      `Wallet RPC unreachable. Wallet-signed mode requires your wallet to access the target RPC. ${walletErrorMessage(
         error,
         ""
       )}`
@@ -228,14 +234,19 @@ export function WalletCreateAuctionForm() {
     [durationSeconds, nftContract, startPriceEth, tokenId]
   );
 
-  const validationError = useMemo(
+  const validationIssue = useMemo(
     () =>
-      validateCreateAuctionFields(values, {
+      getCreateAuctionValidationIssue(values, {
         minAuctionDuration: context?.minAuctionDuration,
         paused: context?.paused === true
       }),
     [context, values]
   );
+  const validationError = validationIssue?.message ?? null;
+  const fieldErrors = useMemo<Partial<Record<CreateAuctionFieldName, string>>>(() => {
+    if (!validationIssue || validationIssue.field === "form") return {};
+    return { [validationIssue.field]: validationIssue.message };
+  }, [validationIssue]);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const ownerMatches = Boolean(owner && address && sameAddress(owner, address));
@@ -255,11 +266,19 @@ export function WalletCreateAuctionForm() {
     : wrongNetwork
       ? `Wallet connected, but not on the target chain (${targetChainLabel}).`
       : null;
+  const isBusy = isChecking || isApproving || isCreating;
+  const checkDisabledReason = validationError ?? modeMessage ?? (isBusy ? "Another wallet step is already in progress." : null);
+  const approveDisabledReason = modeMessage ?? (!ownerMatches
+    ? owner ? "The connected wallet is not the NFT owner." : "Check ownership and approval first."
+    : hasApproval ? "NFTVault is already approved." : isBusy ? "Another wallet step is already in progress." : null);
+  const createDisabledReason = modeMessage ?? (!ownerMatches
+    ? owner ? "The connected wallet is not the NFT owner." : "Check ownership and approval first."
+    : !hasApproval ? "Approve NFTVault before creating the auction." : validationError ?? (isBusy ? "Another wallet step is already in progress." : null));
 
   async function checkOwnershipAndApproval(successMessage?: string) {
     if (!address) throw new Error("Wallet not connected.");
     if (!context) throw new Error("Deployment context is unavailable.");
-    if (wrongNetwork) throw new Error(`Wrong network. Switch MetaMask to the target chain (${targetChainLabel}).`);
+    if (wrongNetwork) throw new Error(`Wrong network. Switch your wallet to the target chain (${targetChainLabel}).`);
     if (validationError) throw new Error(validationError);
 
     try {
@@ -292,7 +311,7 @@ export function WalletCreateAuctionForm() {
         });
       } catch (error) {
         throw new Error(
-          `Unable to read NFT ownership. The token may not exist, or MetaMask cannot reach the target RPC. ${walletErrorMessage(
+          `Unable to read NFT ownership. The token may not exist, or your wallet cannot reach the target RPC. ${walletErrorMessage(
             error,
             ""
           )}`
@@ -442,11 +461,11 @@ export function WalletCreateAuctionForm() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section aria-busy={isContextLoading || isBusy} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div>
         <h2 className="text-xl font-semibold text-white">Wallet-signed create auction</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          This is the production-target flow. MetaMask signs both transactions: NFTVault approval first, then
+          This is the production-target flow. Your wallet signs both transactions: NFTVault approval first, then
           AuctionHouse.createAuction. No server private key is used and no /api/dev route is called.
         </p>
       </div>
@@ -454,22 +473,22 @@ export function WalletCreateAuctionForm() {
       <div className="mt-5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
         <p className="mt-1 text-sm leading-6 text-cyan-100/80">
-          Wallet-signed mode requires MetaMask access to the target RPC for {targetChainLabel}. In Codespaces with local
-          Anvil, MetaMask may not reach the forwarded RPC reliably; use local-dev mode there or expose Anvil through a
+          Wallet-signed mode requires your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
+          Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev mode there or expose Anvil through a
           reliable localhost/testnet RPC.
         </p>
       </div>
 
       {isContextLoading ? (
-        <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
+        <StateNotice tone="loading" title="Loading wallet-signed context" className="mt-5">
           Loading wallet-signed context...
-        </div>
+        </StateNotice>
       ) : null}
 
       {!isContextLoading && contextError ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="error" title="Wallet-signed context is unavailable" className="mt-5">
           {contextError}
-        </div>
+        </StateNotice>
       ) : null}
 
       {context ? (
@@ -492,9 +511,9 @@ export function WalletCreateAuctionForm() {
       </div>
 
       {modeMessage ? (
-        <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+        <StateNotice tone="warning" title="Wallet action unavailable" className="mt-5">
           {modeMessage}
-        </div>
+        </StateNotice>
       ) : null}
 
       <form className="mt-6 grid gap-5" onSubmit={(event) => event.preventDefault()}>
@@ -504,6 +523,8 @@ export function WalletCreateAuctionForm() {
           startPriceEth={startPriceEth}
           durationSeconds={durationSeconds}
           disabled={isChecking || isApproving || isCreating}
+          errors={fieldErrors}
+          idPrefix="wallet-create"
           onNftContractChange={setNftContract}
           onTokenIdChange={setTokenId}
           onStartPriceEthChange={setStartPriceEth}
@@ -511,9 +532,9 @@ export function WalletCreateAuctionForm() {
         />
 
         {validationError ? (
-          <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          <StateNotice tone="warning" title="Review auction details">
             {validationError}
-          </div>
+          </StateNotice>
         ) : null}
 
         {owner ? (
@@ -524,35 +545,47 @@ export function WalletCreateAuctionForm() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <button
-            type="button"
-            disabled={Boolean(validationError) || !isConnected || wrongNetwork || isChecking || isApproving || isCreating}
-            onClick={() =>
-              checkOwnershipAndApproval().catch((caught) => setMessage(walletErrorMessage(caught, "Ownership check failed.")))
-            }
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isChecking ? "Checking..." : "Check ownership and approval"}
-          </button>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div>
+            <button
+              type="button"
+              disabled={Boolean(validationError) || !isConnected || wrongNetwork || isChecking || isApproving || isCreating}
+              aria-describedby={checkDisabledReason ? "check-ownership-disabled-reason" : undefined}
+              onClick={() =>
+                checkOwnershipAndApproval().catch((caught) => setMessage(walletErrorMessage(caught, "Ownership check failed.")))
+              }
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isChecking ? "Checking..." : "Check ownership and approval"}
+            </button>
+            {checkDisabledReason ? <p id="check-ownership-disabled-reason" className="mt-1 text-xs text-slate-400">{checkDisabledReason}</p> : null}
+          </div>
 
-          <button
-            type="button"
-            disabled={!ownerMatches || hasApproval || isChecking || isApproving || isCreating}
-            onClick={approveNftVault}
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isApproving ? "Approving..." : "Approve NFTVault"}
-          </button>
+          <div>
+            <button
+              type="button"
+              disabled={!ownerMatches || hasApproval || isChecking || isApproving || isCreating}
+              aria-describedby={approveDisabledReason ? "approve-nft-disabled-reason" : undefined}
+              onClick={approveNftVault}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isApproving ? "Approving..." : "Approve NFTVault"}
+            </button>
+            {approveDisabledReason ? <p id="approve-nft-disabled-reason" className="mt-1 text-xs text-slate-400">{approveDisabledReason}</p> : null}
+          </div>
 
-          <button
-            type="button"
-            disabled={!ownerMatches || !hasApproval || Boolean(validationError) || isChecking || isApproving || isCreating}
-            onClick={createAuction}
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isCreating ? "Creating auction..." : "Create auction"}
-          </button>
+          <div>
+            <button
+              type="button"
+              disabled={!ownerMatches || !hasApproval || Boolean(validationError) || isChecking || isApproving || isCreating}
+              aria-describedby={createDisabledReason ? "create-auction-disabled-reason" : undefined}
+              onClick={createAuction}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isCreating ? "Creating auction..." : "Create auction"}
+            </button>
+            {createDisabledReason ? <p id="create-auction-disabled-reason" className="mt-1 text-xs text-slate-400">{createDisabledReason}</p> : null}
+          </div>
         </div>
       </form>
 
@@ -561,7 +594,7 @@ export function WalletCreateAuctionForm() {
         <WalletTransactionStatus title="Auction creation" status={createTxStatus} />
       </div>
 
-      {message ? <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {message ? <div role="status" aria-live="polite" className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
 
       {createdAuctionId ? (
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
