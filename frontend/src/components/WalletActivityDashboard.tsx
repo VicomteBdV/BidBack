@@ -1,14 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { WalletActionQueueSection } from "@/components/WalletActionQueueSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { formatEth, shortenAddress } from "@/lib/format";
-import type { WalletActivityApiResponse, WalletActivityDiscoveryStrategy, WalletActivitySummary } from "@/lib/walletActivity";
+import type {
+  WalletActivityApiResponse,
+  WalletActivityDiscoveryStrategy,
+  WalletActivitySummary
+} from "@/lib/walletActivity";
 
 const WALLET_ACTIVITY_LIMIT = 100;
 
@@ -27,18 +31,9 @@ type ActivityCard = {
 
 function cardItems(activity: WalletActivitySummary): ActivityCard[] {
   return [
-    {
-      label: "Auctions created",
-      value: activity.createdAuctions
-    },
-    {
-      label: "Active bids",
-      value: activity.activeBids
-    },
-    {
-      label: "Won",
-      value: activity.wonAuctions
-    },
+    { label: "Auctions created", value: activity.createdAuctions },
+    { label: "Active bids", value: activity.activeBids },
+    { label: "Won", value: activity.wonAuctions },
     {
       label: "Lost / refund available",
       value: activity.claimableRefunds || activity.lostAuctions,
@@ -64,11 +59,9 @@ function cardItems(activity: WalletActivitySummary): ActivityCard[] {
 
 export function WalletActivityDashboard() {
   const { address, chainId, isConnected } = useAccount();
-
   const [data, setData] = useState<WalletActivityApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
   const wrongNetwork = isConnected && chainId !== targetChainId;
 
   const loadActivity = useCallback(async () => {
@@ -81,14 +74,10 @@ export function WalletActivityDashboard() {
 
     try {
       setIsLoading(true);
-
       const response = await fetch(
         `/api/wallet-activity?wallet=${encodeURIComponent(address)}&limit=${WALLET_ACTIVITY_LIMIT}`,
-        {
-          cache: "no-store"
-        }
+        { cache: "no-store" }
       );
-
       const payload = (await response.json().catch(() => null)) as WalletActivityApiResponse | { error?: string } | null;
 
       if (!response.ok) {
@@ -116,17 +105,24 @@ export function WalletActivityDashboard() {
   }, [isConnected, loadActivity]);
 
   const cards = useMemo(() => (data ? cardItems(data.activity) : []), [data]);
+  const activityWarnings = useMemo(
+    () =>
+      data
+        ? [...new Set(data.activity.actionQueue.warnings)].filter((warning) => warning !== data.discovery.warning)
+        : [],
+    [data]
+  );
 
   return (
     <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold text-white">My activity / My actions</h2>
             <ModeBadge variant="read-only" />
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Wallet-specific read-only summary of immediate actions first, then auctions and historical context.
+            Wallet-specific read-only action center. Transaction eligibility is revalidated on each auction detail page.
           </p>
         </div>
 
@@ -147,7 +143,36 @@ export function WalletActivityDashboard() {
       ) : null}
 
       {isConnected ? (
-        <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-4">
+        <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Available actions</div>
+            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
+              {data?.activity.actionQueue.availableActionCount ?? 0}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Related auctions</div>
+            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
+              {data?.activity.actionQueue.relatedAuctionCount ?? 0}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Auction-specific actions</div>
+            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
+              {data?.activity.actionQueue.auctionActions.reduce((total, item) => total + item.actions.length, 0) ?? 0}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Global wallet actions</div>
+            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
+              {data?.activity.actionQueue.globalActions.length ?? 0}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isConnected ? (
+        <div className="mt-3 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-xs text-slate-500">Connected wallet</div>
             <div className="mt-1 font-mono text-cyan-200">{shortenAddress(address)}</div>
@@ -164,14 +189,16 @@ export function WalletActivityDashboard() {
           </div>
           <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-xs text-slate-500">Auction IDs scanned</div>
-            <div className="mt-1 font-mono text-cyan-200">{data?.discovery.returnedIds ?? 0} / {data?.discovery.limit ?? WALLET_ACTIVITY_LIMIT}</div>
+            <div className="mt-1 font-mono text-cyan-200">
+              {data?.discovery.returnedIds ?? 0} / {data?.discovery.limit ?? WALLET_ACTIVITY_LIMIT}
+            </div>
           </div>
         </div>
       ) : null}
 
       {wrongNetwork ? (
         <StateNotice tone="warning" title="Wallet is on a different network" className="mt-5">
-          Wallet connected, but not on the target chain ({targetChainLabel}). This panel remains read-only; switch network before signing wallet actions.
+          Wallet connected, but not on the target chain ({targetChainLabel}). The read-only classification remains visible; switch network before signing wallet actions.
         </StateNotice>
       ) : null}
 
@@ -179,12 +206,6 @@ export function WalletActivityDashboard() {
         <StateNotice tone="warning" title="Wallet activity is bounded" className="mt-5">
           {data.discovery.warning}
         </StateNotice>
-      ) : null}
-
-      {data ? (
-        <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-xs leading-5 text-slate-400">
-          This read model uses bounded on-chain event reads and direct contract reads. It is not a production indexer yet.
-        </div>
       ) : null}
 
       {error ? (
@@ -201,35 +222,40 @@ export function WalletActivityDashboard() {
 
       {data ? (
         <>
-          {data.activity.nextActions.length > 0 ? (
-            <div className="mt-5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-4 py-4">
-              <h3 className="text-sm font-semibold text-white">Actions available now</h3>
-              <div className="mt-3 grid gap-3">
-                {data.activity.nextActions.map((action) => (
-                  <Link
-                    key={`${action.kind}-${action.auctionId}`}
-                    href={action.href}
-                    className="min-w-0 rounded-md border border-slate-800 bg-slate-900 px-4 py-3 transition hover:border-cyan-500/60"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="font-semibold text-cyan-100">{action.label}</div>
-                        <div className="mt-1 text-sm leading-6 text-slate-400">{action.description}</div>
-                      </div>
-                      {action.amount ? <div className="break-all font-mono text-sm text-slate-200">{formatEth(action.amount)}</div> : null}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : data.activity.hasActivity ? (
-            <EmptyState className="mt-5" title="No immediate action">
-              Activity found, but no immediate wallet action is currently available.
-            </EmptyState>
-          ) : (
+          <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-xs leading-5 text-slate-400">
+            This read model uses bounded on-chain event reads and direct contract reads. It is not a production indexer yet.
+          </div>
+
+          {!data.activity.hasActivity ? (
             <EmptyState className="mt-5">
               No activity found for this wallet in the currently scanned auctions. Create an auction with a test ERC-721 NFT or place a bid, then refresh this panel.
             </EmptyState>
+          ) : (
+            <div className="mt-5 grid gap-5">
+              <WalletActionQueueSection
+                title="Action required"
+                description="Immediate auction-specific actions and distinct global wallet credits, ordered by priority."
+                items={data.activity.actionQueue.auctionActions}
+                globalActions={data.activity.actionQueue.globalActions}
+                emptyTitle="No immediate action"
+                emptyMessage="Related activity exists, but no claim, withdrawal, or finalization is currently available."
+              />
+              <WalletActionQueueSection
+                title="Watching"
+                description="Active or incomplete wallet-related auctions with no immediate required action."
+                items={data.activity.actionQueue.watching}
+                emptyTitle="Nothing to watch"
+                emptyMessage="No related active or partial auction is currently waiting for a state change."
+              />
+              <WalletActionQueueSection
+                title="History"
+                description="Finalized wallet-related auctions with no remaining auction-specific action currently known."
+                items={data.activity.actionQueue.history}
+                emptyTitle="No settled history"
+                emptyMessage="No completed wallet-related auction is present in the bounded read model."
+                initialLimit={5}
+              />
+            </div>
           )}
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -242,15 +268,14 @@ export function WalletActivityDashboard() {
             ))}
           </div>
 
-          {data.activity.warnings.length > 0 ? (
-            <div className="mt-5 rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-              <div className="font-semibold">Activity warnings</div>
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                {data.activity.warnings.map((warning) => (
+          {activityWarnings.length > 0 ? (
+            <StateNotice tone="warning" title="Activity warnings" className="mt-5">
+              <ul className="list-disc space-y-1 pl-5">
+                {activityWarnings.map((warning) => (
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
-            </div>
+            </StateNotice>
           ) : null}
         </>
       ) : null}

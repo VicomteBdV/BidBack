@@ -1,23 +1,14 @@
 import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
-import type { SerializedAuction } from "@/lib/auctionTypes";
 import { isZeroAddress } from "@/lib/format";
+import {
+  buildWalletActionQueue,
+  type WalletActionQueue,
+  type WalletActivityAuction,
+  type WalletAuctionPosition,
+  type WalletGlobalCredits
+} from "@/lib/walletActionQueue";
 
-export type WalletAuctionPosition = {
-  cap: string;
-  refundableAmount: string;
-  refundClaimed: boolean;
-  rewardEntitlement: string;
-  rewardClaimed: boolean;
-  sellerCredit: string;
-  protocolFeeCredit: string;
-  auctionFeeRecipient: `0x${string}`;
-  isAuctionFeeRecipient: boolean;
-};
-
-export type WalletActivityAuction = SerializedAuction & {
-  walletPosition?: WalletAuctionPosition;
-  walletPositionError?: string;
-};
+export type { WalletActivityAuction, WalletAuctionPosition } from "@/lib/walletActionQueue";
 
 export type WalletActivitySummary = {
   wallet: `0x${string}` | null;
@@ -38,6 +29,7 @@ export type WalletActivitySummary = {
   hasActivity: boolean;
   nextActions: WalletActivityAction[];
   warnings: string[];
+  actionQueue: WalletActionQueue;
 };
 
 export type WalletActivityActionKind =
@@ -82,6 +74,12 @@ export type WalletActivityApiResponse = {
   activity: WalletActivitySummary;
 };
 
+export type BuildWalletActivityOptions = {
+  globalCredits?: WalletGlobalCredits;
+  partial?: boolean;
+  warnings?: string[];
+};
+
 function sameAddress(a?: string | null, b?: string | null) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
@@ -102,65 +100,43 @@ function gtZero(value?: string | bigint | number | null) {
   return toBigInt(value) > 0n;
 }
 
-function getNftClaimant(auction: SerializedAuction) {
-  return isZeroAddress(auction.highestBidder) ? auction.seller : auction.highestBidder;
-}
-
-function isWalletRelatedToAuction(auction: WalletActivityAuction, wallet: `0x${string}`) {
-  const position = auction.walletPosition;
-
-  return (
-    sameAddress(auction.seller, wallet) ||
-    sameAddress(auction.highestBidder, wallet) ||
-    sameAddress(getNftClaimant(auction), wallet) ||
-    sameAddress(position?.auctionFeeRecipient, wallet) ||
-    gtZero(position?.cap) ||
-    gtZero(position?.refundableAmount) ||
-    gtZero(position?.rewardEntitlement)
+function flattenActions(actionQueue: WalletActionQueue): WalletActivityAction[] {
+  const auctionActions = actionQueue.auctionActions.flatMap((item) =>
+    item.actions.map((action) => ({
+      ...action,
+      auctionId: item.auctionId,
+      label: `${action.label} — Auction #${item.auctionId}`,
+      href: item.href
+    }))
   );
-}
+  const globalActions = actionQueue.globalActions.map((action) => ({
+    ...action,
+    auctionId: action.targetAuctionId ?? "global",
+    href: action.href ?? "/"
+  }));
 
-function pushAction(actions: WalletActivityAction[], action: WalletActivityAction) {
-  const duplicate = actions.some((candidate) => candidate.kind === action.kind && candidate.auctionId === action.auctionId);
-  if (!duplicate) actions.push(action);
+  return [...auctionActions, ...globalActions].sort((a, b) => a.priority - b.priority);
 }
 
 export function buildWalletActivity(
   auctions: WalletActivityAuction[],
   wallet?: `0x${string}` | null,
-  nowSeconds?: number | bigint
+  nowSeconds?: number | bigint,
+  options: BuildWalletActivityOptions = {}
 ): WalletActivitySummary {
-  const warnings = auctions
-    .filter((auction) => Boolean(auction.walletPositionError))
-    .map((auction) => `Auction #${auction.auctionId}: ${auction.walletPositionError}`);
-
-  if (!wallet) {
-    return {
-      wallet: null,
-      walletConnected: false,
-      createdAuctions: 0,
-      activeBids: 0,
-      wonAuctions: 0,
-      lostAuctions: 0,
-      claimableNfts: 0,
-      claimableRefunds: 0,
-      claimableRewards: 0,
-      withdrawableSellerProceeds: 0,
-      withdrawableProtocolFees: 0,
-      totalRefundableAmount: "0",
-      totalRewardEntitlement: "0",
-      sellerProceedsAvailable: "0",
-      protocolFeesAvailable: "0",
-      hasActivity: false,
-      nextActions: [],
-      warnings: ["Connect a wallet to see your activity.", ...warnings]
-    };
-  }
-
-  const actions: WalletActivityAction[] = [];
+  const resolvedNowSeconds = nowSeconds ?? Math.floor(Date.now() / 1000);
+  const actionQueue = buildWalletActionQueue(auctions, wallet, {
+    nowSeconds: resolvedNowSeconds,
+    globalCredits: options.globalCredits,
+    partial: options.partial,
+    warnings: options.warnings
+  });
+  const warnings = wallet
+    ? actionQueue.warnings
+    : ["Connect a wallet to see your activity.", ...actionQueue.warnings];
   const summary: WalletActivitySummary = {
-    wallet,
-    walletConnected: true,
+    wallet: wallet ?? null,
+    walletConnected: Boolean(wallet),
     createdAuctions: 0,
     activeBids: 0,
     wonAuctions: 0,
@@ -175,145 +151,51 @@ export function buildWalletActivity(
     sellerProceedsAvailable: "0",
     protocolFeesAvailable: "0",
     hasActivity: false,
-    nextActions: actions,
-    warnings
+    nextActions: flattenActions(actionQueue),
+    warnings,
+    actionQueue
   };
 
-  let sellerProceedsActionAdded = false;
-  let protocolFeesActionAdded = false;
+  if (!wallet) return summary;
 
   for (const auction of auctions) {
+    const lifecycle = getAuctionLifecycle(auction, resolvedNowSeconds);
     const position = auction.walletPosition;
-    const lifecycle = getAuctionLifecycle(auction, nowSeconds);
-    const href = `/auctions/${auction.auctionId}`;
     const isSeller = sameAddress(auction.seller, wallet);
-    const isHighestBidder = sameAddress(auction.highestBidder, wallet);
-    const isNftClaimant = sameAddress(getNftClaimant(auction), wallet);
+    const isHighestBidder = sameAddress(auction.highestBidder, wallet) && !isZeroAddress(auction.highestBidder);
     const hasWalletCap = gtZero(position?.cap);
-    const isOutbid = hasWalletCap && !isHighestBidder;
-    const isWinner = lifecycle.isFinalized && isHighestBidder && !isZeroAddress(auction.highestBidder);
-    const isLost = lifecycle.isFinalized && isOutbid;
 
     if (isSeller) summary.createdAuctions += 1;
+    if (!lifecycle.isFinalized && hasWalletCap) summary.activeBids += 1;
+    if (lifecycle.isFinalized && isHighestBidder) summary.wonAuctions += 1;
+    if (lifecycle.isFinalized && hasWalletCap && !isHighestBidder) summary.lostAuctions += 1;
+  }
 
-    if (!lifecycle.isFinalized && hasWalletCap) {
-      summary.activeBids += 1;
-
-      if (lifecycle.canBid && isOutbid) {
-        pushAction(actions, {
-          kind: "bid",
-          auctionId: auction.auctionId,
-          label: `Bid again on Auction #${auction.auctionId}`,
-          description: "Your wallet has a cap on this open auction and is not the current highest bidder.",
-          href,
-          priority: 50
-        });
+  for (const item of actionQueue.auctionActions) {
+    for (const action of item.actions) {
+      if (action.kind === "claimNft") summary.claimableNfts += 1;
+      if (action.kind === "claimRefund") {
+        summary.claimableRefunds += 1;
+        summary.totalRefundableAmount = addWei(summary.totalRefundableAmount, action.amount);
       }
-    }
-
-    if (isWinner) summary.wonAuctions += 1;
-    if (isLost) summary.lostAuctions += 1;
-
-    if (lifecycle.canFinalize && isWalletRelatedToAuction(auction, wallet)) {
-      pushAction(actions, {
-        kind: "finalize",
-        auctionId: auction.auctionId,
-        label: `Finalize Auction #${auction.auctionId}`,
-        description: "The auction end time has passed. Finalization opens pull-based claims and withdrawals.",
-        href,
-        priority: 40
-      });
-    }
-
-    if (lifecycle.isFinalized && !auction.nftClaimed && isNftClaimant) {
-      summary.claimableNfts += 1;
-      pushAction(actions, {
-        kind: "claimNft",
-        auctionId: auction.auctionId,
-        label: `Claim NFT from Auction #${auction.auctionId}`,
-        description: isZeroAddress(auction.highestBidder) ? "No bid was placed, so the seller can reclaim the NFT." : "Your wallet is the winner for this auction.",
-        href,
-        priority: 10
-      });
-    }
-
-    if (position && gtZero(position.refundableAmount) && !position.refundClaimed) {
-      summary.claimableRefunds += 1;
-      summary.totalRefundableAmount = addWei(summary.totalRefundableAmount, position.refundableAmount);
-      pushAction(actions, {
-        kind: "claimRefund",
-        auctionId: auction.auctionId,
-        label: `Claim refund from Auction #${auction.auctionId}`,
-        description: "Your wallet has refundable cap available for this auction.",
-        href,
-        amount: position.refundableAmount,
-        priority: 20
-      });
-    }
-
-    if (position && gtZero(position.rewardEntitlement) && !position.rewardClaimed) {
-      summary.claimableRewards += 1;
-      summary.totalRewardEntitlement = addWei(summary.totalRewardEntitlement, position.rewardEntitlement);
-      pushAction(actions, {
-        kind: "claimReward",
-        auctionId: auction.auctionId,
-        label: `Claim reward from Auction #${auction.auctionId}`,
-        description: "Your wallet has a redistribution entitlement for this finalized auction.",
-        href,
-        amount: position.rewardEntitlement,
-        priority: 30
-      });
-    }
-
-    if (isSeller && position && gtZero(position.sellerCredit)) {
-      summary.sellerProceedsAvailable = position.sellerCredit;
-
-      if (!sellerProceedsActionAdded) {
-        summary.withdrawableSellerProceeds = 1;
-        sellerProceedsActionAdded = true;
-        pushAction(actions, {
-          kind: "withdrawSellerProceeds",
-          auctionId: auction.auctionId,
-          label: "Withdraw seller proceeds",
-          description: "Your seller proceeds credit is available through pull-based withdrawal.",
-          href,
-          amount: position.sellerCredit,
-          priority: 35
-        });
-      }
-    }
-
-    if (position?.isAuctionFeeRecipient && gtZero(position.protocolFeeCredit)) {
-      summary.protocolFeesAvailable = position.protocolFeeCredit;
-
-      if (!protocolFeesActionAdded) {
-        summary.withdrawableProtocolFees = 1;
-        protocolFeesActionAdded = true;
-        pushAction(actions, {
-          kind: "withdrawProtocolFees",
-          auctionId: auction.auctionId,
-          label: "Withdraw protocol fees",
-          description: "Your wallet is the fee recipient snapshot for at least one auction with fees available.",
-          href,
-          amount: position.protocolFeeCredit,
-          priority: 36
-        });
+      if (action.kind === "claimReward") {
+        summary.claimableRewards += 1;
+        summary.totalRewardEntitlement = addWei(summary.totalRewardEntitlement, action.amount);
       }
     }
   }
 
-  summary.nextActions.sort((a, b) => a.priority - b.priority);
-  summary.hasActivity =
-    summary.createdAuctions > 0 ||
-    summary.activeBids > 0 ||
-    summary.wonAuctions > 0 ||
-    summary.lostAuctions > 0 ||
-    summary.claimableNfts > 0 ||
-    summary.claimableRefunds > 0 ||
-    summary.claimableRewards > 0 ||
-    summary.withdrawableSellerProceeds > 0 ||
-    summary.withdrawableProtocolFees > 0 ||
-    summary.nextActions.length > 0;
+  for (const action of actionQueue.globalActions) {
+    if (action.kind === "withdrawSellerProceeds") {
+      summary.withdrawableSellerProceeds = 1;
+      summary.sellerProceedsAvailable = action.amount;
+    }
+    if (action.kind === "withdrawProtocolFees") {
+      summary.withdrawableProtocolFees = 1;
+      summary.protocolFeesAvailable = action.amount;
+    }
+  }
 
+  summary.hasActivity = actionQueue.relatedAuctionCount > 0 || actionQueue.globalActions.length > 0;
   return summary;
 }

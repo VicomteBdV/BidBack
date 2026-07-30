@@ -71,20 +71,22 @@ describe("buildWalletActivity", () => {
           stateLabel: "FINALIZED",
           finalized: true,
           highestBidder: testAddresses.secondBidder,
-          walletPosition: walletPosition({ sellerCredit: "1000000000000000000" })
+          walletPosition: walletPosition()
         })
       ],
       testAddresses.seller,
-      2500
+      2500,
+      { globalCredits: { sellerCredit: "1000000000000000000" } }
     );
 
     expect(activity.createdAuctions).toBe(1);
     expect(activity.withdrawableSellerProceeds).toBe(1);
     expect(activity.sellerProceedsAvailable).toBe("1000000000000000000");
     expect(activity.nextActions.some((action) => action.kind === "withdrawSellerProceeds")).toBe(true);
+    expect(activity.actionQueue.globalActions).toHaveLength(1);
   });
 
-  it("tracks active bids that can be increased", () => {
+  it("tracks active bids as watching rather than required actions", () => {
     const activity = buildWalletActivity(
       [
         baseAuction({
@@ -98,7 +100,8 @@ describe("buildWalletActivity", () => {
     );
 
     expect(activity.activeBids).toBe(1);
-    expect(activity.nextActions.some((action) => action.kind === "bid")).toBe(true);
+    expect(activity.nextActions).toHaveLength(0);
+    expect(activity.actionQueue.watching[0].roles).toContain("bidder");
   });
 
   it("tracks a winner with a claimable NFT", () => {
@@ -120,6 +123,7 @@ describe("buildWalletActivity", () => {
     expect(activity.wonAuctions).toBe(1);
     expect(activity.claimableNfts).toBe(1);
     expect(activity.nextActions.some((action) => action.kind === "claimNft")).toBe(true);
+    expect(activity.actionQueue.auctionActions[0].actions[0].kind).toBe("claimNft");
   });
 
   it("tracks a losing bidder with refund and reward available", () => {
@@ -160,17 +164,45 @@ describe("buildWalletActivity", () => {
           highestBidder: testAddresses.secondBidder,
           walletPosition: walletPosition({
             auctionFeeRecipient: testAddresses.feeRecipient,
-            isAuctionFeeRecipient: true,
-            protocolFeeCredit: "20000000000000000"
+            isAuctionFeeRecipient: true
           })
         })
       ],
       testAddresses.feeRecipient,
-      2500
+      2500,
+      { globalCredits: { protocolFeeCredit: "20000000000000000" } }
     );
 
     expect(activity.withdrawableProtocolFees).toBe(1);
     expect(activity.protocolFeesAvailable).toBe("20000000000000000");
     expect(activity.nextActions.some((action) => action.kind === "withdrawProtocolFees")).toBe(true);
+    expect(activity.actionQueue.globalActions[0].kind).toBe("withdrawProtocolFees");
+  });
+
+  it("exposes deterministic queue ordering after input shuffling", () => {
+    const auction = (auctionId: string, endTime: string) =>
+      baseAuction({
+        auctionId,
+        state: 2,
+        stateLabel: "FINALIZED",
+        finalized: true,
+        endTime,
+        highestBidder: testAddresses.secondBidder,
+        nftClaimed: true,
+        walletPosition: walletPosition({ cap: "1", refundableAmount: "1" })
+      });
+    const first = buildWalletActivity(
+      [auction("3", "3000"), auction("1", "2000"), auction("2", "3000")],
+      testAddresses.primaryBidder,
+      4000
+    );
+    const second = buildWalletActivity(
+      [auction("2", "3000"), auction("3", "3000"), auction("1", "2000")],
+      testAddresses.primaryBidder,
+      4000
+    );
+
+    expect(first.actionQueue.auctionActions.map((item) => item.auctionId)).toEqual(["1", "2", "3"]);
+    expect(second.actionQueue).toEqual(first.actionQueue);
   });
 });

@@ -45,6 +45,35 @@ function toBoolean(value: unknown) {
   return Boolean(value);
 }
 
+async function readGlobalCredit({
+  wallet,
+  functionName,
+  label,
+  deployment,
+  client
+}: {
+  wallet: Address;
+  functionName: "sellerCredits" | "protocolFeeCredits";
+  label: string;
+  deployment: DeploymentFile;
+  client: PublicClient;
+}): Promise<{ value: string; warning?: string }> {
+  try {
+    const value = await client.readContract({
+      address: deployment.contracts.escrowVault,
+      abi: escrowVaultAbi,
+      functionName,
+      args: [wallet]
+    });
+    return { value: toDecimalString(value) };
+  } catch (error) {
+    return {
+      value: "0",
+      warning: `Unable to read ${label}: ${errorMessage(error)}`
+    };
+  }
+}
+
 async function readAuctionFeeRecipient({
   auction,
   deployment,
@@ -85,51 +114,38 @@ async function readWalletPosition({
 }): Promise<WalletAuctionPosition> {
   const auctionId = BigInt(auction.auctionId);
 
-  const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed, sellerCredit, protocolFeeCredit] =
-    await Promise.all([
-      client.readContract({
+  const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed] = await Promise.all([
+    client.readContract({
         address: deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
         functionName: "capOf",
         args: [auctionId, wallet]
-      }),
-      client.readContract({
+    }),
+    client.readContract({
         address: deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
         functionName: "refundableAmount",
         args: [auctionId, wallet]
-      }),
-      client.readContract({
+    }),
+    client.readContract({
         address: deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
         functionName: "refundClaimed",
         args: [auctionId, wallet]
-      }),
-      client.readContract({
+    }),
+    client.readContract({
         address: deployment.contracts.distributionVault,
         abi: distributionVaultAbi,
         functionName: "entitlementOf",
         args: [auctionId, wallet]
-      }),
-      client.readContract({
-        address: deployment.contracts.distributionVault,
-        abi: distributionVaultAbi,
-        functionName: "claimed",
-        args: [auctionId, wallet]
-      }),
-      client.readContract({
-        address: deployment.contracts.escrowVault,
-        abi: escrowVaultAbi,
-        functionName: "sellerCredits",
-        args: [wallet]
-      }),
-      client.readContract({
-        address: deployment.contracts.escrowVault,
-        abi: escrowVaultAbi,
-        functionName: "protocolFeeCredits",
-        args: [wallet]
-      })
-    ]);
+    }),
+    client.readContract({
+      address: deployment.contracts.distributionVault,
+      abi: distributionVaultAbi,
+      functionName: "claimed",
+      args: [auctionId, wallet]
+    })
+  ]);
 
   return {
     cap: toDecimalString(cap),
@@ -137,8 +153,6 @@ async function readWalletPosition({
     refundClaimed: toBoolean(refundClaimed),
     rewardEntitlement: toDecimalString(rewardEntitlement),
     rewardClaimed: toBoolean(rewardClaimed),
-    sellerCredit: toDecimalString(sellerCredit),
-    protocolFeeCredit: toDecimalString(protocolFeeCredit),
     auctionFeeRecipient,
     isAuctionFeeRecipient: wallet.toLowerCase() === auctionFeeRecipient.toLowerCase()
   };
@@ -209,11 +223,31 @@ export async function GET(request: Request) {
     });
     const baseAuctions = await readAuctionsByIds(discoveryResult.ids, {
       client,
-      deployment
+      deployment,
+      includeNftMetadata: false
     });
-    const auctions = await Promise.all(
-      baseAuctions.map((auction) => enrichAuctionForWallet({ auction, wallet, deployment, client }))
-    );
+    const [auctions, sellerCredit, protocolFeeCredit] = await Promise.all([
+      Promise.all(baseAuctions.map((auction) => enrichAuctionForWallet({ auction, wallet, deployment, client }))),
+      readGlobalCredit({
+        wallet,
+        functionName: "sellerCredits",
+        label: "global seller proceeds credit",
+        deployment,
+        client
+      }),
+      readGlobalCredit({
+        wallet,
+        functionName: "protocolFeeCredits",
+        label: "global protocol fees credit",
+        deployment,
+        client
+      })
+    ]);
+    const activityWarnings = [
+      discoveryResult.discovery.warning,
+      sellerCredit.warning,
+      protocolFeeCredit.warning
+    ].filter((warning): warning is string => Boolean(warning));
 
     return NextResponse.json({
       chainId: deployment.chainId,
@@ -221,7 +255,14 @@ export async function GET(request: Request) {
       wallet,
       count: auctions.length,
       discovery: discoveryResult.discovery,
-      activity: buildWalletActivity(auctions, wallet)
+      activity: buildWalletActivity(auctions, wallet, undefined, {
+        globalCredits: {
+          sellerCredit: sellerCredit.value,
+          protocolFeeCredit: protocolFeeCredit.value
+        },
+        partial: activityWarnings.length > 0,
+        warnings: activityWarnings
+      })
     });
   } catch (error) {
     return NextResponse.json(
