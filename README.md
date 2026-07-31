@@ -216,6 +216,25 @@ npm run test
 npm run build
 ```
 
+### Automated Local Auction Lifecycle
+
+With Anvil already running on chain ID `31337`, deploy a fresh local environment and execute the complete auction lifecycle with:
+
+```bash
+cd /workspaces/BidBack
+npm run smoke:local:lifecycle
+```
+
+The command runs pure Node guard/calculation tests first, reuses the existing local deployment, deployment JSON validation and read-only on-chain verification, then exercises NFT approval and custody, three bids including a delta-only step-up, finalization, every pull claim and withdrawal, final accounting, and duplicate-action rejection.
+
+This command is **LOCAL ANVIL ONLY**. It uses only the standard public Anvil development accounts, refuses non-loopback RPC hosts and any chain ID other than `31337`, and does not start or stop Anvil. It uses no real funds and does not replace the partial Base Sepolia multi-wallet smoke test.
+
+Detailed prerequisites, expected economics and failure handling are documented in:
+
+```text
+docs/LOCAL_LIFECYCLE_SMOKE_TEST.md
+```
+
 ---
 
 ## Frontend Tests

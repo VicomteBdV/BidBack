@@ -153,6 +153,29 @@ contract AuctionHouseSecurityTest {
         assertEq(FEE_RECIPIENT.balance - feeBefore, 0.025 ether, "fees withdrawn");
     }
 
+    function testSameBidderStepUpDepositsOnlyDelta() external {
+        uint256 auctionId = _createAuction(5, 1 ether, 2 hours);
+
+        _bid(BIDDER_ONE, auctionId, 1.2 ether);
+        _bid(BIDDER_TWO, auctionId, 1.5 ether);
+
+        uint256 escrowBeforeStepUp = address(escrowVault).balance;
+
+        vm.prank(BIDDER_ONE);
+        auctionHouse.placeBid{value: 0.8 ether}(auctionId, 2 ether);
+
+        AuctionHouse.Auction memory auction = auctionHouse.getAuction(auctionId);
+
+        assertEq(escrowVault.capOf(auctionId, BIDDER_ONE), 2 ether, "first bidder cap steps up");
+        assertEq(escrowVault.capOf(auctionId, BIDDER_TWO), 1.5 ether, "second bidder cap is unchanged");
+        assertEq(address(escrowVault).balance - escrowBeforeStepUp, 0.8 ether, "only cap delta is deposited");
+        assertEq(address(escrowVault).balance, 3.5 ether, "escrow contains both caps");
+        assertEq(auction.highestBidder, BIDDER_ONE, "first bidder becomes highest again");
+        assertEq(auction.highestBid, 2 ether, "highest bid is final cap");
+        assertEq(auction.participantCount, 2, "step-up does not add a participant");
+        assertEq(auction.bidCount, 3, "step-up adds one bid record");
+    }
+
     function testDistributionWithThreeLosersRespectsCapsAndPremiumNet() external {
         uint256 auctionId = _createAuction(4, 1 ether, 2 hours);
 
