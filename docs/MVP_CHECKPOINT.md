@@ -1,6 +1,8 @@
 # BidBack MVP Checkpoint
 
-This document summarizes the current MVP state for the BidBack smart contracts, local Codespaces workflow, frontend, local-dev actions, wallet-signed flows, testnet readiness, and CI.
+> **Historical checkpoint:** This document is retained for detailed MVP history. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md) for the current product status and evidence authority.
+
+This document summarizes the MVP state captured for the BidBack smart contracts, local Codespaces workflow, frontend, local-dev actions, wallet-signed flows, testnet readiness, and CI.
 
 ---
 
@@ -297,7 +299,7 @@ CI does not require:
 
 Recommended next steps:
 
-* Select the controlled public testnet and RPC provider.
-* Dry-run `script/DeployTestnet.s.sol` against the selected testnet RPC.
-* Broadcast only after human review of deployment variables and dry-run output.
+* Complete the controlled Base Sepolia multi-wallet smoke and retain transaction evidence.
+* Re-run deployment and on-chain verification checks for any replacement deployment.
+* Broadcast any redeployment only after human review of deployment variables and dry-run output.
 * Sync, validate, and verify the generated deployment JSON.

@@ -1,10 +1,10 @@
 # Post-Deployment Verification
 
-This document defines the manual checks to run after a future BidBack public testnet deployment.
+This document defines reusable manual checks for any controlled BidBack public-testnet deployment, redeployment, or deployment to a new network.
 
-No public testnet deployment exists yet.
+Base Sepolia deployment and verification are partially validated; the complete public multi-wallet smoke test remains incomplete. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md) for current status.
 
-This is a preparation document only. It does not trigger deployment and does not replace contract tests, frontend tests, block explorer verification, or a security audit.
+This procedure does not trigger deployment and does not replace contract tests, frontend tests, block explorer verification, or a security audit.
 
 For the controlled testnet deployment procedure, start with:
 
@@ -70,7 +70,7 @@ For chain ID `31337`, the script uses:
 * `ANVIL_RPC_URL` if set;
 * otherwise `http://127.0.0.1:8545`.
 
-For a future testnet:
+For a controlled public testnet:
 
 ```bash
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
@@ -200,7 +200,7 @@ It is not integrated into CI because it requires a live RPC and, for Anvil, a ge
 
 ## What Must Be Verified On-Chain
 
-After a future testnet deployment, verify every item below against the target RPC and block explorer.
+After any controlled public-testnet deployment or redeployment, verify every item below against the target RPC and block explorer.
 
 ### Chain and Deployment File
 

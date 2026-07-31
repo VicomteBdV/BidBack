@@ -1,8 +1,8 @@
 # Testnet Readiness
 
-BidBack is not deployed to a public testnet yet.
+BidBack has been deployed to Base Sepolia and its deployment and verification checks are partially validated. The complete public multi-wallet lifecycle is not yet validated.
 
-This document prepares the repository for a future controlled public testnet deployment while keeping the current local Anvil workflow as the default and reliable MVP environment.
+This document describes readiness for controlled public-testnet deployment, redeployment, and continued validation while keeping the local Anvil workflow as the default deterministic MVP environment. Current status is maintained in [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
 
 The concrete deployment runbook for a future controlled testnet is documented in:
 
@@ -23,6 +23,7 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 ### Ready Today
 
 * Local Anvil chain `31337`
+* Base Sepolia deployment and verification checks partially validated
 * Foundry local deployment script
 * Controlled testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Frontend deployment files under `frontend/public/deployments/`
@@ -39,9 +40,9 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 
 ### Not Done Yet
 
-* No public testnet deployment
+* No complete Base Sepolia public multi-wallet lifecycle
 * No production deployment
-* No broadcast performed by the testnet scaffold lot
+* No retained evidence that every public actor transaction and final balance has completed in one canonical smoke run
 * No contract verification workflow
 * No production governance ownership handoff
 * No hosted frontend environment
@@ -76,7 +77,7 @@ They must never be enabled in production or in a hosted testnet frontend.
 
 ### Controlled Public Testnet
 
-A future controlled public testnet deployment should use:
+Any controlled public-testnet deployment or redeployment should use:
 
 ```text
 frontend/public/deployments/<chainId>.json
@@ -230,7 +231,7 @@ This command assumes:
 * `frontend/public/deployments/31337.json` exists;
 * the local deployment has already been created with `npm run local:deploy` or synced with `npm run frontend:sync`.
 
-For future testnet verification:
+For controlled public-testnet verification:
 
 ```bash
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>

@@ -98,9 +98,17 @@ Stores bounded economic and safety parameters.
 
 ---
 
-## MVP Checkpoint
+## Current Product Status and Roadmap
 
-The current MVP status, UI modes, local workflow, test commands, CI coverage, known limitations, and recommended next steps are documented in:
+The current source of truth is [`docs/PRODUCT_STATUS.md`](docs/PRODUCT_STATUS.md). BidBack is **Demo-ready for a controlled local demonstration** as of the 31 July 2026 checkpoint. Base Sepolia deployment and checks are only partially validated; the complete public multi-wallet smoke test is not finished. This is a production-target MVP, not a production-ready product.
+
+Progression gates are defined in [`docs/ROADMAP.md`](docs/ROADMAP.md), open technical choices in [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md), and the approved Codex/Git process in [`docs/CODEX_WORKFLOW.md`](docs/CODEX_WORKFLOW.md).
+
+The local lifecycle procedure is in [`docs/LOCAL_LIFECYCLE_SMOKE_TEST.md`](docs/LOCAL_LIFECYCLE_SMOKE_TEST.md). Base Sepolia deployment and smoke procedures are in [`docs/TESTNET_DEPLOYMENT_RUNBOOK.md`](docs/TESTNET_DEPLOYMENT_RUNBOOK.md) and [`docs/BASE_SEPOLIA_SMOKE_TEST.md`](docs/BASE_SEPOLIA_SMOKE_TEST.md).
+
+## Historical MVP Checkpoint
+
+The detailed historical MVP status, UI modes, local workflow, test commands, CI coverage, known limitations, and recommended next steps are documented in:
 
 ```text
 docs/MVP_CHECKPOINT.md
@@ -112,13 +120,13 @@ The local MVP release candidate checklist is documented in:
 docs/LOCAL_MVP_RELEASE_CANDIDATE.md
 ```
 
-Testnet readiness and future deployment-environment preparation are documented in:
+Testnet readiness, deployment, and redeployment preparation are documented in:
 
 ```text
 docs/TESTNET_READINESS.md
 ```
 
-Future post-deployment verification steps are documented in:
+Reusable post-deployment verification steps are documented in:
 
 ```text
 docs/POST_DEPLOYMENT_VERIFICATION.md

@@ -1,10 +1,10 @@
 # Controlled Testnet Deployment Runbook
 
-This runbook describes how to prepare and execute a first controlled public testnet deployment of BidBack.
+This runbook describes how to prepare and execute a controlled public-testnet deployment, redeployment, or deployment to a new network.
 
 No deployment is performed by this document.
 
-The current scaffold provides the deployment script, JSON sync tooling, validation tooling, and documentation required to make a future deployment reproducible.
+The repository provides the deployment script, JSON sync tooling, validation tooling, and documentation required to make a controlled deployment reproducible. Current environment status is maintained in [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
 
 BidBack testnet deployments must remain aligned with the project constraints:
 
@@ -19,7 +19,7 @@ BidBack testnet deployments must remain aligned with the project constraints:
 
 ## Status and Warning
 
-A first public testnet deployment should be treated as:
+Any controlled public-testnet deployment should be treated as:
 
 ```text
 controlled public testnet / unaudited
@@ -63,7 +63,7 @@ This runbook does not cover:
 
 ## Prerequisites
 
-Before attempting a real testnet broadcast, confirm:
+Before attempting any controlled testnet broadcast, confirm:
 
 * CI is green;
 * `forge test -vv` passes;
@@ -177,7 +177,7 @@ Confirm:
 
 ---
 
-## Future Broadcast
+## Controlled Broadcast
 
 Only broadcast after human review of the dry-run output and environment variables.
 
@@ -200,7 +200,7 @@ Do not commit private keys, `.env` files, or raw secret material.
 
 ## Sync Deployment JSON
 
-After a successful future broadcast, generate the frontend deployment file:
+After a successful broadcast, generate the frontend deployment file:
 
 ```bash
 npm run testnet:sync -- <chainId>

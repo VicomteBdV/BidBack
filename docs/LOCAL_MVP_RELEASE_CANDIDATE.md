@@ -1,5 +1,7 @@
 # Local MVP Release Candidate
 
+> **Historical local candidate:** This document is retained as a local release-candidate checklist, not as the current status authority. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
+
 This document describes the local BidBack MVP release candidate and the manual validation checklist for Codespaces.
 
 This is a local release candidate only. It is not a production release and it is not a public testnet deployment.
@@ -42,7 +44,7 @@ This release candidate covers the current BidBack MVP running in the local Codes
 
 ### Not Included
 
-* No real public testnet deployment yet
+* No public testnet validation is included in this historical local candidate
 * No production deployment
 * No external audit
 * No backend persistence
@@ -292,7 +294,7 @@ This deployment validation is not part of `local:check` yet because `frontend/pu
 
 This release candidate does not include:
 
-* real public testnet deployment;
+* public testnet validation within this historical local candidate;
 * production deployment;
 * external security audit;
 * production governance setup;

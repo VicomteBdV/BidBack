@@ -1,6 +1,6 @@
 # Architecture Decisions
 
-This document captures major product and technical architecture decisions that remain open for BidBack before public testnet and production readiness.
+This document captures major product and technical architecture decisions that remain open before controlled beta, public beta, and production readiness.
 
 It does not freeze final choices.
 
@@ -31,6 +31,7 @@ The current MVP is centered on a local Anvil workflow and a modular smart contra
 Current baseline:
 
 * local Anvil deployment on chain ID `31337`;
+* Base Sepolia deployment and verification checks partially validated, with the complete public multi-wallet smoke still incomplete;
 * modular Foundry contracts;
 * Next.js frontend under `frontend/`;
 * read-only auction views through Next.js server routes;
@@ -221,8 +222,8 @@ Key impacts:
 
 Open questions:
 
-* Which wallets are required for first public testnet?
-* Is WalletConnect required before public testnet or only before broader beta?
+* Which wallets are required for the controlled Base Sepolia demonstration?
+* Is WalletConnect required before controlled beta or only before broader public beta?
 * How should the UI present wallet-specific RPC limitations?
 * Which wallets support the selected chain and any future account abstraction model?
 
@@ -588,13 +589,13 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
 | Bidding authorization model       | Wallet-signed bids plus local-dev server actions for testing                                                          | Session keys, account abstraction, auction-scoped delegation, signed intents, hybrid model | Unauthorized bids, poor UX, relayer trust, replay risk                                | `AuctionHouse`, wallet layer, frontend, future backend  | Before production UX; prototype before public beta |
 | Multi-wallet support              | Wallet-signed panels exist; MetaMask-oriented testing so far                                                          | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps                              | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                  |
-| Chain selection                   | Local Anvil `31337`; no public testnet yet                                                                            | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before first public testnet deployment             |
+| Chain selection                   | Local Anvil `31337` plus partial Base Sepolia validation; production chain remains open                                | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before public beta and production                  |
 | Redistribution computation model  | Deterministic on-chain SCR in MVP                                                                                     | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors                             | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data         |
-| Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before public testnet with external users          |
-| Auction parameter snapshots       | Params, modules, and fee recipient are snapshotted, tested, and visible read-only                                      | Richer events, auction-level verification, richer indexer schema                           | User cannot inspect all rules, stale module confusion, incomplete verification         | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; verify before testnet    |
+| Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before controlled/public beta progression          |
+| Auction parameter snapshots       | Params, modules, and fee recipient are snapshotted, tested, and visible read-only                                      | Richer events, auction-level verification, richer indexer schema                           | User cannot inspect all rules, stale module confusion, incomplete verification         | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; verify each deployment   |
 | Indexing and persistence          | Event-based auction discovery, client-side browsing over loaded windows, and wallet activity discovery with fallbacks  | Event indexer, backend cache, hosted read API                                              | Missing history, RPC log range failures, scalability limits, stale data               | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
 | NFT metadata display              | Opportunistic direct tokenURI reads with HTTP/IPFS support; no cache or media proxy                                    | Metadata cache, media proxy, NFT metadata service, collection indexer                      | Broken media, malicious metadata, stale metadata, external availability                | frontend, future backend, docs                          | Before broader public UX                           |
-| Production trust and verification | JSON validation and expanded on-chain verification exist                                                              | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public testnet and production               |
+| Production trust and verification | JSON validation and expanded on-chain verification exist                                                              | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public beta and production                  |
 | Local-dev tooling boundary        | `/api/dev/*` guarded and local only                                                                                   | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
 | Final UI/UX model                 | Functional MVP UI, not final design                                                                                   | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                                          | frontend, copy, docs, user education                    | After core public testnet mechanics are validated  |
 
@@ -632,7 +633,7 @@ Areas likely to evolve before production:
 * persistent indexer and backend persistence for scalable reads;
 * production-grade auction browsing, pagination, and historical search;
 * NFT metadata caching, media proxying, and content safety;
-* first public testnet deployment execution and verification;
+* completion and retained evidence of the Base Sepolia multi-wallet lifecycle;
 * multi-wallet and network configuration;
 * production monitoring and incident response;
 * final product UX and trust surfaces.
