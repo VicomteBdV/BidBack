@@ -13,6 +13,7 @@
     "testnet:validate": "npm run validate:deployment --",
     "testnet:verify": "npm run verify:deployment:onchain --",
     "local:deploy": "bash scripts/local-demo.sh",
+    "smoke:local:lifecycle": "bash scripts/local-lifecycle-smoke.sh",
     "local:check": "forge test -vv && npm --prefix frontend run test && npm --prefix frontend run typecheck && npm --prefix frontend run build"
   }
 }

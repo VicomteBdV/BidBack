@@ -36,6 +36,7 @@ The current MVP supports:
   * Claim reward
   * Withdraw seller proceeds
   * Withdraw protocol fees
+* Automated, deterministic full-auction lifecycle smoke test against a fresh local Anvil deployment, including delta-only cap step-up, exact settlement accounting, all pull actions, duplicate-action rejection, and a zero final escrow balance
 * Local-dev create auction from the UI
 * Wallet-signed create auction panel
 * Wallet-signed bid panel
@@ -61,7 +62,7 @@ The auction detail page now exposes a read-only `Economic transparency / Settlem
 
 The homepage now includes a short MVP onboarding layer. It explains the ERC-721 auction flow, separates refunds from rewards, states that rewards are conditional and can be zero, and reminds testers that the current app is a controlled MVP/testnet interface rather than a production product.
 
-No public testnet deployment has been executed yet. The repository is prepared for a controlled public testnet deployment, but the deployment must still be reviewed, broadcast, verified, and smoke-tested manually.
+Base Sepolia validation is currently partial. The automated Anvil lifecycle is exhaustive for local deterministic validation, but it does not replace the remaining public multi-wallet transactions and manual review required to complete the Base Sepolia smoke test.
 
 ---
 
@@ -234,6 +235,15 @@ npm run verify:deployment:onchain -- 31337
 
 `verify:deployment:onchain` requires a running RPC and an existing deployment JSON file. For local Anvil, run `npm run local:deploy` and `npm run frontend:sync` first if the local deployment was reset.
 
+Run the exhaustive local lifecycle smoke test with Anvil already running on chain ID `31337`:
+
+```bash
+cd /workspaces/BidBack
+npm run smoke:local:lifecycle
+```
+
+This command is LOCAL ANVIL ONLY. It deploys a fresh local environment, verifies exact premium-funded accounting, and completes every claim and withdrawal without assets of real value. Base Sepolia validation remains partial; this deterministic local result does not replace a public multi-wallet lifecycle.
+
 ---
 
 ## 5. CI Coverage
@@ -262,7 +272,7 @@ CI does not require:
 * MetaMask may not be able to reach Anvil through Codespaces port forwarding.
 * Local-dev actions use known Anvil test private keys.
 * Local-dev actions are not production architecture.
-* No public testnet deployment has been executed yet.
+* Base Sepolia validation remains partial and is not completed by the local Anvil lifecycle.
 * No backend or persistent event indexer exists yet.
 * Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
 * Auction browsing filters and sorting apply only to the currently loaded bounded auction window, not to complete historical auction data.

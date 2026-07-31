@@ -1,10 +1,12 @@
 # Base Sepolia Smoke Test
 
-This document describes the manual smoke test procedure for the first controlled BidBack deployment on Base Sepolia.
+This document describes the manual smoke test procedure for the controlled BidBack deployment on Base Sepolia.
 
 The goal is to validate the full wallet-signed auction lifecycle with a real external ERC-721 testnet NFT.
 
 This is not a production launch checklist. The deployment remains a controlled public testnet, unaudited, and must not be used with assets of real value.
+
+Base Sepolia validation is currently partial. The exhaustive automated lifecycle documented in `docs/LOCAL_LIFECYCLE_SMOKE_TEST.md` runs only on local Anvil with valueless development accounts. It does not replace this public multi-wallet smoke test and must not be presented as proof that the Base Sepolia lifecycle is complete.
 
 ---
 
