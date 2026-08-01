@@ -59,9 +59,9 @@ export default function Home() {
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
             <h2 className="text-lg font-semibold text-white">Demo readiness</h2>
             <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-              <p>The deployment view remains available even when a browser wallet cannot read the Codespaces Anvil RPC.</p>
-              <p>Local-dev actions stay restricted to Anvil 31337. Wallet-signed actions target the configured chain.</p>
-              <p>Outside local Anvil, keep ENABLE_LOCAL_DEV_ACTIONS disabled and use only testnet assets.</p>
+              <p>The read-only deployment view uses the configured server RPC and does not require a connected wallet.</p>
+              <p>Local-dev actions require Anvil 31337 and an explicit server-side enable flag.</p>
+              <p>Wallet-signed actions target {targetChainLabel}; use only valueless assets on public testnets.</p>
             </div>
           </div>
         </section>

@@ -18,6 +18,7 @@ frontend/.env.local
 
 frontend/public/deployments/*.json
 !frontend/public/deployments/.gitkeep
+!frontend/public/deployments/84532.json
 
 coverage/
 lcov.info

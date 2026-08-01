@@ -1,439 +1,173 @@
-# Controlled Testnet Deployment Runbook
+# Controlled Base Sepolia Deployment Runbook
 
-This runbook describes how to prepare and execute a controlled public-testnet deployment, redeployment, or deployment to a new network.
+This runbook prepares a fresh controlled Base Sepolia deployment. It does not authorize or perform a deployment. Broadcast, public RPC access and transactions always require separate explicit approval.
 
-No deployment is performed by this document.
+## Safety Boundary
 
-The repository provides the deployment script, JSON sync tooling, validation tooling, and documentation required to make a controlled deployment reproducible. Current environment status is maintained in [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
+- Base Sepolia chain ID: `84532`.
+- Test ETH and explicitly valueless test NFTs only.
+- No private key, seed phrase, `.env` file or credential-bearing RPC URL in the repository.
+- No guaranteed reward language.
+- No hosted frontend, relayer, account abstraction, WalletConnect or indexer in this lot.
+- `ENABLE_LOCAL_DEV_ACTIONS` must be false or unset outside Anvil.
 
-BidBack testnet deployments must remain aligned with the project constraints:
+## Fresh Deployment Decision
 
-* no guaranteed yield;
-* no lending;
-* no leverage;
-* no derivatives;
-* no redistribution funded by losing bidders' refundable caps;
-* no real private key committed to the repository.
+Use a fresh deployment because the previous public deployment has no retained repository manifest, core addresses or deployment hashes sufficient to prove provenance. A fresh isolated deployment also starts with zero credits and an unambiguous accounting baseline.
 
----
+The existing `script/DeployTestnet.s.sol` is the approved core deployment script and must not be modified for this run. It deploys the six core modules, wires the vaults once and transfers ownership to `TESTNET_OWNER`. It does not deploy a test NFT or create an auction.
 
-## Status and Warning
+## Roles
 
-Any controlled public-testnet deployment should be treated as:
+Prepare five distinct public addresses:
 
-```text
-controlled public testnet / unaudited
-```
+- `W_OWNER`: deployer and `TESTNET_OWNER`;
+- `W_SELLER`: `TESTNET_SMOKE_NFT_RECIPIENT` and auction seller;
+- `W_FEE`: `TESTNET_FEE_RECIPIENT`;
+- `W_A`: bidder A;
+- `W_B`: bidder B.
 
-It is not production.
+The owner EOA is temporary testnet administration, not production governance.
 
-It is not externally audited.
+## Pre-Broadcast Validation
 
-It should use testnet assets and testnet ETH only.
+Run the full Windows or Codespaces validation suite documented in `BASE_SEPOLIA_SMOKE_TEST.md`. Review the exact commit and require a clean approved diff.
 
-No frontend, documentation, or demo copy should imply guaranteed rewards or yield.
-
----
-
-## Scope
-
-This runbook covers:
-
-* selecting a target EVM testnet;
-* preparing RPC and wallet configuration;
-* deploying the core BidBack contracts with Foundry;
-* syncing `frontend/public/deployments/<chainId>.json`;
-* validating the deployment JSON;
-* running read-only on-chain verification;
-* configuring a hosted frontend;
-* running a manual wallet-signed smoke test.
-
-This runbook does not cover:
-
-* production deployment;
-* multisig or timelock setup;
-* block explorer automation;
-* account abstraction;
-* session keys;
-* relayers;
-* indexers;
-* external security audit.
-
----
-
-## Prerequisites
-
-Before attempting any controlled testnet broadcast, confirm:
-
-* CI is green;
-* `forge test -vv` passes;
-* frontend tests pass;
-* frontend typecheck passes;
-* frontend build passes;
-* a target EVM testnet is selected;
-* the deployer wallet is funded with testnet gas only;
-* the owner/admin address is decided;
-* the fee recipient address is decided;
-* the browser wallet can access the target testnet RPC;
-* a server-side RPC URL is available for Next.js read-only routes;
-* no real private key is committed or pasted into docs.
-
-Run the local checks first:
-
-```bash
-forge test -vv
-npm --prefix frontend run test
-npm --prefix frontend run typecheck
-npm --prefix frontend run build
-```
-
----
-
-## Required Environment Variables
-
-Set these variables outside the repository, for example in your shell or secure deployment environment.
-
-```bash
-export TESTNET_RPC_URL=<testnet-rpc-url>
-export TESTNET_PRIVATE_KEY=<deployer-private-key>
-export TESTNET_OWNER=<final-owner-address>
-export TESTNET_FEE_RECIPIENT=<protocol-fee-recipient-address>
-```
-
-Rules:
-
-* `TESTNET_PRIVATE_KEY` is used only by Foundry deployment tooling.
-* `TESTNET_PRIVATE_KEY` must never be committed.
-* `TESTNET_PRIVATE_KEY` must never be exposed through `NEXT_PUBLIC_*` variables.
-* `TESTNET_OWNER` should be the final owner/admin for the controlled testnet.
-* `TESTNET_FEE_RECIPIENT` is the protocol fee recipient used by future auctions.
-* For production, ownership should move to multisig and timelock governance. A controlled testnet may temporarily use a documented EOA.
-
-Optional verification variables:
-
-```bash
-export EXPECTED_OWNER=<expected-owner-address>
-export EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address>
-```
-
-These are used only by the read-only verification script.
-
-* If `EXPECTED_OWNER` is set, every readable core `owner()` must match it.
-* If `EXPECTED_OWNER` is unset, owners are printed but not compared.
-* If `EXPECTED_FEE_RECIPIENT` is set, `AuctionHouse.feeRecipient()` must match it.
-* If `EXPECTED_FEE_RECIPIENT` is unset, the fee recipient is printed but not compared.
-* These variables are optional and are not required for local Anvil.
-
----
-
-## Deployment Script
-
-The testnet deployment script is:
+Set deployment values only in the secure execution environment:
 
 ```text
-script/DeployTestnet.s.sol
+TESTNET_RPC_URL=<Base Sepolia RPC>
+TESTNET_PRIVATE_KEY=<W_OWNER signing key>
+TESTNET_OWNER=<W_OWNER public address>
+TESTNET_FEE_RECIPIENT=<W_FEE public address>
+TESTNET_SMOKE_NFT_RECIPIENT=<W_SELLER public address>
 ```
 
-It deploys only the BidBack core contracts:
+Never echo or record the signing key. Public addresses can be recorded.
 
-* `ParamsController`
-* `NFTVault`
-* `EscrowVault`
-* `DistributionVault`
-* `ReputationAdapter`
-* `AuctionHouse`
+## Core Dry-Run
 
-It does not deploy:
-
-* `LocalERC721`
-* mock NFTs
-* demo auctions
-
-It wires the vaults to the deployed `AuctionHouse`, then transfers final ownership to `TESTNET_OWNER`.
-
----
-
-## Dry-Run
-
-Run a dry-run before any broadcast:
-
-```bash
-forge script script/DeployTestnet.s.sol:DeployTestnet \
-  --rpc-url "$TESTNET_RPC_URL" \
-  -vvv
-```
-
-Review the output carefully.
-
-Confirm:
-
-* no `LocalERC721` is deployed;
-* no NFT is minted;
-* no demo auction is created;
-* `TESTNET_OWNER` is correct;
-* `TESTNET_FEE_RECIPIENT` is correct;
-* all core contracts are deployed;
-* vaults are wired to the expected `AuctionHouse`.
-
----
-
-## Controlled Broadcast
-
-Only broadcast after human review of the dry-run output and environment variables.
-
-```bash
-forge script script/DeployTestnet.s.sol:DeployTestnet \
-  --rpc-url "$TESTNET_RPC_URL" \
-  --broadcast \
-  -vvv
-```
-
-This creates a Foundry broadcast artifact under:
+After separate approval, run without `--broadcast`:
 
 ```text
-broadcast/DeployTestnet.s.sol/<chainId>/run-latest.json
+forge script script/DeployTestnet.s.sol:DeployTestnet --rpc-url "$TESTNET_RPC_URL" -vvv
 ```
 
-Do not commit private keys, `.env` files, or raw secret material.
+Confirm six creates, correct constructor inputs, three one-time vault links, ownership ending at `W_OWNER`, fee recipient `W_FEE`, no mock NFT and no demo auction.
 
----
+## Controlled Core Broadcast
 
-## Sync Deployment JSON
-
-After a successful broadcast, generate the frontend deployment file:
-
-```bash
-npm run testnet:sync -- <chainId>
-```
-
-Equivalent frontend command:
-
-```bash
-npm --prefix frontend run sync:deployment:testnet -- <chainId>
-```
-
-The sync script reads:
+Only after human review and a separate broadcast authorization:
 
 ```text
-broadcast/DeployTestnet.s.sol/<chainId>/run-latest.json
+forge script script/DeployTestnet.s.sol:DeployTestnet --rpc-url "$TESTNET_RPC_URL" --broadcast -vvv
 ```
 
-It writes:
+Retain every deployment, wiring and ownership transaction hash from the Foundry artifact. Do not commit `broadcast/`, `cache/` or `out/`.
+
+## Public Manifest
+
+Generate the manifest from the successful broadcast:
 
 ```text
-frontend/public/deployments/<chainId>.json
+npm run testnet:sync -- 84532
+npm run validate:deployment -- 84532
 ```
 
-The generated file includes only core BidBack contracts:
+`frontend/public/deployments/84532.json` is explicitly allowed by `.gitignore`; local `31337.json` and other generated deployment files remain ignored. Do not use `git add -f`.
 
-* `auctionHouse`
-* `nftVault`
-* `escrowVault`
-* `distributionVault`
-* `paramsController`
-* `reputationAdapter`
+The public manifest must omit `localNft`. Record its checksum and confirm its addresses match the verified broadcast.
 
-It intentionally does not include `localNft`.
+## Deployment Verification
 
----
+Run the existing deployment verifier with explicit expected public addresses:
 
-## Validate Deployment JSON
-
-Validate the generated deployment JSON:
-
-```bash
-npm run validate:deployment -- <chainId>
+```text
+EXPECTED_OWNER=<W_OWNER> \
+EXPECTED_FEE_RECIPIENT=<W_FEE> \
+BIDBACK_RPC_URL=<Base Sepolia RPC> \
+npm run verify:deployment:onchain -- 84532
 ```
 
-The validator checks the file shape and Ethereum address format.
+Additionally verify source and constructor arguments on BaseScan. The repository verifier checks bytecode presence, not source-bytecode equivalence.
 
-It does not prove on-chain bytecode, ownership, parameters, or wiring.
+Expected exact parameters:
 
----
-
-## Read-Only On-Chain Verification
-
-Run the on-chain verification script against the target RPC:
-
-```bash
-BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
+```text
+fee bps                    500
+redistribution bps         5000
+minimum participants       2
+SCR weights                6000 / 3000 / 1000
+minimum bid increment      500 bps
+per-user reward cap        4000 bps
+maximum participants       64
+minimum duration           3600 seconds
+anti-snipe                 600 / 600 seconds, max 6
+minimum exposure           300 seconds
+minimum net premium        0.01 ETH
+EF / ET / II caps          1e18
+paused                     false
 ```
 
-For stricter verification when the final owner and fee recipient are known:
+## Separate Smoke NFT
 
-```bash
-EXPECTED_OWNER="$TESTNET_OWNER" \
-EXPECTED_FEE_RECIPIENT="$TESTNET_FEE_RECIPIENT" \
-BIDBACK_RPC_URL="$TESTNET_RPC_URL" \
-npm run verify:deployment:onchain -- <chainId>
+`script/DeployBaseSepoliaSmokeNft.s.sol` reuses the existing simple `LocalERC721` implementation solely as a valueless public-testnet helper. It is technically sufficient for mint, ownership, approval and safe transfer, so no second ERC-721 implementation is needed.
+
+Dry-run first and confirm recipient `W_SELLER`. After separate authorization, deploy it independently. Its token ID `1` is minted to `W_SELLER`.
+
+Dry-run command:
+
+```text
+forge script script/DeployBaseSepoliaSmokeNft.s.sol:DeployBaseSepoliaSmokeNft --rpc-url "$TESTNET_RPC_URL" -vvv
 ```
 
-This verifies:
+Separately approved broadcast command:
 
-* RPC reachability;
-* RPC chain ID;
-* bytecode presence for core contracts;
-* critical reads;
-* every core `owner()` is readable and non-zero;
-* `EXPECTED_OWNER` matches readable owners when provided;
-* `AuctionHouse.feeRecipient()` is readable and non-zero;
-* `EXPECTED_FEE_RECIPIENT` matches the global fee recipient when provided;
-* selected `ParamsController.params()` sanity checks;
-* deployment-level module linkage through public getters.
-
-Parameter sanity checks include basis-point bounds, non-zero duration and anti-sniping values, SCR weight ordering and sum, participant bounds, and cap bounds.
-
-If the script fails:
-
-* `RPC unreachable` usually means the RPC URL is wrong, unavailable, or rate-limited.
-* `RPC chainId` mismatch means the RPC does not point to the deployment JSON chain.
-* `bytecode missing` means the deployment JSON is stale, wrong, or the address was never deployed.
-* `owner()` mismatch means `EXPECTED_OWNER` does not match the on-chain owner for at least one module.
-* `feeRecipient()` mismatch means `EXPECTED_FEE_RECIPIENT` does not match the current global `AuctionHouse` fee recipient.
-* parameter failures mean the deployed `ParamsController` values are outside the MVP sanity bounds and need human review before using the deployment.
-* module linkage failures mean a module address is stale or wired to the wrong `AuctionHouse`.
-
-The script does not verify:
-
-* multisig or timelock readiness;
-* explorer source verification;
-* transaction smoke tests;
-* source-bytecode equivalence;
-* external audit status.
-
----
-
-## Hosted Frontend Configuration
-
-For a hosted testnet frontend, configure public browser/wallet variables:
-
-```env
-NEXT_PUBLIC_CHAIN_ID=<testnet-chain-id>
-NEXT_PUBLIC_CHAIN_NAME=<testnet-name>
-NEXT_PUBLIC_WALLET_RPC_URL=<wallet-reachable-testnet-rpc-url>
-NEXT_PUBLIC_BLOCK_EXPLORER_URL=<optional-block-explorer-url>
+```text
+forge script script/DeployBaseSepoliaSmokeNft.s.sol:DeployBaseSepoliaSmokeNft --rpc-url "$TESTNET_RPC_URL" --broadcast -vvv
 ```
 
-Configure server-side read variables:
+Record the NFT deployment hash, address, token ID and recipient. Do not run the smoke NFT script more than once for the canonical run.
 
-```env
-BIDBACK_CHAIN_ID=<testnet-chain-id>
-BIDBACK_RPC_URL=<server-side-testnet-rpc-url>
+The helper:
+
+- is not part of BidBack core;
+- is not included in `84532.json`;
+- must not be described as a marketplace-minted or valuable NFT;
+- can be replaced for later runs without redeploying BidBack core.
+
+## Frontend Configuration
+
+Configure the untracked local frontend environment with:
+
+```text
+NEXT_PUBLIC_CHAIN_ID=84532
+NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
+NEXT_PUBLIC_WALLET_RPC_URL=<wallet-accessible RPC>
+NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://sepolia.basescan.org
+BIDBACK_CHAIN_ID=84532
+BIDBACK_RPC_URL=<server-side RPC>
+ENABLE_LOCAL_DEV_ACTIONS=false
 ```
 
-Important:
+Never expose a credential-bearing server RPC through `NEXT_PUBLIC_*`.
 
-* `NEXT_PUBLIC_*` values are public.
-* `BIDBACK_RPC_URL` may be private to the server runtime, but it must not contain private keys.
-* Do not set `ENABLE_LOCAL_DEV_ACTIONS=true` in hosted testnet or production environments.
-* The `/api/dev/*` routes are for local Anvil only.
+Before the smoke, confirm local-dev controls are absent, wallet-signed controls remain available, wrong-network switching targets 84532, read-only pages work without a wallet, and no `/api/dev/*` request is used.
 
----
+## Funding Plan
 
-## Local-Dev Boundary Check
+Use the estimates in `BASE_SEPOLIA_SMOKE_TEST.md`: owner approximately `0.05 ETH`, seller `0.005`, bidder A `0.035`, bidder B `0.020`, fee recipient `0.002`, always adjusted to transaction value plus twice the current gas estimate.
 
-Before opening a controlled public testnet frontend, confirm:
+## Execution Handoff
 
-* `ENABLE_LOCAL_DEV_ACTIONS` is unset or not exactly `true`;
-* `/api/dev/*` routes refuse execution;
-* no Anvil private keys are configured in the hosted frontend;
-* wallet-signed panels do not call `/api/dev/*`;
-* user transactions are signed by the connected wallet.
+After deployment, manifest, source and frontend checks pass, follow `BASE_SEPOLIA_SMOKE_TEST.md` exactly for P1 and T1–T11. Derive the auction ID from `nextAuctionId`; do not hard-code it.
 
-Local-dev actions are not production architecture.
+## Failure and Recovery
 
----
+Before any deposit, stop on an address, chain, bytecode, source, owner, parameter, wiring, pause, NFT or frontend mismatch. Do not replace the manifest with an unverified deployment.
 
-## Manual Smoke Test With A Real Testnet NFT
+If an auction already exists, preserve it. With no bids, wait, finalize and let the seller reclaim. With bids, wait, finalize and complete legitimate exit claims. A recovered run does not count as a successful canonical smoke.
 
-Use testnet assets only.
+## Evidence and Status
 
-### Setup
-
-Confirm:
-
-* seller wallet owns an ERC-721 testnet NFT;
-* bidder wallets have testnet ETH;
-* wallet is connected to the target testnet;
-* frontend points to `frontend/public/deployments/<chainId>.json`;
-* deployment JSON validation passes;
-* on-chain verification passes.
-
-### Create Auction
-
-1. Connect the seller wallet.
-2. Approve `NFTVault` for the NFT token.
-3. Call `AuctionHouse.createAuction(nft, tokenId, startPrice, duration)` through the wallet-signed UI.
-4. Confirm the NFT moves into `NFTVault` custody.
-5. Confirm the auction appears in the read-only auction list.
-6. Confirm the auction detail page shows `OPEN`.
-
-### Bid
-
-1. Connect bidder #1.
-2. Place a wallet-signed bid.
-3. Confirm highest bid and highest bidder update.
-4. Connect bidder #2.
-5. Place a higher wallet-signed bid.
-6. Confirm bidder #1 becomes a losing bidder.
-7. Confirm caps are visible through read-only state.
-
-### Finalize
-
-1. Wait until actual end time.
-2. Finalize the auction.
-3. Confirm auction state becomes `FINALIZED`.
-4. Confirm final price, seller proceeds, protocol fee, distribution reserve, total assigned, and auction rules snapshot.
-
-### Claims and Withdrawals
-
-1. Winner claims NFT.
-2. Losing bidder claims refund.
-3. Eligible bidder claims reward if entitlement is greater than zero.
-4. Seller withdraws proceeds.
-5. Fee recipient withdraws protocol fees.
-
-### Expected Results
-
-Confirm:
-
-* losing bidder recovers the refundable cap;
-* winner can recover surplus when applicable;
-* rewards come only from premium-derived reserve;
-* no claim makes `EscrowVault` insolvent;
-* double claims fail;
-* pause does not block post-finalization claims.
-
----
-
-## Post-Deployment Notes
-
-Record:
-
-* target chain ID;
-* RPC provider used;
-* deployment transaction hashes;
-* contract addresses;
-* deployment JSON file path;
-* smoke test transaction hashes;
-* known issues;
-* current owner/admin address;
-* current fee recipient address;
-* whether explorer verification is complete.
-
-Keep these notes free of secrets.
-
----
-
-## Rollback / Reset
-
-If the deployment is wrong:
-
-* do not reuse a stale deployment JSON;
-* remove or replace the bad `frontend/public/deployments/<chainId>.json` before pointing the frontend at the chain;
-* deploy a fresh set of contracts if vaults are wired incorrectly;
-* rerun deployment JSON validation;
-* rerun on-chain verification;
-* rerun the smoke test.
-
-Vault `setAuctionHouse` is intentionally one-time locked. A vault wired to the wrong `AuctionHouse` should be treated as unusable for that deployment.
+Retain deployment hashes, addresses, source-verification links, manifest checksum and the later lifecycle evidence. Do not create an evidence report or update product status before the actual public cycle succeeds and is reviewed.

@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BidBack MVP",
-  description: "Local BidBack MVP interface for Codespaces and Anvil"
+  description: "BidBack MVP interface for local and controlled public-testnet validation"
 };
 
 export default function RootLayout({

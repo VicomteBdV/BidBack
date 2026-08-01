@@ -208,6 +208,24 @@ export function readOptionalDevAccount(role: DevAccountRole): DevAccountInfo {
   };
 }
 
+export function publicBidderAccountsFromParticipants(participants: readonly Address[]) {
+  const primaryAddress = participants[0] ?? null;
+  const secondaryAddress = participants[1] ?? null;
+
+  return {
+    primary: {
+      role: "primary" as const,
+      address: primaryAddress,
+      configured: primaryAddress !== null
+    },
+    secondary: {
+      role: "secondary" as const,
+      address: secondaryAddress,
+      configured: secondaryAddress !== null
+    }
+  };
+}
+
 async function resolveDeploymentPath(chainId: number) {
   const fileName = `${chainId}.json`;
   const candidates = [
@@ -641,12 +659,7 @@ async function readAuctionEconomics(
   deployment: DeploymentFile,
   client: PublicClient
 ): Promise<AuctionEconomics> {
-  const primary = readOptionalDevAccount("primary");
-  const secondary = readOptionalDevAccount("secondary");
-  const sellerAccount = readOptionalDevAccount("seller");
-  const feeAccount = readOptionalDevAccount("feeRecipient");
-
-  const [globalFeeRecipient, settlementRaw, distributionRaw] = await Promise.all([
+  const [globalFeeRecipient, settlementRaw, distributionRaw, participants] = await Promise.all([
     client.readContract({
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
@@ -663,12 +676,28 @@ async function readAuctionEconomics(
       abi: distributionVaultAbi,
       functionName: "distributions",
       args: [auctionId]
+    }),
+    client.readContract({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "getParticipants",
+      args: [auctionId]
     })
   ]);
 
   const auctionFeeRecipient = auction.auctionFeeRecipient ?? globalFeeRecipient;
   const settlement = serializeSettlement(settlementRaw);
   const distribution = serializeDistribution(distributionRaw);
+  const publicBidders = publicBidderAccountsFromParticipants(participants);
+  const isLocalDeployment = deployment.chainId === anvilChainId;
+  const primary = isLocalDeployment ? readOptionalDevAccount("primary") : publicBidders.primary;
+  const secondary = isLocalDeployment ? readOptionalDevAccount("secondary") : publicBidders.secondary;
+  const sellerAccount = isLocalDeployment
+    ? readOptionalDevAccount("seller")
+    : { role: "seller" as const, address: auction.seller, configured: true };
+  const feeAccount = isLocalDeployment
+    ? readOptionalDevAccount("feeRecipient")
+    : { role: "feeRecipient" as const, address: auctionFeeRecipient, configured: true };
 
   const [primaryBidder, secondBidder, sellerCredit, protocolFeeCredit] = await Promise.all([
     readBidderEconomics({

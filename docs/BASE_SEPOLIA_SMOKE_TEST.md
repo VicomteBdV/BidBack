@@ -1,430 +1,274 @@
-# Base Sepolia Smoke Test
+# Base Sepolia Canonical Multi-Wallet Smoke Test
 
-This document describes the manual smoke test procedure for the controlled BidBack deployment on Base Sepolia.
+This runbook defines the canonical wallet-signed BidBack lifecycle on Base Sepolia (`84532`). It is a controlled public-testnet procedure using valueless assets. It is not production, an audit, or evidence of guaranteed rewards.
 
-The goal is to validate the full wallet-signed auction lifecycle with a real external ERC-721 testnet NFT.
+The public smoke remains incomplete until every transaction and read-only phase check below succeeds and its evidence is retained. The deterministic Anvil lifecycle is a separate prerequisite and never substitutes for this run.
 
-This is not a production launch checklist. The deployment remains a controlled public testnet, unaudited, and must not be used with assets of real value.
+## 1. Deployment Decision
 
-Base Sepolia validation is currently partial. The exhaustive automated lifecycle documented in `docs/LOCAL_LIFECYCLE_SMOKE_TEST.md` runs only on local Anvil with valueless development accounts. It does not replace this public multi-wallet smoke test and must not be presented as proof that the Base Sepolia lifecycle is complete.
+Use a fresh deployment of the six core contracts from the validated commit. The previously referenced Base Sepolia deployment cannot be reconstructed from retained repository addresses and transaction hashes. Do not reuse it unless an independently recovered manifest passes source, bytecode, ownership, parameter, wiring, and provenance review before funds are used.
 
----
+The public manifest is `frontend/public/deployments/84532.json`. It must contain only:
 
-## 1. Scope
+- `AuctionHouse`
+- `NFTVault`
+- `EscrowVault`
+- `DistributionVault`
+- `ParamsController`
+- `ReputationAdapter`
 
-This smoke test validates:
+The smoke NFT is deliberately excluded from the BidBack core manifest.
 
-- Base Sepolia deployment loading;
-- MVP onboarding and testnet disclaimers are visible before wallet actions;
-- wallet connection on the correct chain;
-- external ERC-721 ownership detection;
-- NFT approval to `NFTVault`;
-- wallet-signed auction creation;
-- auction lifecycle summary in list and detail views;
-- read-only economic transparency / settlement breakdown in auction detail views;
-- wallet-signed bidding;
-- wallet-signed action availability and disabled reasons;
-- wallet-signed transaction feedback, transaction hash display, and explorer links when configured;
-- post-confirmation data refresh after wallet-signed transactions;
-- finalization;
-- NFT claim;
-- refund claim;
-- reward claim, when applicable;
-- seller proceeds withdrawal;
-- protocol fee withdrawal.
+## 2. Five Distinct Wallets
 
-This smoke test does not validate:
+| Label | Role | Transactions |
+| --- | --- | --- |
+| `W_OWNER` | deployer and temporary testnet owner | core deployment and smoke NFT deployment |
+| `W_SELLER` | NFT seller | approval, creation, finalization, seller withdrawal |
+| `W_FEE` | snapshotted fee recipient | protocol fee withdrawal |
+| `W_A` | bidder A and expected winner | initial bid, step-up, NFT claim |
+| `W_B` | bidder B and expected losing recipient | outbid, refund claim, reward claim |
 
-- production-grade monitoring;
-- explorer source-code verification;
-- multisig / timelock governance;
-- account abstraction;
-- session keys;
-- relayers;
-- indexer scalability;
-- production UX.
+All five addresses must be valid and pairwise distinct. Store keys only in wallets or an approved secret environment. Never put keys, seed phrases, credential-bearing RPC URLs, or wallet exports in the repository or evidence.
 
----
+## 3. Funding Estimate
 
-## 2. Prerequisites
+| Wallet | Initial target |
+| --- | ---: |
+| `W_OWNER` | approximately `0.05 ETH`, adjusted to at least twice the deployment gas estimate |
+| `W_SELLER` | approximately `0.005 ETH` |
+| `W_A` | approximately `0.035 ETH` |
+| `W_B` | approximately `0.020 ETH` |
+| `W_FEE` | approximately `0.002 ETH` |
 
-Before starting, prepare the following wallets and assets.
+The auction deposits exactly `0.045 ETH`. Before each transaction, require the transaction value plus twice the current gas estimate; the table is a planning estimate, not a fixed guarantee.
 
-| Item | Requirement |
-| --- | --- |
-| Network | Base Sepolia |
-| Seller wallet | Funded with Base Sepolia ETH |
-| Bidder #1 wallet | Funded with Base Sepolia ETH |
-| Bidder #2 wallet | Funded with Base Sepolia ETH |
-| Fee recipient wallet | Funded if it needs to submit withdrawal transactions |
-| NFT | A real ERC-721 testnet NFT owned by the seller |
-| Frontend | Configured for Base Sepolia |
-| Local-dev actions | Disabled outside Anvil |
+## 4. Canonical Economics
 
-`ENABLE_LOCAL_DEV_ACTIONS` must be absent or set to `false`.
+Use a two-hour auction and finish all bids during the first 30 minutes so the anti-sniping window is not entered.
 
-Do not use `LocalERC721` for this smoke test.
+| Step | Total cap | Value sent |
+| --- | ---: | ---: |
+| Start price | `0.010 ETH` | — |
+| Bidder A initial bid | `0.012 ETH` | `0.012 ETH` |
+| Bidder B outbid | `0.015 ETH` | `0.015 ETH` |
+| Bidder A step-up | `0.030 ETH` | `0.018 ETH` delta |
 
-ERC-721 token ID `0` is valid. The smoke test may use token ID `0`, `1`, or any other non-negative integer token ID actually owned by the seller.
+Expected settlement under the exact snapshotted parameter profile:
 
----
+```text
+gross premium             0.0200 ETH
+protocol fee              0.0010 ETH
+net premium               0.0190 ETH
+candidate distribution    0.0095 ETH
+bidder B reward           0.0038 ETH
+seller proceeds           0.0252 ETH
+bidder B refund           0.0150 ETH
+total deposits            0.0450 ETH
+final escrow balance      0 ETH
+```
 
-## 3. Pre-test Deployment Checks
+The `0.015 ETH` refund is the losing bidder's full cap and is independent of the conditional `0.0038 ETH` reward. The positive reward is expected only for this controlled scenario; rewards can be zero in other auctions.
 
-From the repo root:
+## 5. Prerequisites
+
+Before any public transaction:
+
+1. Validate the approved commit in Codespaces with the commands in section 13.
+2. Complete the fresh core deployment under `docs/TESTNET_DEPLOYMENT_RUNBOOK.md` with separately approved broadcast authority.
+3. Generate and validate `frontend/public/deployments/84532.json`.
+4. Verify source, bytecode, owner, fee recipient, exact parameters and module wiring.
+5. Configure the local frontend for Base Sepolia and keep `ENABLE_LOCAL_DEV_ACTIONS=false` or unset.
+6. Confirm local-dev forms and panels are absent while wallet-signed and read-only surfaces remain available.
+7. Deploy the separate valueless smoke NFT and record its address and token ID without adding it to the core manifest.
+8. Confirm `ownerOf(tokenId) = W_SELLER`.
+9. Record the next auction ID before creation; never assume it is `1`.
+
+## 6. Read-Only Verifier
+
+The verifier creates only a Viem public client. It does not import a wallet account, read a private key, sign, broadcast, or modify on-chain state.
+
+Example from the repository root:
+
+```text
+npm run verify:base-sepolia:lifecycle -- \
+  --rpc-url <BASE_SEPOLIA_RPC> \
+  --manifest frontend/public/deployments/84532.json \
+  --auction-id <AUCTION_ID> \
+  --owner <W_OWNER> \
+  --seller <W_SELLER> \
+  --fee-recipient <W_FEE> \
+  --bidder-a <W_A> \
+  --bidder-b <W_B> \
+  --nft <SMOKE_NFT> \
+  --token-id 1 \
+  --phase <PHASE> \
+  --output <NEW_JSON_EVIDENCE_PATH>
+```
+
+The output path is optional. When supplied, it must not already exist. Supported phases are:
+
+- `before-create`
+- `after-create`
+- `after-bid-a`
+- `after-bid-b`
+- `after-step-up`
+- `after-finalize`
+- `after-nft-claim`
+- `after-refund`
+- `after-reward`
+- `after-seller-withdraw`
+- `final`
+
+The verifier must print `[OK]` for completed checks and exit non-zero with `[FAIL]`, the failed step, expected value and observed value on any divergence.
+
+## 7. Transaction Sequence and Phase Checks
+
+### P1 — Test-only NFT preparation
+
+`W_OWNER` deploys `LocalERC721` through `DeployBaseSepoliaSmokeNft.s.sol`; its first token is minted to `W_SELLER`.
+
+Expected: NFT bytecode exists and `ownerOf(1) = W_SELLER`.
+
+### T1 — NFT approval
+
+`W_SELLER` calls `approve(NFTVault, tokenId)`.
+
+Expected: `getApproved(tokenId) = NFTVault`. Run `before-create`; it must also prove the derived auction ID, Base Sepolia chain lock, empty fresh escrow and seller custody.
+
+### T2 — Create auction
+
+`W_SELLER` calls `createAuction(nft, tokenId, 0.01 ether, 7200)`.
+
+Run `after-create`. Expected: open auction, exact seller/NFT/token/start/duration, zero bids and participants, zero caps, exact parameter/fee/module snapshots, active NFTVault lock, NFT held by NFTVault, no extension.
+
+### T3 — Bidder A initial bid
+
+`W_A` calls `placeBid(auctionId, 0.012 ether)` with `0.012 ETH`.
+
+Run `after-bid-a`. Expected: A is highest, cap A `0.012`, one participant, one bid, escrow `0.012`, no extension.
+
+### T4 — Bidder B outbid
+
+`W_B` calls `placeBid(auctionId, 0.015 ether)` with `0.015 ETH`.
+
+Run `after-bid-b`. Expected: B is highest, caps A/B `0.012/0.015`, two participants, two bids, escrow `0.027`, no extension.
+
+### T5 — Bidder A step-up
+
+`W_A` calls `placeBid(auctionId, 0.030 ether)` with exactly `0.018 ETH`.
+
+Run `after-step-up`. Expected: A highest at `0.030`, cap A `0.030`, cap B `0.015`, two participants, three exact bid records, escrow `0.045`, no extension.
+
+### Wait for real expiry
+
+Do not manipulate time. Wait until the public-chain timestamp is greater than `endTime`. The stored state can remain `OPEN` until finalization while the frontend derives `Ready to finalize`.
+
+### T6 — Finalize
+
+`W_SELLER` calls `finalizeAuction(auctionId)`.
+
+Run `after-finalize`. Expected: finalized, A winner, final price `0.030`, fee `0.001`, B refund `0.015`, B entitlement and reserve `0.0038`, seller credit `0.0252`, fee credit `0.001`, escrow `0.045`.
+
+### T7 — Winner claims NFT
+
+`W_A` calls `claimNft(auctionId)` and then run `after-nft-claim`.
+
+Expected: `nftClaimed=true`, lock released, NFT owned by A, escrow unchanged.
+
+### T8 — Losing bidder claims refund
+
+`W_B` calls `claimRefund(auctionId)` and then run `after-refund`.
+
+Expected: refund flag true, full refund remains readable as `0.015`, escrow `0.030`.
+
+### T9 — Losing bidder claims reward
+
+`W_B` calls `DistributionVault.claim(auctionId)` and then run `after-reward`.
+
+Expected: reward flag true, total claimed `0.0038`, reserve zero, escrow `0.0262`.
+
+### T10 — Seller withdraws
+
+`W_SELLER` calls `withdrawSellerProceeds()` and then run `after-seller-withdraw`.
+
+Expected: seller credit zero, fee credit `0.001`, escrow `0.001`.
+
+### T11 — Fee recipient withdraws
+
+`W_FEE` calls `withdrawProtocolFees()` and then run `final`.
+
+Expected: all credits and reserve zero, assigned equals claimed `0.0038`, claim flags true, NFT owned by A, escrow zero.
+
+## 8. Evidence to Retain Later
+
+Do not create evidence files before the public run. For the actual run retain:
+
+- validated commit and clean-worktree status;
+- tool versions and chain ID;
+- public role addresses;
+- public manifest plus checksum;
+- deployment, P1 and T1–T11 hashes;
+- receipt status, block, timestamp, from/to, gas and decoded events;
+- one verifier JSON snapshot per phase;
+- explorer links and redacted screenshots;
+- retry/anomaly notes;
+- read-only simulations showing duplicate NFT, refund, reward and withdrawal actions revert.
+
+EOA balance deltas include gas and are supporting evidence only. Contract state, receipts and events are authoritative for the accounting checks.
+
+## 9. Stop Conditions
+
+Stop before funds if chain, manifest, bytecode, source, owner, fee recipient, wiring, exact parameters, pause state, NFT ownership, role separation or frontend boundary is wrong.
+
+Stop new economic actions if any cap, delta, highest bidder, count, custody field, extension, settlement amount, refund, reward, credit or escrow balance differs from the expected phase. Preserve the failing snapshot and transaction receipt.
+
+## 10. Safe Recovery
+
+- Approval only: revoke approval if abandoning the run.
+- Auction with no bids: wait for expiry, finalize, and let the seller reclaim the NFT.
+- Auction with deposits: do not abandon funds; wait for expiry, finalize and execute the legitimate exit claims.
+- Never overwrite the manifest or evidence to conceal a failed run.
+- Use global pause only after an explicit incident decision; it blocks creation and bidding but must not block exits.
+- A recovered anomalous run is evidence for diagnosis, not a successful canonical smoke.
+
+## 11. Frontend Boundary
+
+For Base Sepolia:
+
+- local-dev forms and `AuctionDevActions` must not render;
+- `/api/dev/*` remains server-disabled;
+- wallet-signed create, bid, finalize, claim and withdrawal controls remain available;
+- read-only pages remain available without a wallet;
+- no copy may describe the configured Base Sepolia RPC as a local Anvil RPC;
+- public participant economics comes from bounded `getParticipants(auctionId)` reads, not Anvil account keys.
+
+## 12. Go / No-Go
+
+Proceed only when every prerequisite and pre-funded check passes. Do not describe Base Sepolia as fully validated until T11, the final verifier snapshot, duplicate simulations and evidence review all succeed.
+
+## 13. Validation Before the Public Run
+
+Windows:
+
+```powershell
+cd C:\Users\Vibe\Code\BidBack
+npm --prefix frontend run test:base-sepolia-verifier
+npm --prefix frontend run test
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+```
+
+Codespaces:
 
 ```bash
 cd /workspaces/BidBack
-
-npm run validate:deployment -- 84532
-
-BIDBACK_RPC_URL="https://sepolia.base.org" \
-npm run verify:deployment:onchain -- 84532
+forge test -vv
+npm --prefix frontend run test:base-sepolia-verifier
+npm --prefix frontend run test
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+npm run smoke:local:lifecycle
 ```
 
-Expected result:
-
-- deployment JSON is valid;
-- Base Sepolia RPC is reachable;
-- deployed bytecode is present for all core contracts;
-- owners are readable;
-- global feeRecipient is readable;
-- `ParamsController.params()` is readable;
-- module linkage is valid.
-
-Optional owner / fee recipient check:
-
-```bash
-EXPECTED_OWNER="<expected-owner-address>" \
-EXPECTED_FEE_RECIPIENT="<expected-fee-recipient-address>" \
-BIDBACK_RPC_URL="https://sepolia.base.org" \
-npm run verify:deployment:onchain -- 84532
-```
-
----
-
-## 4. Frontend Configuration
-
-For local frontend testing against Base Sepolia, use:
-
-```bash
-cd /workspaces/BidBack/frontend
-
-cat > .env.local <<EOF
-NEXT_PUBLIC_CHAIN_ID=84532
-NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
-NEXT_PUBLIC_WALLET_RPC_URL=https://sepolia.base.org
-NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://sepolia.basescan.org
-BIDBACK_CHAIN_ID=84532
-BIDBACK_RPC_URL=https://sepolia.base.org
-ENABLE_LOCAL_DEV_ACTIONS=false
-EOF
-
-npm run dev
-```
-
-Expected result:
-
-- the frontend loads the `84532.json` deployment file;
-- the deployment console displays Base Sepolia;
-- the homepage shows the MVP onboarding panel and concise testnet disclaimers;
-- the onboarding copy states that refunds are separate from rewards and rewards are not guaranteed;
-- auction list cards show a readable lifecycle status and next action;
-- auction detail shows the `Auction lifecycle` section before rules/economics/actions;
-- auction detail shows the `Economic transparency / Settlement breakdown` section;
-- the wallet can connect;
-- if the wallet is on the wrong chain, the UI proposes switching to Base Sepolia;
-- wallet-signed actions show clear disabled reasons before asking for a signature when an action is not currently possible;
-- wallet-signed transactions show waiting, pending, confirmed, rejected, or failed status;
-- transaction hashes are visible, and link to the configured explorer when `NEXT_PUBLIC_BLOCK_EXPLORER_URL` is set;
-- local-dev actions remain unavailable.
-
----
-
-## 5. Manual Smoke Test Scenario
-
-### Step 1 - Seller Connects Wallet
-
-Use the seller wallet.
-
-Expected result:
-
-- wallet is connected;
-- wallet is on Base Sepolia;
-- deployment is loaded;
-- AuctionHouse and NFTVault addresses are visible.
-
-### Step 2 - Seller Enters NFT Details
-
-In the create auction flow, enter:
-
-- ERC-721 contract address;
-- token ID.
-
-Token ID rules:
-
-- `0` is valid;
-- `1` is valid;
-- any non-negative integer token ID is valid if the token exists and is owned by the seller;
-- empty, negative, or decimal token IDs are invalid.
-
-Expected result:
-
-- `ownerOf(tokenId)` is read successfully;
-- displayed owner matches the connected seller wallet;
-- NFTVault address is displayed;
-- approval status is displayed.
-
-Do not continue if the seller is not the NFT owner.
-
-### Step 3 - Seller Approves NFTVault
-
-If the NFT is not approved:
-
-- click `Approve NFTVault`;
-- sign the wallet transaction;
-- wait for confirmation.
-
-Expected result:
-
-- transaction status moves from wallet signature to pending to confirmed;
-- transaction hash is visible;
-- `getApproved(tokenId)` equals NFTVault, or;
-- `isApprovedForAll(owner, NFTVault)` is true;
-- approval status is refreshed after confirmation;
-- create auction action becomes available.
-
-### Step 4 - Seller Creates Auction
-
-Create an auction with test parameters.
-
-| Parameter | Recommendation |
-| --- | --- |
-| Start price | Low enough for bidders to test |
-| Duration | Short but not too short |
-| NFT | Real ERC-721 testnet NFT |
-| Seller | Current connected wallet |
-
-Expected result:
-
-- transaction succeeds;
-- transaction hash is visible;
-- auction appears in the UI;
-- auction lifecycle status is `Open` and next action points to bidding;
-- NFT is transferred into custody;
-- auction status is open;
-- parameter snapshot is visible;
-- fee recipient snapshot is visible;
-- economic transparency shows the current highest bid and pending settlement values without promising rewards.
-
-### Step 5 - Bidder #1 Places a Bid
-
-Switch to bidder #1 wallet.
-
-Expected result:
-
-- wallet is on Base Sepolia;
-- bidder #1 can place a valid bid;
-- transaction succeeds;
-- transaction hash is visible;
-- auction data refreshes after confirmation;
-- bidder #1 becomes highest bidder;
-- bidder cap / exposure is updated.
-
-### Step 6 - Bidder #2 Outbids Bidder #1
-
-Switch to bidder #2 wallet.
-
-Expected result:
-
-- bidder #2 can place a higher valid bid;
-- transaction succeeds;
-- transaction hash is visible;
-- auction data refreshes after confirmation;
-- bidder #2 becomes highest bidder;
-- bidder #1 becomes outbid;
-- auction state remains consistent.
-
-### Step 7 - Wait for Auction Expiration
-
-Wait until the auction end time has passed.
-
-Expected result:
-
-- auction list/detail lifecycle status becomes `Ready to finalize` after refresh;
-- auction can be finalized;
-- no premature finalization is possible before expiry;
-- wallet-signed bidding is blocked after the end time and the UI directs the user to refresh or finalize.
-
-### Step 8 - Finalize Auction
-
-Use any eligible wallet if finalization is permissionless, or the expected wallet if the UI restricts this action.
-
-Expected result:
-
-- finalization transaction succeeds;
-- transaction hash is visible;
-- auction detail refreshes after confirmation;
-- lifecycle phase becomes claims and withdrawals;
-- auction status becomes finalized;
-- final price is fixed;
-- seller proceeds are credited;
-- protocol fees are credited to the fee recipient snapshot;
-- refunds / rewards are available where applicable;
-- economic transparency shows final price, seller proceeds, protocol fees, redistribution status, and visible refund/reward amounts when available.
-
-### Step 9 - Winner Claims NFT
-
-Use the winner wallet.
-
-Expected result:
-
-- winner can claim the NFT;
-- transaction hash is visible;
-- auction detail refreshes after confirmation;
-- NFT is transferred from custody to the winner;
-- duplicate NFT claim is impossible;
-- non-winner wallets see a clear disabled reason.
-
-### Step 10 - Losing Bidder Claims Refund
-
-Use the losing bidder wallet.
-
-Expected result:
-
-- losing bidder can claim refund;
-- transaction hash is visible;
-- wallet claim data refreshes after confirmation;
-- refund amount is transferred;
-- duplicate refund claim is impossible;
-- wallets with no refund see a clear disabled reason.
-
-### Step 11 - Losing Bidder Claims Reward, if Applicable
-
-Use the losing bidder wallet.
-
-Expected result:
-
-- reward claim succeeds if reward entitlement is greater than zero;
-- transaction hash is visible;
-- wallet claim data refreshes after confirmation;
-- if no reward is available, the UI should make this clear;
-- duplicate reward claim is impossible.
-
-Rewards may be zero if the premium net is too low or if redistribution conditions are not met.
-
-### Step 12 - Seller Withdraws Proceeds
-
-Use the seller wallet.
-
-Expected result:
-
-- seller can withdraw proceeds;
-- transaction hash is visible;
-- wallet claim data refreshes after confirmation;
-- proceeds are transferred;
-- duplicate withdrawal is impossible;
-- non-seller wallets see a clear disabled reason.
-
-### Step 13 - Fee Recipient Withdraws Protocol Fees
-
-Use the fee recipient wallet.
-
-Expected result:
-
-- fee recipient can withdraw protocol fees;
-- transaction hash is visible;
-- wallet claim data refreshes after confirmation;
-- fees were credited to the fee recipient snapshot of the auction;
-- duplicate withdrawal is impossible;
-- non-fee-recipient wallets see a clear disabled reason.
-
----
-
-## 6. Expected Final State
-
-| Area | Expected result |
-| --- | --- |
-| Auction | Finalized |
-| NFT | Held by winner |
-| Seller | Proceeds withdrawn |
-| Losing bidder | Refund claimed |
-| Reward | Claimed if applicable |
-| Protocol fees | Withdrawn by fee recipient |
-| Settlement breakdown | Final price, proceeds, fees, visible refunds/rewards, and redistribution status are readable |
-| Double claims | Rejected |
-| Local-dev actions | Not used |
-| Server-side private keys | Not used |
-
----
-
-## 7. Common Issues and Mitigations
-
-| Issue | Likely cause | Mitigation |
-| --- | --- | --- |
-| Wallet on wrong network | Wallet not on Base Sepolia | Use the network switch button or switch manually |
-| Deployment not loaded | Missing or stale `84532.json` | Re-run deployment sync and validation |
-| NFT owner mismatch | Wrong wallet or wrong token ID | Confirm seller wallet and token ID |
-| Token ID rejected | Empty, negative, or decimal token ID | Use a non-negative integer; `0` is valid |
-| Approval missing | NFTVault not approved | Use `Approve NFTVault` before creating the auction |
-| Create auction fails | Wrong approval, wrong owner, or invalid parameters | Re-check owner, approval and auction inputs |
-| Transaction rejected | User rejected the wallet request | Retry only if the displayed action and wallet prompt are expected |
-| Bid fails | Bid too low or wallet underfunded | Increase bid and check Base Sepolia ETH balance |
-| Bid button disabled after expiry | Auction reached end time | Refresh auction state and finalize instead of bidding |
-| Cannot finalize | Auction not expired | Wait until end time |
-| Reward is zero | Premium net too low or conditions not met | Use a larger second bid in a future test |
-| Claim or withdrawal disabled | Current wallet is not eligible or no amount is available | Read the disabled reason shown by the UI, then switch wallet or continue to the next step |
-| Fee withdrawal fails | Wrong wallet | Use the fee recipient snapshot wallet |
-| Some economic fields show unavailable | RPC read failed or the MVP read model does not expose that field yet | Refresh and verify settlement-critical values directly on-chain if needed |
-| RPC errors | Public RPC rate limit or instability | Retry or use a more reliable RPC |
-| Local-dev actions visible | `ENABLE_LOCAL_DEV_ACTIONS` enabled | Set it to false or remove it outside Anvil |
-
----
-
-## 8. Smoke Test Execution Log
-
-| Step | Wallet | Transaction hash | Result | Notes |
-| --- | --- | --- | --- | --- |
-| Seller connects wallet | Seller | N/A | | |
-| NFT ownership check | Seller | N/A | | |
-| Approve NFTVault | Seller | | | |
-| Create auction | Seller | | | |
-| First bid | Bidder #1 | | | |
-| Second bid | Bidder #2 | | | |
-| Finalize auction | | | | |
-| Review settlement breakdown | N/A | N/A | | |
-| Claim NFT | Winner | | | |
-| Claim refund | Losing bidder | | | |
-| Claim reward | Losing bidder | | | |
-| Withdraw seller proceeds | Seller | | | |
-| Withdraw protocol fees | Fee recipient | | | |
-
----
-
-## 9. Go / No-Go
-
-### Go
-
-Proceed only if:
-
-- Base Sepolia deployment verification passes;
-- frontend loads `84532.json`;
-- onboarding and disclaimers are visible;
-- wallet network switching works;
-- seller owns a real ERC-721 testnet NFT;
-- seller and bidders are funded;
-- `ENABLE_LOCAL_DEV_ACTIONS` is disabled;
-- no secrets are committed;
-- all participants understand this is a controlled unaudited testnet.
-
-### No-Go
-
-Stop if:
-
-- deployment verification fails;
-- owner or fee recipient is unexpected;
-- frontend points to the wrong chain;
-- seller does not own the NFT;
-- NFTVault approval cannot be confirmed;
-- any private key appears in a file or command history intended for commit;
-- local-dev actions are enabled outside Anvil.
+Passing Anvil proves the local deterministic lifecycle only. Passing this Base Sepolia run proves one canonical public multi-wallet execution only; neither is a production-readiness claim.
