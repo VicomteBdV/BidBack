@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { AuctionDetail } from "@/components/AuctionDetail";
 import { WalletButton } from "@/components/WalletButton";
+import { targetChainLabel } from "@/lib/chains";
+import { isLocalDevUiEnabled } from "@/lib/localDevUi";
 
 export default async function AuctionPage({ params }: { params: Promise<{ auctionId: string }> }) {
   const { auctionId } = await params;
+  const localDevActionsEnabled = isLocalDevUiEnabled();
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -15,13 +18,13 @@ export default async function AuctionPage({ params }: { params: Promise<{ auctio
             </Link>
             <h1 className="mt-2 text-3xl font-semibold text-white">Auction detail</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Read-only auction data is fetched by Next.js from the local Anvil RPC.
+              Read-only auction data is fetched by Next.js from the configured RPC for {targetChainLabel}.
             </p>
           </div>
           <WalletButton />
         </header>
 
-        <AuctionDetail auctionId={auctionId} />
+        <AuctionDetail auctionId={auctionId} localDevActionsEnabled={localDevActionsEnabled} />
       </div>
     </main>
   );

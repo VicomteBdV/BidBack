@@ -2,8 +2,11 @@ import Link from "next/link";
 import { CreateAuctionForm } from "@/components/CreateAuctionForm";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { WalletButton } from "@/components/WalletButton";
+import { isLocalDevUiEnabled } from "@/lib/localDevUi";
 
 export default function CreateAuctionPage() {
+  const localDevActionsEnabled = isLocalDevUiEnabled();
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
@@ -21,7 +24,7 @@ export default function CreateAuctionPage() {
           <WalletButton />
         </header>
 
-        <CreateAuctionForm />
+        {localDevActionsEnabled ? <CreateAuctionForm /> : null}
         <WalletCreateAuctionForm />
       </div>
     </main>

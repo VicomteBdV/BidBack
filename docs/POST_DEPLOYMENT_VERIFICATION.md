@@ -1,682 +1,135 @@
 # Post-Deployment Verification
 
-This document defines reusable manual checks for any controlled BidBack public-testnet deployment, redeployment, or deployment to a new network.
+This document defines the read-only checks required after a controlled Base Sepolia deployment and during its canonical smoke. It does not authorize a broadcast or transaction.
 
-Base Sepolia deployment and verification are partially validated; the complete public multi-wallet smoke test remains incomplete. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md) for current status.
+## 1. Deployment Manifest
 
-This procedure does not trigger deployment and does not replace contract tests, frontend tests, block explorer verification, or a security audit.
-
-For the controlled testnet deployment procedure, start with:
+Validate `frontend/public/deployments/84532.json`:
 
 ```text
-docs/TESTNET_DEPLOYMENT_RUNBOOK.md
+npm run validate:deployment -- 84532
 ```
 
----
+Expected:
 
-## Purpose
+- `chainId` is exactly `84532`;
+- all six core addresses are valid and non-zero;
+- no `localNft` is present;
+- addresses match the reviewed Foundry broadcast;
+- the file checksum is recorded for later evidence.
 
-The deployment JSON validator checks that a file such as:
+## 2. Deployment-Level On-Chain Checks
+
+Run after explicit RPC authorization:
 
 ```text
-frontend/public/deployments/<chainId>.json
+EXPECTED_OWNER=<W_OWNER> \
+EXPECTED_FEE_RECIPIENT=<W_FEE> \
+BIDBACK_RPC_URL=<Base Sepolia RPC> \
+npm run verify:deployment:onchain -- 84532
 ```
 
-has the expected shape.
+This verifies chain ID, bytecode presence, readable non-zero owners, expected owner, global fee recipient, parameter sanity and deployment-level module wiring.
 
-It verifies:
+Human review must additionally confirm:
 
-* the JSON is readable;
-* `chainId` exists;
-* `chainId` matches the expected chain;
-* core contract fields are present;
-* core contract addresses are valid Ethereum addresses;
-* `localNft` is optional;
-* unknown fields do not break validation.
+- every deployed source and constructor argument on BaseScan;
+- source commit and compiler settings;
+- every deployment, wiring and ownership receipt;
+- exact parameter values, not only sanity bounds;
+- `paused=false`;
+- no unexpected existing credits or activity in the fresh deployment.
 
-However, the deployment JSON validator does not verify real on-chain state.
+## 3. Exact Core Configuration
 
-It does not prove that:
+All six `owner()` values must equal `W_OWNER`. `AuctionHouse.feeRecipient()` must equal `W_FEE`.
 
-* the addresses contain bytecode;
-* the bytecode matches the expected contracts;
-* contracts are wired to each other correctly;
-* ownership/admin setup is intended;
-* the global fee recipient is intended;
-* economic parameters are reasonable;
-* the frontend points to the same chain that was deployed;
-* the deployment is safe for production.
+The five AuctionHouse module getters must match the manifest. Each of `NFTVault`, `EscrowVault` and `DistributionVault` must point back to the same `AuctionHouse`.
 
-Post-deployment verification closes part of that gap.
+Required exact parameter profile:
 
----
+| Parameter | Expected |
+| --- | ---: |
+| `bidbackFeeBps` | 500 |
+| `redistributionBps` | 5000 |
+| `minParticipants` | 2 |
+| `alphaBps / betaBps / gammaBps` | 6000 / 3000 / 1000 |
+| `minBidIncrementBps` | 500 |
+| `perUserRewardCapBps` | 4000 |
+| `maxParticipants` | 64 |
+| `maxInteractionCount` | 5 |
+| `minAuctionDuration` | 3600 |
+| `antiSnipeWindow / extension / max` | 600 / 600 / 6 |
+| `minExposure` | 300 |
+| `minPremiumNet` | 0.01 ETH |
+| `efCap / etCap / iiCap` | 1e18 / 1e18 / 1e18 |
 
-## On-Chain Verification Script
+## 4. Test-Only NFT
 
-BidBack includes a read-only on-chain verification script:
+The smoke NFT is external to BidBack core and absent from the manifest. Verify its bytecode, `ownerOf(tokenId) = W_SELLER`, approval target before creation, NFTVault custody after creation and winner ownership after claim.
 
-```bash
-npm run verify:deployment:onchain -- <chainId>
-```
+Metadata availability is optional and must never affect custody or settlement checks.
 
-For local Anvil:
+## 5. Lifecycle Verifier
 
-```bash
-npm run verify:deployment:onchain -- 31337
-```
+`frontend/scripts/verify-base-sepolia-lifecycle.mjs` is chain-locked to `84532` and creates only a public client. It requires explicit RPC, manifest, auction, NFT and five public role inputs. It never reads a private key or signs a transaction.
 
-For chain ID `31337`, the script uses:
+Run it after each phase described in `BASE_SEPOLIA_SMOKE_TEST.md`. The verifier checks:
 
-* `ANVIL_RPC_URL` if set;
-* otherwise `http://127.0.0.1:8545`.
+- manifest and all core bytecodes;
+- all owners, fee recipient, pause state and exact parameters;
+- deployment and auction module wiring;
+- auction parameter and fee recipient snapshots;
+- seller, NFT, token ID, duration and start price;
+- bounded participant list and three bounded bid records;
+- caps, highest bidder, participant and bid counts;
+- zero anti-sniping extensions;
+- NFT custody and lock flags;
+- settlement, refunds, reward entitlements, claim flags and credits;
+- distribution reserve, assigned/claimed totals and escrow link;
+- exact escrow balance for the selected phase.
 
-For a controlled public testnet:
+An optional output path creates a JSON snapshot with exclusive-create semantics. Never overwrite a prior phase snapshot.
 
-```bash
-BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
-```
+## 6. Canonical Phase Matrix
 
-The script requires:
+| Phase | Key expected state |
+| --- | --- |
+| `before-create` | derived next ID, seller owns NFT, fresh escrow zero |
+| `after-create` | open, custody locked, no participants or bids |
+| `after-bid-a` | A cap/highest 0.012, escrow 0.012 |
+| `after-bid-b` | B highest 0.015, two participants, escrow 0.027 |
+| `after-step-up` | A highest/cap 0.030, three bids, escrow 0.045 |
+| `after-finalize` | fee 0.001, reward/reserve 0.0038, seller 0.0252, refund B 0.015 |
+| `after-nft-claim` | NFT owned by A, lock released |
+| `after-refund` | B refund claimed, escrow 0.030 |
+| `after-reward` | B reward claimed, reserve zero, escrow 0.0262 |
+| `after-seller-withdraw` | seller credit zero, escrow 0.001 |
+| `final` | fee credit zero, escrow zero, assigned equals claimed |
 
-* a reachable RPC;
-* a deployment JSON file at `frontend/public/deployments/<chainId>.json`;
-* a deployment JSON file that passes `npm run validate:deployment -- <chainId>`.
+## 7. Duplicate-Action Diagnostics
 
-The script verifies:
+After the final state, use read-only simulations at a recorded block to confirm duplicate NFT claim, refund claim, reward claim, seller withdrawal and protocol fee withdrawal revert. Do not send intentionally reverting public transactions merely to obtain a hash.
 
-* deployment JSON shape and address format;
-* RPC reachability;
-* RPC chain ID matches the deployment file chain ID;
-* bytecode exists for all core contracts;
-* bytecode exists for `localNft` if present;
-* `AuctionHouse.nextAuctionId()` can be read;
-* `ParamsController.paused()` can be read;
-* `ParamsController.params()` can be read;
-* each core `owner()` is readable and non-zero;
-* `AuctionHouse.feeRecipient()` is readable and non-zero;
-* selected economic and operational parameter sanity checks;
-* deployment-level module linkage that is exposed by public getters.
+## 8. Failure Policy
 
-The owner checks cover:
+Any `[FAIL]`, missing field, RPC chain mismatch, unexpected extension, stale manifest, zero bytecode, source mismatch or economic divergence invalidates the canonical run. Preserve the JSON and receipt, stop new bids, and follow the safe recovery procedure in `BASE_SEPOLIA_SMOKE_TEST.md`.
 
-* `AuctionHouse.owner()`;
-* `NFTVault.owner()`;
-* `EscrowVault.owner()`;
-* `DistributionVault.owner()`;
-* `ParamsController.owner()`;
-* `ReputationAdapter.owner()`.
+## 9. Evidence Review
 
-By default, owners are reported but not compared to an expected address.
+Before changing product status, a reviewer must reconcile:
 
-To enforce an expected owner during testnet verification:
+- manifest and verified source addresses;
+- P1 and T1–T11 receipts;
+- all phase JSON snapshots;
+- expected and observed accounting totals;
+- NFT final owner;
+- zero final credits, reserve and escrow balance;
+- duplicate-action simulations;
+- absence of secrets and `/api/dev/*` usage.
 
-```bash
-EXPECTED_OWNER=<expected-owner-address> \
-BIDBACK_RPC_URL=<testnet-rpc-url> \
-npm run verify:deployment:onchain -- <chainId>
-```
+Only then may status documentation record one dated canonical Base Sepolia multi-wallet lifecycle. It must not imply production readiness or guaranteed rewards.
 
-To enforce an expected global fee recipient:
+## 10. Local/Public Distinction
 
-```bash
-EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
-BIDBACK_RPC_URL=<testnet-rpc-url> \
-npm run verify:deployment:onchain -- <chainId>
-```
-
-Both expected values can be combined:
-
-```bash
-EXPECTED_OWNER=<expected-owner-address> \
-EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
-BIDBACK_RPC_URL=<testnet-rpc-url> \
-npm run verify:deployment:onchain -- <chainId>
-```
-
-`EXPECTED_OWNER` and `EXPECTED_FEE_RECIPIENT` are optional. They are never required for local Anvil.
-
-The script verifies these module links:
-
-* `AuctionHouse.nftVault()` matches `deployment.contracts.nftVault`;
-* `AuctionHouse.escrowVault()` matches `deployment.contracts.escrowVault`;
-* `AuctionHouse.distributionVault()` matches `deployment.contracts.distributionVault`;
-* `AuctionHouse.paramsController()` matches `deployment.contracts.paramsController`;
-* `AuctionHouse.reputationAdapter()` matches `deployment.contracts.reputationAdapter`;
-* `NFTVault.auctionHouse()` matches `deployment.contracts.auctionHouse`;
-* `EscrowVault.auctionHouse()` matches `deployment.contracts.auctionHouse`;
-* `DistributionVault.auctionHouse()` matches `deployment.contracts.auctionHouse`.
-
-The script checks selected parameter invariants, including:
-
-* protocol fee basis points are within the MVP bound;
-* redistribution basis points are not above `10000`;
-* minimum participants is at least `2`;
-* SCR weights respect `alpha > beta >= gamma`;
-* SCR weights sum to `10000`;
-* bid increment is non-zero and at most `10000` bps;
-* per-user reward cap is non-zero and at most `10000` bps;
-* max participants is not below min participants and remains bounded;
-* max interaction count is non-zero;
-* minimum auction duration is non-zero;
-* anti-sniping window and extension are non-zero;
-* max anti-sniping extensions stays within the MVP bound;
-* minimum exposure is not above minimum auction duration;
-* EF / ET / II caps are non-zero and at most `1e18`.
-
-These are sanity checks, not governance approval. Human review must still confirm that parameter values are suitable for the chosen testnet.
-
-The script fails with exit code `1` if:
-
-* the deployment file is missing;
-* the deployment JSON is invalid;
-* the RPC is inaccessible;
-* the RPC chain ID is wrong;
-* a checked contract address has no bytecode;
-* a critical read fails;
-* an owner is zero or unreadable;
-* `EXPECTED_OWNER` is set and a readable owner differs;
-* `AuctionHouse.feeRecipient()` is zero or unreadable;
-* `EXPECTED_FEE_RECIPIENT` is set and the readable fee recipient differs;
-* a parameter sanity check fails;
-* a verifiable module linkage check fails.
-
-The script intentionally skips these auction-scoped checks for now:
-
-* `DistributionVault.escrowForAuction(auctionId)`, because it exists per auction after a distribution is opened;
-* `AuctionHouse.getAuctionModules(auctionId)`, because it is an auction-specific snapshot.
-
-The script does not verify yet:
-
-* complete governance readiness;
-* multisig or timelock configuration;
-* transaction smoke tests;
-* block explorer verification;
-* source-bytecode equivalence;
-* external security audit status.
-
-It is not integrated into CI because it requires a live RPC and, for Anvil, a generated local deployment file.
-
----
-
-## What Must Be Verified On-Chain
-
-After any controlled public-testnet deployment or redeployment, verify every item below against the target RPC and block explorer.
-
-### Chain and Deployment File
-
-Confirm:
-
-* the controlled testnet runbook was followed;
-* the RPC chain ID matches the deployment JSON filename;
-* the deployment JSON `chainId` matches the target chain;
-* `frontend/public/deployments/<chainId>.json` is the latest deployment artifact;
-* the deployment JSON was generated from `broadcast/DeployTestnet.s.sol/<chainId>/run-latest.json`.
-
-Run the local deployment JSON validator:
-
-```bash
-npm run validate:deployment -- <chainId>
-```
-
-Run read-only on-chain verification:
-
-```bash
-BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
-```
-
-Run stricter read-only verification when the expected owner and fee recipient are known:
-
-```bash
-EXPECTED_OWNER=<expected-owner-address> \
-EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address> \
-BIDBACK_RPC_URL=<testnet-rpc-url> \
-npm run verify:deployment:onchain -- <chainId>
-```
-
-### Bytecode Presence
-
-For each core contract address in the deployment JSON, confirm bytecode exists on-chain:
-
-* `AuctionHouse`
-* `NFTVault`
-* `EscrowVault`
-* `DistributionVault`
-* `ParamsController`
-* `ReputationAdapter`
-
-A controlled public testnet deployment should not include `localNft` unless a mock NFT was deliberately deployed for a test-only environment.
-
-An address with empty bytecode means the deployment JSON is wrong or stale.
-
-### ABI Compatibility
-
-Confirm each contract responds to critical read functions expected by the frontend and scripts.
-
-Expected examples include:
-
-* `AuctionHouse.nextAuctionId()`
-* `AuctionHouse.getAuction(uint256)`
-* `AuctionHouse.minimumNextBid(uint256)`
-* `AuctionHouse.feeRecipient()`
-* `AuctionHouse.getAuctionParams(uint256)`
-* `AuctionHouse.getAuctionFeeRecipient(uint256)`
-* `EscrowVault.capOf(uint256,address)`
-* `EscrowVault.refundableAmount(uint256,address)`
-* `EscrowVault.sellerCredits(address)`
-* `EscrowVault.protocolFeeCredits(address)`
-* `DistributionVault.entitlementOf(uint256,address)`
-* `DistributionVault.claimed(uint256,address)`
-* `ParamsController.params()`
-* `ParamsController.paused()`
-
-If these calls fail, the address, ABI, or deployment version is wrong.
-
-### Module Linkage
-
-Confirm `AuctionHouse` references the intended deployed modules.
-
-The on-chain verification script checks the deployment-level getters currently exposed by the MVP contracts:
-
-* `AuctionHouse.nftVault()`
-* `AuctionHouse.escrowVault()`
-* `AuctionHouse.distributionVault()`
-* `AuctionHouse.paramsController()`
-* `AuctionHouse.reputationAdapter()`
-* `NFTVault.auctionHouse()`
-* `EscrowVault.auctionHouse()`
-* `DistributionVault.auctionHouse()`
-
-A mismatch means the deployment JSON is stale, a module was wired incorrectly, or a vault is locked to the wrong `AuctionHouse`.
-
-The script does not check auction-scoped module snapshots yet:
-
-* `DistributionVault.escrowForAuction(auctionId)`;
-* `AuctionHouse.getAuctionModules(auctionId)`.
-
-Those should be checked later with an auction-aware verification or smoke test.
-
-### Vault AuctionHouse Locks
-
-Confirm each vault has the intended `AuctionHouse` set:
-
-* `NFTVault`
-* `EscrowVault`
-* `DistributionVault`
-
-Confirm the one-time set / lock behavior has not left any vault pointing to a stale or wrong `AuctionHouse`.
-
-A wrong vault-to-house link can break custody, settlement, refunds, or redistribution.
-
-### Ownership and Admin State
-
-Confirm temporary ownership/admin state is explicit and documented.
-
-The on-chain verification script reads every core `owner()` value. If `EXPECTED_OWNER` is set, it fails on any mismatch.
-
-Verify:
-
-* deployer address;
-* final owner address from `TESTNET_OWNER`;
-* owner/admin address for each module;
-* pause authority;
-* parameter authority;
-* fee recipient from `TESTNET_FEE_RECIPIENT`;
-* any remaining EOA ownership.
-
-For real production, ownership should move to multisig/timelock governance. A controlled testnet may temporarily use an EOA, but that must be intentional and documented.
-
-### Fee Recipient State
-
-Confirm the current global fee recipient matches the intended testnet recipient.
-
-The on-chain verification script reads `AuctionHouse.feeRecipient()` and fails if it is zero. If `EXPECTED_FEE_RECIPIENT` is set, it fails on mismatch.
-
-Remember that auctions also snapshot the fee recipient at creation. The global fee recipient check confirms the current default for future auctions; auction-specific snapshots must be reviewed on auction details when needed.
-
-### ParamsController State
-
-Confirm `ParamsController` contains expected MVP parameters.
-
-The on-chain verification script checks basic parameter sanity. Human review must still verify exact intended values.
-
-Verify at minimum:
-
-* minimum auction duration;
-* minimum participants;
-* premium threshold;
-* protocol fee configuration;
-* redistribution fraction;
-* bid increment;
-* anti-sniping window and extension;
-* max participants;
-* pause state.
-
-Confirm values match the intended testnet configuration and do not imply guaranteed yield.
-
-### ReputationAdapter State
-
-Confirm `ReputationAdapter` is in the expected testnet mode.
-
-Verify:
-
-* reputation is non-blocking;
-* it affects only redistribution;
-* it cannot block refunds;
-* configured multipliers are bounded as expected.
-
-### NFTVault Behavior
-
-Confirm `NFTVault` can receive and release ERC-721 tokens through the intended auction flow.
-
-Verify:
-
-* NFT approval targets `NFTVault`, not `AuctionHouse`;
-* auction creation transfers custody as expected;
-* NFT claim after finalization is pull-based;
-* no-bid seller reclaim behavior works if applicable.
-
-### EscrowVault Behavior
-
-Confirm `EscrowVault` is correctly configured.
-
-Verify:
-
-* caps are tracked per auction and bidder;
-* cap step-up accounting works;
-* losing bidder refund remains fully recoverable;
-* winner surplus refund remains recoverable;
-* seller proceeds are pull-based;
-* protocol fee withdrawal is pull-based;
-* claims are not blocked by pause.
-
-### DistributionVault Behavior
-
-Confirm `DistributionVault` is correctly configured.
-
-Verify:
-
-* redistribution opens only after finalization;
-* entitlements are deterministic;
-* reward claims are pull-based;
-* double claim is rejected;
-* total claimed cannot exceed assigned rewards;
-* assigned rewards cannot exceed available distribution reserve.
-
----
-
-## Smoke Test Flow
-
-Run a small end-to-end testnet scenario with test assets and test funds only.
-
-### Setup
-
-Confirm:
-
-* wallet is on the target testnet;
-* frontend points to `frontend/public/deployments/<chainId>.json`;
-* the deployment JSON validator passes;
-* read-only on-chain verification passes;
-* all core addresses have bytecode;
-* a real testnet ERC-721 NFT is available;
-* the seller wallet owns the NFT;
-* bidder wallets have enough test ETH for gas and bids.
-
-### Auction Creation
-
-1. Approve `NFTVault` for the NFT token.
-2. Call `AuctionHouse.createAuction(nft, tokenId, startPrice, duration)`.
-3. Confirm the NFT moves into vault custody.
-4. Confirm the auction appears in the frontend read-only list.
-5. Confirm auction detail shows `OPEN`.
-6. Confirm auction parameter snapshot and fee recipient snapshot are visible.
-
-### Bidding
-
-1. Place first bid from bidder #1.
-2. Confirm highest bidder and highest bid update.
-3. Place second bid from bidder #2 with a higher cap.
-4. Confirm bidder #1 becomes a losing bidder.
-5. Confirm caps are visible through `EscrowVault.capOf`.
-
-### Finalization
-
-1. Wait until actual auction end time.
-2. Finalize the auction.
-3. Confirm auction state becomes `FINALIZED`.
-
-Confirm settlement values:
-
-* final price;
-* seller proceeds;
-* protocol fee;
-* distribution reserve;
-* total assigned rewards.
-
-### Claims and Withdrawals
-
-1. Winner claims NFT through `AuctionHouse.claimNft`.
-2. Losing bidder claims refund through `EscrowVault.claimRefund`.
-3. Eligible bidder claims reward through `DistributionVault.claim`.
-4. Seller withdraws proceeds through `EscrowVault.withdrawSellerProceeds`.
-5. Fee recipient withdraws protocol fees through `EscrowVault.withdrawProtocolFees`.
-
-### Expected Results
-
-Confirm:
-
-* losing bidder recovers the refundable cap;
-* winner can recover any surplus where applicable;
-* rewards come only from the available premium-derived reserve;
-* no claim makes `EscrowVault` insolvent;
-* double claims are rejected;
-* pause does not block post-finalization claims.
-
----
-
-## Failure Modes
-
-Watch for these failure modes during testnet verification.
-
-### Network and RPC
-
-* Wrong RPC URL.
-* Wrong chain ID.
-* MetaMask connected to the wrong network.
-* RPC rate limits.
-* Stale RPC state.
-* Chain fork or reset on a temporary testnet.
-
-### Deployment File
-
-* Deployment JSON is stale.
-* Deployment JSON has the wrong `chainId`.
-* Deployment JSON points to an old deployment.
-* Deployment JSON contains a valid address with no bytecode.
-* Deployment JSON contains an address for the wrong contract.
-
-### Contract Wiring
-
-* Vault points to the wrong `AuctionHouse`.
-* `AuctionHouse` references the wrong vault.
-* `DistributionVault` or `EscrowVault` is not the one expected by `AuctionHouse`.
-* `ParamsController` is not the intended instance.
-* `ReputationAdapter` is not the intended instance.
-* Auction-scoped module snapshots differ from the expected deployment for auctions created before a module update.
-
-### Admin and Ownership
-
-* Owner is an unexpected EOA.
-* `EXPECTED_OWNER` is set to the wrong address.
-* Fee recipient is wrong.
-* `EXPECTED_FEE_RECIPIENT` is set to the wrong address.
-* Pause authority is wrong.
-* Params authority is wrong.
-* Ownership handoff plan is missing or unclear.
-
-### Params
-
-* Protocol fee is above the intended MVP bound.
-* Redistribution bps is above `10000`.
-* SCR weights do not satisfy `alpha > beta >= gamma`.
-* SCR weights do not sum to `10000`.
-* Auction duration or anti-sniping values are zero.
-* Max participants is below min participants.
-* Caps are zero or above their intended scale.
-
-### ABI and Versioning
-
-* Frontend ABI does not match deployed bytecode.
-* Critical read functions revert.
-* Transaction functions revert unexpectedly.
-* Constructor arguments do not match documentation.
-* Source is not verified on the explorer.
-
-### User Flow
-
-* NFT approval targets the wrong address.
-* NFT custody transfer fails.
-* Bid value is wrong.
-* Step-up cap value is wrong.
-* Finalization happens too early or reverts after end time.
-* Claims fail after finalization.
-* Refund or reward already claimed unexpectedly.
-* Seller proceeds or protocol fee credits are zero unexpectedly.
-
-### Security and Economic Invariants
-
-* Losing bidder cannot recover full refundable cap.
-* Reward appears funded from losing bidder refundable cap.
-* Reward total exceeds available premium-derived reserve.
-* Claims can make escrow insolvent.
-* Pause blocks claims.
-* UI or docs imply guaranteed rewards or yield.
-
----
-
-## Manual Checklist
-
-Use this checklist on the day of a real testnet deployment.
-
-### Pre-Verification
-
-* Confirm `docs/TESTNET_DEPLOYMENT_RUNBOOK.md` was followed.
-* Confirm target chain ID.
-* Confirm target RPC URL.
-* Confirm block explorer URL.
-* Confirm deployment transaction hashes.
-* Confirm deployment JSON path: `frontend/public/deployments/<chainId>.json`.
-* Confirm deployment JSON was generated with `npm run testnet:sync -- <chainId>`.
-* Run `npm run validate:deployment -- <chainId>`.
-* Run `BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>`.
-* If owner and fee recipient are final, run with `EXPECTED_OWNER` and `EXPECTED_FEE_RECIPIENT`.
-* Confirm no real private key is committed.
-* Confirm frontend env points to the target chain.
-* Confirm `ENABLE_LOCAL_DEV_ACTIONS` is not enabled in the hosted frontend.
-
-### Bytecode and ABI
-
-* Confirm `AuctionHouse` has bytecode.
-* Confirm `NFTVault` has bytecode.
-* Confirm `EscrowVault` has bytecode.
-* Confirm `DistributionVault` has bytecode.
-* Confirm `ParamsController` has bytecode.
-* Confirm `ReputationAdapter` has bytecode.
-* Confirm critical read calls work.
-* Confirm frontend ABI matches deployed contracts.
-
-### Module Linkage
-
-* Confirm `AuctionHouse` references expected `NFTVault`.
-* Confirm `AuctionHouse` references expected `EscrowVault`.
-* Confirm `AuctionHouse` references expected `DistributionVault`.
-* Confirm `AuctionHouse` references expected `ParamsController`.
-* Confirm `AuctionHouse` references expected `ReputationAdapter`.
-* Confirm `NFTVault` points to expected `AuctionHouse`.
-* Confirm `EscrowVault` points to expected `AuctionHouse`.
-* Confirm `DistributionVault` points to expected `AuctionHouse`.
-* Confirm auction-scoped module snapshots are checked separately when relevant.
-
-### Admin and Params
-
-* Confirm owner/admin addresses.
-* Confirm fee recipient.
-* Confirm pause authority.
-* Confirm params authority.
-* Confirm `ParamsController.params()`.
-* Confirm parameter sanity checks pass.
-* Confirm exact parameter values are intentionally chosen.
-* Confirm `ParamsController.paused()` is expected.
-* Confirm `ReputationAdapter` state is expected.
-* Confirm testnet EOA ownership is temporary and documented.
-
-### Smoke Test
-
-* Confirm seller owns test NFT.
-* Approve `NFTVault`.
-* Create auction.
-* Confirm auction is visible in frontend.
-* Place first bid.
-* Place second bid.
-* Confirm highest bidder and highest bid.
-* Wait until end time.
-* Finalize auction.
-* Winner claims NFT.
-* Losing bidder claims refund.
-* Eligible bidder claims reward if entitlement exists.
-* Seller withdraws proceeds.
-* Fee recipient withdraws protocol fees.
-
-### Post-Smoke-Test Checks
-
-* Confirm losing bidder refund behavior.
-* Confirm reward source is premium-derived reserve only.
-* Confirm total claimed does not exceed total assigned.
-* Confirm escrow remains solvent.
-* Confirm double claims fail.
-* Confirm read-only frontend refreshes correctly.
-* Confirm wallet-signed panels remain separate from local-dev mode.
-* Confirm no `/api/dev/*` route is used for wallet-signed flows.
-
-### Documentation
-
-* Update deployment JSON if needed.
-* Update testnet deployment notes.
-* Record deployment transaction hashes.
-* Record smoke test transaction hashes.
-* Record known issues.
-* Confirm docs do not imply guaranteed yield.
-
----
-
-## Future Automation
-
-A future verification script can automate more of this checklist.
-
-Already automated:
-
-* deployment JSON validation;
-* RPC chain ID check;
-* bytecode presence checks;
-* selected critical read checks;
-* owner read checks and optional expected owner comparison;
-* global fee recipient read check and optional expected fee recipient comparison;
-* selected parameter sanity checks;
-* deployment-level module linkage checks exposed by public getters.
-
-Potential future automation:
-
-* exact expected-value checks for a named parameter profile;
-* governance handoff checks for multisig/timelock;
-* auction-scoped module snapshot checks;
-* pause authority checks beyond `owner()`;
-* read-only smoke checks for `getAuction`;
-* optional dry-run transaction simulations;
-* explorer source verification checks.
-
-Automation should not replace manual review for:
-
-* economic parameter reasonableness;
-* governance readiness;
-* deployment approval;
-* security review;
-* UI/product language review.
+`npm run smoke:local:lifecycle` is deterministic Anvil validation on `31337`, with controllable time and known valueless development accounts. The Base Sepolia verifier is read-only and observes real public-chain time and transactions. Neither result substitutes for the other.

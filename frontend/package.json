@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:local-lifecycle": "node --test scripts/local-lifecycle-core.test.mjs",
+    "test:base-sepolia-verifier": "node --test scripts/verify-base-sepolia-lifecycle.test.mjs",
     "preflight:local-lifecycle": "node scripts/local-lifecycle-smoke.mjs --preflight-only",
     "smoke:local:lifecycle": "node scripts/local-lifecycle-smoke.mjs",
     "sync:deployment": "node scripts/sync-deployment.mjs",
@@ -17,6 +18,7 @@
     "validate:deployment": "node scripts/validate-deployment-json.mjs",
     "validate:deployment:local": "npm run validate:deployment -- 31337",
     "verify:deployment:onchain": "node scripts/verify-deployment-onchain.mjs",
+    "verify:base-sepolia:lifecycle": "node scripts/verify-base-sepolia-lifecycle.mjs",
     "sync": "npm run sync:deployment",
     "check": "npm run test && npm run typecheck && npm run build",
     "demo": "npm run sync:deployment && npm run dev"

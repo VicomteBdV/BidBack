@@ -17,8 +17,15 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StateNotice } from "@/components/ui/StateNotice";
 import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
+import { isLocalAnvilTarget } from "@/lib/chains";
 
-export function AuctionDetail({ auctionId }: { auctionId: string }) {
+export function AuctionDetail({
+  auctionId,
+  localDevActionsEnabled = isLocalAnvilTarget
+}: {
+  auctionId: string;
+  localDevActionsEnabled?: boolean;
+}) {
   const [data, setData] = useState<AuctionDetailApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -132,13 +139,15 @@ export function AuctionDetail({ auctionId }: { auctionId: string }) {
         </div>
       </SectionCard>
 
-      <AuctionDevActions
-        auctionId={auction.auctionId}
-        auctionState={auction.state}
-        finalized={auction.finalized}
-        economics={economics}
-        onActionComplete={loadAuction}
-      />
+      {localDevActionsEnabled ? (
+        <AuctionDevActions
+          auctionId={auction.auctionId}
+          auctionState={auction.state}
+          finalized={auction.finalized}
+          economics={economics}
+          onActionComplete={loadAuction}
+        />
+      ) : null}
 
       <AuctionLifecyclePanel auction={auction} />
 
