@@ -1,0 +1,13 @@
+{
+  "chainId": 84532,
+  "generatedAt": "2026-08-01T21:12:38.667Z",
+  "source": "foundry-broadcast:DeployTestnet.s.sol",
+  "contracts": {
+    "paramsController": "0x0b78cb13f4c6b4a9cd0f688ba97f94e377a849b4",
+    "nftVault": "0x9fd6aa12af1f106626f97e326c6e1256507aeaac",
+    "escrowVault": "0x128cbc5cb733746ba2877aba3b4ed386ce81bbf5",
+    "distributionVault": "0x68f08f8591ddc9dd84cbbbe6fd33c491b4b457f3",
+    "reputationAdapter": "0x121a1f9951d79a2d7912fda7249e7c335ff9ef4a",
+    "auctionHouse": "0x709a8fde1e824adaef2cbe30683e884dac88bc67"
+  }
+}
