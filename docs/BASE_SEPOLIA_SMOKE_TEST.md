@@ -2,11 +2,15 @@
 
 This runbook defines the canonical wallet-signed BidBack lifecycle on Base Sepolia (`84532`). It is a controlled public-testnet procedure using valueless assets. It is not production, an audit, or evidence of guaranteed rewards.
 
-The public smoke remains incomplete until every transaction and read-only phase check below succeeds and its evidence is retained. The deterministic Anvil lifecycle is a separate prerequisite and never substitutes for this run.
+**Current status — 22 August 2026: One complete canonical Base Sepolia cycle validated.** Auction `#2` completed the procedure across five distinct public role wallets and a separately deployed valueless test-only NFT. The lifecycle verifier succeeded successively from `after-create` through `final`, five duplicate-action `eth_call` simulations reverted as expected, and `final` still passed afterward. The bounded accepted record is [`evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md`](./evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md).
+
+This runbook remains the procedure for future canonical runs. Each later run must independently satisfy the transaction and read-only checks below and retain its own evidence. The deterministic Anvil lifecycle is a separate prerequisite and never substitutes for a public-chain run. One successful public run does not prove repeatability or any beta or production readiness gate.
 
 ## 1. Deployment Decision
 
-Use a fresh deployment of the six core contracts from the validated commit. The previously referenced Base Sepolia deployment cannot be reconstructed from retained repository addresses and transaction hashes. Do not reuse it unless an independently recovered manifest passes source, bytecode, ownership, parameter, wiring, and provenance review before funds are used.
+The 22 August 2026 canonical run used the fresh six-contract deployment recorded in `frontend/public/deployments/84532.json` at commit `bd56f9005b52dcae61b8c16599f10e67e29de3f6`. Deployment transaction hashes, checksums, exact block metadata, and BaseScan source-verification status remain pending archival evidence in the run report.
+
+For a future replacement deployment, use a fresh deployment from its validated commit. Reuse the current deployment only after its manifest, source, bytecode, ownership, parameter, wiring, current accounting state, and provenance are reviewed for that later run.
 
 The public manifest is `frontend/public/deployments/84532.json`. It must contain only:
 
@@ -200,9 +204,9 @@ Expected: seller credit zero, fee credit `0.001`, escrow `0.001`.
 
 Expected: all credits and reserve zero, assigned equals claimed `0.0038`, claim flags true, NFT owned by A, escrow zero.
 
-## 8. Evidence to Retain Later
+## 8. Evidence to Retain for Each Run
 
-Do not create evidence files before the public run. For the actual run retain:
+For every public run retain:
 
 - validated commit and clean-worktree status;
 - tool versions and chain ID;
@@ -245,7 +249,7 @@ For Base Sepolia:
 
 ## 12. Go / No-Go
 
-Proceed only when every prerequisite and pre-funded check passes. Do not describe Base Sepolia as fully validated until T11, the final verifier snapshot, duplicate simulations and evidence review all succeed.
+Proceed only when every prerequisite and pre-funded check passes. Record a dated canonical Base Sepolia cycle as validated only after T11, the final verifier snapshot, duplicate simulations, and evidence review succeed. Keep the claim bounded to that named run.
 
 ## 13. Validation Before the Public Run
 

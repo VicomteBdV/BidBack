@@ -2,6 +2,8 @@
 
 This runbook prepares a fresh controlled Base Sepolia deployment. It does not authorize or perform a deployment. Broadcast, public RPC access and transactions always require separate explicit approval.
 
+**Current status — 22 August 2026: One complete canonical Base Sepolia cycle validated.** The accepted auction `#2` run used the six-contract deployment recorded in `frontend/public/deployments/84532.json` and is documented in [`evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md`](./evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md). This runbook remains applicable to an explicitly approved replacement deployment; it does not imply that another deployment is currently required.
+
 ## Safety Boundary
 
 - Base Sepolia chain ID: `84532`.
@@ -13,7 +15,9 @@ This runbook prepares a fresh controlled Base Sepolia deployment. It does not au
 
 ## Fresh Deployment Decision
 
-Use a fresh deployment because the previous public deployment has no retained repository manifest, core addresses or deployment hashes sufficient to prove provenance. A fresh isolated deployment also starts with zero credits and an unambiguous accounting baseline.
+Use a fresh deployment when an explicitly approved replacement is required. A fresh isolated deployment starts with zero credits and an unambiguous accounting baseline. Do not overwrite or silently substitute the current accepted manifest.
+
+The current Base Sepolia deployment source of truth is `frontend/public/deployments/84532.json` at commit `bd56f9005b52dcae61b8c16599f10e67e29de3f6`. Its canonical lifecycle is confirmed, while deployment transaction hashes, checksums, exact block metadata, and BaseScan source-verification status remain pending archival evidence. A future run may reuse it only after current state and provenance are reviewed for that run.
 
 The existing `script/DeployTestnet.s.sol` is the approved core deployment script and must not be modified for this run. It deploys the six core modules, wires the vaults once and transfers ownership to `TESTNET_OWNER`. It does not deploy a test NFT or create an auction.
 
@@ -160,7 +164,7 @@ Use the estimates in `BASE_SEPOLIA_SMOKE_TEST.md`: owner approximately `0.05 ETH
 
 ## Execution Handoff
 
-After deployment, manifest, source and frontend checks pass, follow `BASE_SEPOLIA_SMOKE_TEST.md` exactly for P1 and T1–T11. Derive the auction ID from `nextAuctionId`; do not hard-code it.
+After a future deployment, manifest, source and frontend checks pass, follow `BASE_SEPOLIA_SMOKE_TEST.md` exactly for P1 and T1–T11. Derive the auction ID from `nextAuctionId`; do not hard-code it. Auction `#2` is the identifier of the accepted 22 August 2026 run only.
 
 ## Failure and Recovery
 
@@ -170,4 +174,4 @@ If an auction already exists, preserve it. With no bids, wait, finalize and let 
 
 ## Evidence and Status
 
-Retain deployment hashes, addresses, source-verification links, manifest checksum and the later lifecycle evidence. Do not create an evidence report or update product status before the actual public cycle succeeds and is reviewed.
+For each future run, retain deployment hashes, addresses, source-verification links, manifest checksum and lifecycle evidence. Create or accept that run's evidence report and update product status only after its public cycle succeeds and is reviewed. The accepted 22 August 2026 run remains bounded by the confirmed and pending fields in its own report.

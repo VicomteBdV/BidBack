@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-08-22-auction-2-bd56f90",
+  "qualification": {
+    "status": "Confirmed",
+    "wording": "One complete canonical Base Sepolia cycle validated",
+    "scope": "One bounded public-testnet scenario only",
+    "controlledBetaReady": false,
+    "publicBetaReady": false,
+    "productionReady": false
+  },
+  "run": {
+    "completionDate": "2026-08-22",
+    "startedAtUtc": null,
+    "completedAtUtc": null,
+    "chainName": "Base Sepolia",
+    "chainId": 84532,
+    "auctionId": "2",
+    "commit": "bd56f9005b52dcae61b8c16599f10e67e29de3f6",
+    "worktreeCleanAfterRun": {
+      "status": "Confirmed",
+      "archivalOutput": null
+    },
+    "ciGreenBeforeRun": {
+      "status": "Confirmed",
+      "url": null,
+      "timestamp": null,
+      "archivalOutput": null
+    }
+  },
+  "manifest": {
+    "path": "frontend/public/deployments/84532.json",
+    "generatedAt": "2026-08-01T21:12:38.667Z",
+    "source": "foundry-broadcast:DeployTestnet.s.sol",
+    "checksum": null,
+    "checksumStatus": "Pending evidence"
+  },
+  "contracts": {
+    "paramsController": {
+      "address": "0x0b78cb13f4c6b4a9cd0f688ba97f94e377a849b4",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    },
+    "nftVault": {
+      "address": "0x9fd6aa12af1f106626f97e326c6e1256507aeaac",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    },
+    "escrowVault": {
+      "address": "0x128cbc5cb733746ba2877aba3b4ed386ce81bbf5",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    },
+    "distributionVault": {
+      "address": "0x68f08f8591ddc9dd84cbbbe6fd33c491b4b457f3",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    },
+    "reputationAdapter": {
+      "address": "0x121a1f9951d79a2d7912fda7249e7c335ff9ef4a",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    },
+    "auctionHouse": {
+      "address": "0x709a8fde1e824adaef2cbe30683e884dac88bc67",
+      "deploymentTransactionHash": null,
+      "baseScanVerificationStatus": null
+    }
+  },
+  "wallets": {
+    "W_OWNER": "0xde38b5e092fC9B369ec8c15659387049f9Fa45e1",
+    "W_SELLER": "0x085d7838d500CDAfa701158af33a0246F37aa2a5",
+    "W_FEE": "0xEa0b4d289955083159d95467f830a501082E7E6f",
+    "W_A": "0x594bFc4c748f1feBf1C4C81d0949D000B5745256",
+    "W_B": "0x7d8f0090A5ddfFC136bc5aAB154C12666562f1f3"
+  },
+  "testOnlyNft": {
+    "status": "Confirmed",
+    "address": "0x0D63564c6c6dc0Ce8b39F9e3eF31f0Aeb120B7F9",
+    "tokenId": "1",
+    "valueless": true,
+    "partOfBidBackCore": false,
+    "deploymentTransactionHash": null,
+    "blockNumber": null,
+    "timestampUtc": null
+  },
+  "transactions": [
+    {
+      "id": "P1",
+      "action": "Deploy test-only NFT and prepare token 1 for W_SELLER",
+      "actor": "W_OWNER",
+      "status": "Confirmed",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T1",
+      "action": "Approve NFTVault",
+      "actor": "W_SELLER",
+      "status": "Confirmed",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T2",
+      "action": "Create auction 2",
+      "actor": "W_SELLER",
+      "status": "Confirmed",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T3",
+      "action": "Place bidder A initial cap",
+      "actor": "W_A",
+      "status": "Confirmed",
+      "valueEth": "0.012",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T4",
+      "action": "Place bidder B cap",
+      "actor": "W_B",
+      "status": "Confirmed",
+      "valueEth": "0.015",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T5",
+      "action": "Step bidder A total cap to 0.030 ETH",
+      "actor": "W_A",
+      "status": "Confirmed",
+      "valueEth": "0.018",
+      "resultingCapEth": "0.030",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T6",
+      "action": "Finalize auction 2",
+      "actor": "W_SELLER",
+      "status": "Confirmed",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T7",
+      "action": "Claim winner NFT",
+      "actor": "W_A",
+      "status": "Confirmed",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T8",
+      "action": "Claim losing-bidder refund",
+      "actor": "W_B",
+      "status": "Confirmed",
+      "amountEth": "0.015",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T9",
+      "action": "Claim conditional reward",
+      "actor": "W_B",
+      "status": "Confirmed",
+      "amountEth": "0.0038",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T10",
+      "action": "Withdraw seller proceeds",
+      "actor": "W_SELLER",
+      "status": "Confirmed",
+      "amountEth": "0.0252",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    },
+    {
+      "id": "T11",
+      "action": "Withdraw protocol fee",
+      "actor": "W_FEE",
+      "status": "Confirmed",
+      "amountEth": "0.001",
+      "transactionHash": null,
+      "blockNumber": null,
+      "timestampUtc": null
+    }
+  ],
+  "economicsEth": {
+    "startPrice": "0.010",
+    "bidderAInitialCap": "0.012",
+    "bidderBCap": "0.015",
+    "bidderAFinalCap": "0.030",
+    "bidderAStepUpDelta": "0.018",
+    "totalDeposits": "0.045",
+    "finalPrice": "0.030",
+    "grossPremium": "0.020",
+    "protocolFee": "0.001",
+    "netPremium": "0.019",
+    "candidateRedistributionPool": "0.0095",
+    "bidderBRefund": "0.015",
+    "bidderBReward": "0.0038",
+    "sellerProceeds": "0.0252",
+    "finalEscrow": "0"
+  },
+  "finalState": {
+    "status": "Confirmed",
+    "finalized": true,
+    "winner": "W_A",
+    "winnerAddress": "0x594bFc4c748f1feBf1C4C81d0949D000B5745256",
+    "finalPriceEth": "0.030",
+    "nftClaimed": true,
+    "nftOwner": "0x594bFc4c748f1feBf1C4C81d0949D000B5745256",
+    "bidderBRefundClaimed": true,
+    "bidderBRewardClaimed": true,
+    "sellerProceedsWithdrawn": true,
+    "protocolFeeWithdrawn": true,
+    "sellerCreditEth": "0",
+    "protocolFeeCreditEth": "0",
+    "distributionReserveEth": "0",
+    "escrowBalanceEth": "0",
+    "finalVerifierPassedBeforeDuplicateSimulations": true,
+    "finalVerifierPassedAfterDuplicateSimulations": true
+  },
+  "verifier": {
+    "executionStatus": "Confirmed",
+    "persistedSnapshotsStatus": "Pending evidence",
+    "phases": {
+      "before-create": {
+        "status": "Not tested",
+        "persistedSnapshot": null
+      },
+      "after-create": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-bid-a": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-bid-b": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-step-up": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-finalize": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-nft-claim": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-refund": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-reward": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "after-seller-withdraw": {
+        "status": "Confirmed",
+        "persistedSnapshot": null
+      },
+      "final": {
+        "status": "Confirmed before and after duplicate-action simulations",
+        "persistedSnapshot": null,
+        "blockNumber": null,
+        "timestampUtc": null
+      }
+    }
+  },
+  "duplicateActionSimulations": [
+    {
+      "action": "Second NFT claim",
+      "actor": "W_A",
+      "method": "claimNft(2)",
+      "status": "Confirmed",
+      "result": "Rejected as expected",
+      "blockTag": null,
+      "rawRevert": null,
+      "decodedReason": null
+    },
+    {
+      "action": "Second refund claim",
+      "actor": "W_B",
+      "method": "claimRefund(2)",
+      "status": "Confirmed",
+      "result": "Rejected as expected",
+      "blockTag": null,
+      "rawRevert": null,
+      "decodedReason": null
+    },
+    {
+      "action": "Second reward claim",
+      "actor": "W_B",
+      "method": "DistributionVault.claim(2)",
+      "status": "Confirmed",
+      "result": "Rejected as expected",
+      "blockTag": null,
+      "rawRevert": null,
+      "decodedReason": null
+    },
+    {
+      "action": "Second seller proceeds withdrawal",
+      "actor": "W_SELLER",
+      "method": "withdrawSellerProceeds()",
+      "status": "Confirmed",
+      "result": "Rejected as expected",
+      "blockTag": null,
+      "rawRevert": null,
+      "decodedReason": null
+    },
+    {
+      "action": "Second protocol fee withdrawal",
+      "actor": "W_FEE",
+      "method": "withdrawProtocolFees()",
+      "status": "Confirmed",
+      "result": "Rejected as expected",
+      "blockTag": null,
+      "rawRevert": null,
+      "decodedReason": null
+    }
+  ],
+  "pendingEvidence": [
+    "P1 and T1-T11 transaction hashes",
+    "transaction receipts, blocks, exact UTC timestamps, gas values, and decoded events",
+    "deployment, wiring, and ownership transaction hashes",
+    "manifest and verifier-output checksums",
+    "BaseScan source-verification status and links",
+    "persisted verifier snapshots and raw final output",
+    "duplicate-call block tags, calldata, raw reverts, and decoded reasons",
+    "exact CI run URL and retained output",
+    "clean-worktree archival command output"
+  ],
+  "notTested": [
+    "Repeated canonical cycles and wallet/browser/RPC support matrix",
+    "Hosted frontend isolation and operations",
+    "Public load, maximum-bound gas, reorg, long-history, and indexer behavior",
+    "Alternative public auction economics and broader bidder profiles",
+    "Sybil, collusion, artificial bidding, reward farming, and score manipulation",
+    "Production governance, real-value assets, legal review, and external audit"
+  ]
+}

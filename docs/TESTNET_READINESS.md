@@ -1,8 +1,10 @@
 # Testnet Readiness
 
-BidBack has been deployed to Base Sepolia and its deployment and verification checks are partially validated. The complete public multi-wallet lifecycle is not yet validated.
+**One complete canonical Base Sepolia cycle validated:** on 22 August 2026, auction `#2` completed the public multi-wallet lifecycle on Base Sepolia (`84532`) using five distinct role wallets and a separately deployed valueless test-only NFT. The confirmed run covered creation, bidding, delta-only step-up, finalization, all claims and withdrawals, exact economic reconciliation, a passing final verifier, and five rejected duplicate-action simulations. The retained report is [`evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md`](./evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md).
 
-This document describes readiness for controlled public-testnet deployment, redeployment, and continued validation while keeping the local Anvil workflow as the default deterministic MVP environment. Current status is maintained in [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
+This is one bounded canonical scenario. It does not establish repeatability, hosted-beta readiness, public-beta readiness, production readiness, or external audit coverage.
+
+This document describes readiness for controlled public-testnet deployment, redeployment, repetition, and continued validation while keeping the local Anvil workflow as the default deterministic MVP environment. Current status is maintained in [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md).
 
 The concrete deployment runbook for a future controlled testnet is documented in:
 
@@ -23,7 +25,10 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 ### Ready Today
 
 * Local Anvil chain `31337`
-* Base Sepolia deployment and verification checks partially validated
+* Six-contract Base Sepolia deployment recorded in `frontend/public/deployments/84532.json`
+* One complete canonical Base Sepolia cycle validated on 22 August 2026 for auction `#2`
+* Successive lifecycle verifier checks from `after-create` through `final`
+* Five expected duplicate-action rejections through read-only `eth_call`, followed by another passing `final` check
 * Foundry local deployment script
 * Controlled testnet deployment scaffold through `script/DeployTestnet.s.sol`
 * Frontend deployment files under `frontend/public/deployments/`
@@ -40,10 +45,10 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 
 ### Not Done Yet
 
-* No complete Base Sepolia public multi-wallet lifecycle
 * No production deployment
-* No retained evidence that every public actor transaction and final balance has completed in one canonical smoke run
-* No contract verification workflow
+* No repeated Base Sepolia wallet/browser/RPC support matrix
+* No complete archival transaction metadata for the canonical run; P1/T1–T11 hashes, blocks, exact timestamps, checksums, deployment hashes, and BaseScan verification status remain pending evidence
+* No automated contract source-verification workflow
 * No production governance ownership handoff
 * No hosted frontend environment
 * No production indexer
@@ -179,7 +184,7 @@ From inside `frontend/`, the equivalent command is:
 npm run validate:deployment:local
 ```
 
-For a future testnet deployment file:
+For a future testnet deployment or replacement file:
 
 ```bash
 npm run validate:deployment -- <testnet-chain-id>
@@ -231,7 +236,7 @@ This command assumes:
 * `frontend/public/deployments/31337.json` exists;
 * the local deployment has already been created with `npm run local:deploy` or synced with `npm run frontend:sync`.
 
-For controlled public-testnet verification:
+For controlled public-testnet verification or re-verification:
 
 ```bash
 BIDBACK_RPC_URL=<testnet-rpc-url> npm run verify:deployment:onchain -- <chainId>
@@ -322,7 +327,7 @@ export TESTNET_FEE_RECIPIENT=<protocol-fee-recipient-address>
 
 `TESTNET_PRIVATE_KEY` must never be committed and must never be exposed to the frontend.
 
-### Future Testnet Verification Variables
+### Testnet Verification Variables
 
 Prepare these when you want the on-chain verifier to enforce expected owner and fee recipient values:
 
@@ -333,7 +338,7 @@ export EXPECTED_FEE_RECIPIENT=<expected-fee-recipient-address>
 
 These variables are optional. Without them, the script reports owners and fee recipient without failing on address mismatch.
 
-### Future Testnet Frontend Variables
+### Testnet Frontend Variables
 
 Prepare these when a public testnet deployment exists:
 
@@ -346,7 +351,7 @@ NEXT_PUBLIC_BLOCK_EXPLORER_URL=<optional-block-explorer-url>
 
 These values are public frontend configuration. They must not contain private keys.
 
-### Future Testnet Server-Side Variables
+### Testnet Server-Side Variables
 
 Prepare these for Next.js server-side reads:
 
@@ -367,7 +372,7 @@ or leave the variable unset.
 
 ---
 
-## Commands for Future Testnet Day
+## Commands for a Future Testnet Deployment or Repetition
 
 Follow the full runbook first:
 
@@ -453,14 +458,14 @@ npm --prefix frontend run build
 
 ---
 
-## Known Risks Before Real Testnet
+## Known Risks After the Canonical Testnet Checkpoint
 
 * Current production ownership handoff is not finalized.
 * A multisig and timelock process should be defined before production-like deployment.
 * A controlled testnet may temporarily use an EOA owner, but that must be intentional and documented.
 * Public RPC reliability must be tested from both Next.js server runtime and user wallets.
 * Wallet-signed actions require the wallet to reach the configured RPC.
-* Contract verification is not automated yet.
+* BaseScan source-verification status for the accepted canonical deployment remains pending archival evidence, and contract source verification is not automated.
 * Deployment JSON must exactly match the deployed contract addresses.
 * Deployment JSON validation checks shape and address format only; it does not verify on-chain bytecode.
 * On-chain verification checks bytecode, owner reads, fee recipient, selected parameter sanity, critical reads, and deployment-level module linkage; it does not verify multisig/timelock state or auction-scoped linkage yet.
@@ -471,7 +476,7 @@ npm --prefix frontend run build
 
 ---
 
-## Checklist Before Real Testnet
+## Checklist Before a Future Public-Testnet Deployment or Canonical Repetition
 
 Before broadcasting any public testnet deployment:
 

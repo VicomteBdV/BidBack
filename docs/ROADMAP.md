@@ -15,7 +15,40 @@ Gates are earned through retained evidence, not through code presence alone.
 
 ### Current Gate Assessment
 
-As of the 31 July 2026 checkpoint, **Demo-ready is achieved for a controlled local demonstration**. The evidence includes dated green `main` CI and a successful complete Anvil lifecycle in Codespaces. Reservations: Base Sepolia is only partially validated; the public multi-wallet smoke is incomplete; the read model is bounded; and hosting, monitoring, user testing, governance, audit, and legal review are absent. No later gate is achieved.
+As of the 22 August 2026 checkpoint, **Demo-ready is achieved for a controlled local demonstration**. **One complete canonical Base Sepolia cycle validated:** auction `#2` completed on Base Sepolia (`84532`) across five distinct public role wallets and a separately deployed valueless test-only NFT, with reconciled economics, a passing final verifier, five rejected duplicate-action `eth_call` simulations, and a passing final verifier after those simulations.
+
+This satisfies the single canonical public multi-wallet lifecycle criterion for the recorded run. It does not by itself prove repeatability or close the full **Controlled beta-ready** gate. The read model remains bounded, and hosting, supported wallet/RPC definition, monitoring, support, incident handling, moderated user testing, governance, audit, and legal review remain absent or unresolved. **Controlled beta-ready**, **Public beta-ready**, and **Production-ready** are not achieved.
+
+| Controlled beta criterion | Current evidence status |
+| --- | --- |
+| One complete canonical public-testnet multi-wallet lifecycle | **Satisfied for the 22 August 2026 Base Sepolia auction `#2` run** |
+| Economic reconciliation and final state for that run | **Satisfied for the canonical run** |
+| Duplicate-action rejection for that run | **Satisfied through five read-only `eth_call` simulations** |
+| Canonical evidence retention | **Partially retained:** confirmed results are recorded; transaction hashes, block metadata, exact timestamps, checksums, and other archival fields remain pending evidence |
+| Repeatability and wallet/browser/RPC support matrix | Not satisfied |
+| Hosted environment with technical exclusion of local-dev routes | Not satisfied |
+| Monitoring, support, and incident handling | Not satisfied |
+| Moderated user scenarios | Not satisfied |
+| Blocking architecture decisions | Not satisfied |
+
+## Next Major Workstream — BidBack Economic Model V1
+
+**Objective:** formalize, simulate, compare, and adversarially evaluate BidBack's current economic mechanism before deciding whether any parameter or Solidity change is justified.
+
+This is the next major workstream after the 22 August 2026 canonical Base Sepolia checkpoint. This documentation lot does not start the simulator, change an on-chain parameter, modify Solidity, or select a proxy or upgradeability model.
+
+- **Formalization:** specify the current premium, fee, seller-proceeds, scoring, cap, redistribution, refund, and claim functions together with the conservation and solvency invariants.
+- **Decision boundary:** distinguish configurable parameters and bounded thresholds from structural algorithm choices.
+- **Off-chain simulator:** design a reproducible simulator, probably in Python, without implementing it in this lot.
+- **Scenario generation:** define auction scenarios and bidder profiles across participation, valuation, timing, cap, step-up, and interaction patterns.
+- **Model comparison:** compare multiple scoring and redistribution functions against the current deterministic on-chain SCR baseline.
+- **Metrics:** measure seller revenue, BidBack revenue, losing bidder compensation, participation, marginal contribution, and pool efficiency.
+- **Adversarial analysis:** evaluate sybil behavior, collusion, artificial bidding, reward farming, and score manipulation.
+- **Candidate selection:** identify a bounded shortlist of candidate models with explicit tradeoffs, failure modes, and economic assumptions.
+- **Later implementation decision:** decide only after reproducible results whether to keep the current model, change configurable parameters, or propose a bounded Solidity evolution.
+- **Explicit exclusions:** no simulator implementation yet, no Solidity change, no on-chain parameter change, no proxy or upgradeability decision, and no premature over-parameterization.
+
+**Exit evidence for the future workstream:** a reviewed economic specification, reproducible simulation methodology and results, adversarial findings, candidate comparison, and a recorded decision separating parameter changes from structural Solidity changes. Completion of this workstream does not automatically satisfy a beta or production gate.
 
 ## Milestone 0 — Product Checkpoint and Workflow
 
@@ -38,6 +71,8 @@ As of the 31 July 2026 checkpoint, **Demo-ready is achieved for a controlled loc
 - **Exit criteria:** every required public lifecycle step succeeds from the intended actor wallet; balances and contract state reconcile; duplicate actions fail; evidence is retained and repeatable; no server-held testnet key powers user actions.
 - **Risks:** faucet/RPC instability, wallet network friction, stale deployment metadata, incomplete explorer verification, accidental exposure of local-dev routes.
 - **Out of scope:** real-value assets, broad public access, production chain launch, production governance.
+
+**Checkpoint evidence:** the 22 August 2026 Base Sepolia auction `#2` run satisfies the one-cycle canonical lifecycle portion of this milestone. Evidence retention is incomplete for archival transaction metadata, and the milestone's hosted-access, support-matrix, repeatability, and Controlled beta requirements remain open.
 
 ## Milestone 2 — User Validation
 
@@ -102,7 +137,8 @@ No option below is selected merely because an MVP implementation exists.
 | --- | --- | --- | --- | --- |
 | Indexing strategy | bounded RPC reads; managed indexer; custom event indexer; hybrid | completeness, reorg handling, latency, cost, portability, recovery | traffic/history targets, hosting, data ownership | Controlled beta if current bounds suffice; required resolution for Public beta |
 | Bid authorization | signature per bid; session keys; account abstraction; delegated/intents model | custody, revocation, UX, replay protection, chain support, cost | user research, wallet support, threat model | Controlled beta can retain signatures; Public beta decision required if UX is unacceptable |
-| Base Sepolia smoke depth | one canonical full cycle; repeated matrix across browsers/wallets; automated plus manual runs | actor separation, repeatability, failure coverage, retained evidence | wallets, RPC, hosted access, test assets | Blocks Controlled beta-ready |
+| Base Sepolia smoke depth | one canonical full cycle completed; repeated matrix across browsers/wallets; automated plus manual runs | actor separation, repeatability, failure coverage, retained evidence | wallets, RPC, hosted access, test assets | Single-cycle criterion satisfied; repetition, support matrix, and evidence-completeness decisions still affect Controlled beta-ready |
+| BidBack Economic Model V1 outcome | keep current model; parameter-only change; bounded Solidity evolution | solvency, seller revenue, BidBack revenue, losing bidder compensation, participation, marginal contribution, pool efficiency, manipulation resistance | formal model, simulator, scenarios, bidder profiles, adversarial analysis | No gate advances automatically; any contract change requires a later explicit decision and separately approved implementation |
 | Hosting architecture | managed frontend; container/platform host; self-managed infrastructure; static/edge hybrid | local-dev isolation, secrets, observability, rollback, cost, jurisdiction | data/indexer, RPC, legal/privacy | Blocks Controlled beta-ready |
 | Wallet strategy | injected only; multi-connector library; mobile-first WalletConnect; curated support matrix | adoption, chain switching, accessibility, mobile behavior, support burden | user research, hosting, bid authorization | Minimum matrix blocks Controlled beta; broader proof blocks Public beta |
 | Production chain | Base; another L2; Ethereum; multi-chain | security, liquidity, fees, NFT ecosystem, RPC/explorer quality, governance, legal | user market, audit, operations, asset policy | Blocks Production-ready; may affect Public beta |

@@ -1,6 +1,6 @@
 # BidBack Product Status
 
-**Checkpoint date:** 31 July 2026
+**Checkpoint date:** 22 August 2026
 
 **Status authority:** This document is the current source of truth for BidBack product status. Procedure documents and older checkpoints must not override it.
 
@@ -10,13 +10,15 @@ BidBack is a functional NFT auction MVP with modular on-chain custody, bidding, 
 
 At this checkpoint:
 
-- the `main` CI workflow was reported green on 31 July 2026; this is a dated observation, not a permanent guarantee;
+- the `main` CI workflow was reported green on 31 July 2026 and was confirmed green before the 22 August 2026 public smoke; the later CI run URL and archival metadata remain pending evidence, and neither observation is a permanent guarantee;
 - the complete automated local lifecycle was successfully executed in GitHub Codespaces on 31 July 2026 against a fresh Anvil chain on `31337`;
 - the local run confirmed deployment, three bids across two bidders, delta-only step-up, finalization, all claims and withdrawals, duplicate-action rejection, and verified final balances;
-- Base Sepolia deployment and verification are partially validated, but the public multi-wallet smoke test remains incomplete;
+- **One complete canonical Base Sepolia cycle validated:** on 22 August 2026, auction `#2` completed the wallet-signed lifecycle on Base Sepolia (`84532`) across five distinct public role wallets and a separately deployed valueless test-only NFT; the final verifier passed, five duplicate-action `eth_call` simulations reverted as expected, and the final verifier still passed afterward;
 - no hosted demonstration frontend, production indexer, external audit, production governance, monitoring, user research, or legal review is confirmed.
 
-BidBack therefore meets the documented **Demo-ready** gate for a controlled local demonstration. It does not meet **Controlled beta-ready**, **Public beta-ready**, or **Production-ready**.
+BidBack therefore meets the documented **Demo-ready** gate for a controlled local demonstration. The canonical public-testnet cycle criterion is satisfied for this one bounded run, but the remaining Controlled beta criteria are not. BidBack does not meet **Controlled beta-ready**, **Public beta-ready**, or **Production-ready**.
+
+The next major workstream is **BidBack Economic Model V1**: formalize the current mechanism and design an off-chain simulation and adversarial-comparison program before deciding between retaining the model, changing parameters, or proposing a bounded Solidity evolution. No simulator, Solidity change, on-chain parameter change, proxy, or upgradeability decision is part of this checkpoint.
 
 ## Status Legend
 
@@ -25,7 +27,7 @@ BidBack therefore meets the documented **Demo-ready** gate for a controlled loca
 | Completed | Implemented and supported by repository evidence appropriate to the claim. |
 | Functional but partial | Usable for the MVP, with a documented coverage, scale, UX, or validation limitation. |
 | Validated locally | Executed successfully against local Anvil or covered by the confirmed local validation environment. |
-| Partially validated on Base Sepolia | Some deployment or transaction checks succeeded, but the complete public multi-wallet lifecycle is not proven. |
+| One complete canonical Base Sepolia cycle validated | One dated, bounded public-testnet lifecycle completed with retained final-state and economic confirmation. This status does not generalize to other deployments, wallets, providers, browsers, scenarios, load levels, or production use. |
 | Not started | No substantive implementation or validation evidence was found. |
 | Blocked by decision | Progress depends on an explicit product, architecture, governance, security, or legal choice. |
 
@@ -39,27 +41,27 @@ Status claims use the following evidence classes:
 | Automated tests present | A behavior has deterministic test coverage. | That every branch, integration, or deployment environment is covered. |
 | CI green at checkpoint | The configured CI jobs passed at the stated date. | Future CI health or checks not included in the workflow. |
 | Manual execution confirmed | A named scenario was run successfully in a named environment and date. | Equivalent behavior on a public chain or under production load. |
-| Partial public validation | Some public testnet deployment or transaction evidence exists. | A complete, repeatable public lifecycle. |
+| Canonical public validation | One named public-testnet scenario completed with distinct actors, reconciled economics, final-state verification, and duplicate-action simulations. | Repeatability, a support matrix, hosted-beta operations, broad adversarial coverage, audit assurance, or production readiness. |
 | No evidence | No reliable repository or confirmed execution evidence was identified. | That work has never happened outside the inspected record. |
 
 ## Smart Contracts
 
 | Capability | Status | Evidence | Limits / next proof required |
 | --- | --- | --- | --- |
-| ERC-721 auction creation | Completed; validated locally | `AuctionHouse`, `NFTVault`, Foundry tests, Anvil lifecycle | Public multi-wallet creation still requires complete Base Sepolia smoke evidence. |
+| ERC-721 auction creation | Completed; validated locally and in one canonical Base Sepolia cycle | `AuctionHouse`, `NFTVault`, Foundry tests, Anvil lifecycle, Base Sepolia auction `#2` | Public repetition across supported environments remains unproven. |
 | NFT custody and release | Completed; validated locally | `NFTVault`, claim tests, Anvil custody and release checks | No external audit. |
 | Bidding and highest valid cap | Completed; validated locally | `AuctionHouse.placeBid`, Solidity tests, Anvil lifecycle | Public load and gas behavior not measured. |
 | Step-up-only cap accounting | Completed; validated locally | Targeted Solidity test and Anvil `0.8 ETH` delta step-up | No fuzzed bid-sequence coverage. |
 | Anti-sniping | Functional but partial | Contract implementation and snapshotted parameters | No dedicated behavioral test proving extension boundaries and maximum extensions was found. |
-| Finalization | Completed; validated locally | Solidity integration tests and Anvil lifecycle | Public-chain lifecycle incomplete. |
+| Finalization | Completed; validated locally and in one canonical Base Sepolia cycle | Solidity integration tests, Anvil lifecycle, Base Sepolia auction `#2` | No repeated public matrix or production-load evidence. |
 | Winner NFT claim | Completed; validated locally | Pull-based claim implementation, double-claim test, Anvil lifecycle | No independent audit. |
 | Losing bidder refunds | Completed; validated locally | Full-cap refund accounting, tests, `1.5 ETH` Anvil refund | Production-scale solvency assurance still requires invariants and audit. |
 | Conditional rewards | Completed; validated locally | Premium-derived calculation tests and `0.19 ETH` Anvil reward | Rewards remain conditional and can be zero outside the deterministic scenario. |
 | Seller proceeds | Completed; validated locally | Pull withdrawal tests and `1.76 ETH` Anvil withdrawal | Historical attribution needs an indexer or richer event model. |
 | Protocol fees | Completed; validated locally | Premium-only fee logic, snapshot tests, `0.05 ETH` Anvil withdrawal | Governance and production recipient policy are open. |
-| Parameter, module, and fee-recipient snapshots | Completed | Dedicated Solidity suites and read-only frontend display | Per-deployment public verification remains procedural. |
+| Parameter, module, and fee-recipient snapshots | Completed | Dedicated Solidity suites, read-only frontend display, canonical Base Sepolia verifier | Future deployments still require their own verification. |
 | Pause and permissions | Completed for MVP | Owner controls, one-time vault wiring, pause tests proving exits remain available | Production roles, multisig, and timelock are absent. |
-| Duplicate-action protection | Completed; validated locally | Solidity reverts and Anvil duplicate simulations | No adversarial external review. |
+| Duplicate-action protection | Completed; validated locally and in one canonical Base Sepolia cycle | Solidity reverts, Anvil duplicate simulations, five Base Sepolia `eth_call` duplicate simulations | No adversarial external review; archival call metadata remains pending evidence. |
 | Bounded settlement loops | Completed for configured MVP bounds | Participant caps and bounded recipient limits | Gas ceilings at maximum bounds are not load-tested. |
 | Configured non-fee costs | Not started | No current contract parameter or deduction beyond protocol fee | Any future cost category must preserve the net-premium invariant. |
 | Fuzzing and invariant testing | Not started | No fuzz or invariant suite found | Required before public beta. |
@@ -72,9 +74,9 @@ Status claims use the following evidence classes:
 | --- | --- | --- | --- |
 | Auction browsing | Completed for bounded MVP reads | Search, filters, sorts, configurable limits, component tests | Not complete historical pagination or cross-window search. |
 | NFT metadata | Functional but partial | ERC-721 reads, HTTP/IPFS handling, fallback tests | No persistent cache, media proxy, moderation, or production metadata service. |
-| Auction creation | Completed for MVP | Local-dev and wallet-signed flows, ownership/approval validation tests | Hosted public-wallet validation remains incomplete. |
+| Auction creation | Completed for MVP; one canonical public wallet run validated | Local-dev and wallet-signed flows, ownership/approval validation tests, Base Sepolia auction `#2` | Hosted support and cross-wallet/browser validation remain incomplete. |
 | Bidding | Completed for MVP | Wallet-signed bid panel, delta calculation guards, local-dev flow | A signature is required for every current wallet-signed bid. |
-| Finalization | Completed for MVP | Wallet-signed and local-dev panels with lifecycle guards | Public multi-wallet proof incomplete. |
+| Finalization | Completed for MVP; one canonical public wallet run validated | Wallet-signed and local-dev panels with lifecycle guards, Base Sepolia auction `#2` | Hosted support and repeatability remain incomplete. |
 | Claims and withdrawals | Completed for MVP | NFT, refund, reward, seller, and fee actions with eligibility guards | Production support and monitoring absent. |
 | Lifecycle presentation | Completed for MVP | Open, ready-to-finalize, finalized, claimable, and settled projections with tests | Derived from bounded reads rather than a persistent index. |
 | Bid history | Functional but partial | On-chain bid records plus event enrichment and fallback tests | Bounded; no production pagination or complete withdrawal attribution. |
@@ -114,8 +116,8 @@ Status claims use the following evidence classes:
 | Frontend production build | Passed in CI at checkpoint | Dated green `main` CI | Does not prove hosted runtime behavior. |
 | Local deployment | Validated locally | `DeployLocal.s.sol`, sync tooling, successful Codespaces lifecycle | Uses known local accounts and valueless mock assets. |
 | Automated local lifecycle | Validated locally | Successful Codespaces run on 31 July 2026: `31337`, fresh deployment, 2 bidders, 3 bids, delta step-up, finalization, NFT/refund/reward/proceeds/fees, duplicate rejection, final balances | Does not replace a Base Sepolia public multi-wallet cycle. |
-| Base Sepolia deployment and verification | Partially validated on Base Sepolia | Current Base Sepolia smoke documentation and confirmed checkpoint context | Complete transaction evidence is not recorded as a finished multi-wallet lifecycle. |
-| Base Sepolia public smoke | Functional but incomplete | Manual procedure exists | Full create/bid/finalize/claim/withdraw cycle across wallets remains incomplete. |
+| Base Sepolia deployment and verification | One complete canonical Base Sepolia cycle validated | Six-contract deployment in `frontend/public/deployments/84532.json`, final lifecycle verifier, evidence report | Deployment transaction hashes, BaseScan source-verification status, checksums, and exact block metadata remain pending evidence. |
+| Base Sepolia public smoke | One complete canonical Base Sepolia cycle validated | 22 August 2026, auction `#2`, five distinct wallets, test-only NFT, complete claim/withdraw sequence, final verifier, five duplicate simulations | One bounded scenario only; no repeated wallet/browser/RPC matrix, hosted-beta proof, load test, or external audit. |
 | Hosted demonstration frontend | Not started / no evidence | Repository docs describe it as absent | Hosting, environment isolation, RPC reachability, and telemetry are open. |
 | Public production | Not started | No production deployment or operational evidence | All later gates remain unmet. |
 
@@ -138,7 +140,7 @@ Status claims use the following evidence classes:
 
 ## Known Risks
 
-- A complete Base Sepolia multi-wallet lifecycle has not been demonstrated.
+- Only one bounded canonical Base Sepolia multi-wallet lifecycle has been demonstrated; repeatability and broader scenario coverage remain unproven.
 - The read model can miss history outside bounded windows.
 - Direct NFT metadata is externally mutable and can fail or be malicious.
 - The wallet strategy is injected-wallet-centric and unvalidated on mobile or multiple providers.
@@ -154,7 +156,7 @@ The following decisions remain explicitly open and must not be inferred from the
 
 - persistent indexing strategy;
 - signature-per-bid versus session keys, account abstraction, delegation, or signed intents;
-- required depth and repetition of the Base Sepolia smoke test;
+- required repetition and wallet/browser/RPC matrix beyond the single validated canonical Base Sepolia cycle;
 - hosting and RPC architecture;
 - wallet compatibility strategy;
 - production chain;
@@ -163,6 +165,7 @@ The following decisions remain explicitly open and must not be inferred from the
 - policy for assets with real value;
 - legal and regulatory framework;
 - strict exclusion or build-time removal of local-dev actions from hosted environments.
+- BidBack Economic Model V1 outcome: retain the current model, change configurable parameters, or propose a bounded Solidity evolution only after reproducible simulation and adversarial analysis.
 
 Options, criteria, dependencies, and gate impacts are tracked in [`ROADMAP.md`](./ROADMAP.md) and [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md).
 
@@ -170,7 +173,7 @@ Options, criteria, dependencies, and gate impacts are tracked in [`ROADMAP.md`](
 
 - CI status is accurate only for the reported state on 31 July 2026.
 - Local lifecycle evidence proves behavior on deterministic Anvil with known development accounts, not public-chain reliability.
-- Base Sepolia is partially validated only; this document does not claim a completed public smoke test.
+- Base Sepolia evidence proves one complete canonical public smoke on 22 August 2026 only; it does not prove broad testnet validation or any higher readiness gate.
 - Generated deployment files are intentionally ignored and are not repository evidence by themselves.
 - “Production-target” describes the intended user-signed transaction model; it does not mean production-ready.
 - Repository inspection cannot prove external work for which no retained evidence was supplied.
@@ -180,7 +183,8 @@ Options, criteria, dependencies, and gate impacts are tracked in [`ROADMAP.md`](
 - [`README.md`](../README.md) — repository overview and local entry points.
 - [`MVP_CHECKPOINT.md`](./MVP_CHECKPOINT.md) — historical detailed MVP checkpoint.
 - [`LOCAL_LIFECYCLE_SMOKE_TEST.md`](./LOCAL_LIFECYCLE_SMOKE_TEST.md) — validated local lifecycle procedure and expected economics.
-- [`BASE_SEPOLIA_SMOKE_TEST.md`](./BASE_SEPOLIA_SMOKE_TEST.md) — incomplete public multi-wallet smoke procedure.
+- [`BASE_SEPOLIA_SMOKE_TEST.md`](./BASE_SEPOLIA_SMOKE_TEST.md) — reusable canonical public multi-wallet smoke procedure.
+- [`REPORT.md`](./evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md) — accepted bounded record for the 22 August 2026 canonical Base Sepolia run, including pending archival fields.
 - [`TESTNET_DEPLOYMENT_RUNBOOK.md`](./TESTNET_DEPLOYMENT_RUNBOOK.md) — controlled testnet deployment and redeployment procedure.
 - [`POST_DEPLOYMENT_VERIFICATION.md`](./POST_DEPLOYMENT_VERIFICATION.md) — reusable deployment verification procedure.
 - [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md) — open technical decisions and options.

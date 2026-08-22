@@ -100,11 +100,11 @@ Stores bounded economic and safety parameters.
 
 ## Current Product Status and Roadmap
 
-The current source of truth is [`docs/PRODUCT_STATUS.md`](docs/PRODUCT_STATUS.md). BidBack is **Demo-ready for a controlled local demonstration** as of the 31 July 2026 checkpoint. Base Sepolia deployment and checks are only partially validated; the complete public multi-wallet smoke test is not finished. This is a production-target MVP, not a production-ready product.
+The current source of truth is [`docs/PRODUCT_STATUS.md`](docs/PRODUCT_STATUS.md). BidBack is **Demo-ready for a controlled local demonstration** as of the 22 August 2026 checkpoint. **One complete canonical Base Sepolia cycle validated:** auction `#2` completed across five distinct public role wallets with a separately deployed valueless test-only NFT, reconciled economics, final-state verification, and rejected duplicate-action simulations. This is one bounded public-testnet scenario, not broad Base Sepolia validation. BidBack is not Controlled beta-ready, Public beta-ready, or Production-ready.
 
 Progression gates are defined in [`docs/ROADMAP.md`](docs/ROADMAP.md), open technical choices in [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md), and the approved Codex/Git process in [`docs/CODEX_WORKFLOW.md`](docs/CODEX_WORKFLOW.md).
 
-The local lifecycle procedure is in [`docs/LOCAL_LIFECYCLE_SMOKE_TEST.md`](docs/LOCAL_LIFECYCLE_SMOKE_TEST.md). Base Sepolia deployment and smoke procedures are in [`docs/TESTNET_DEPLOYMENT_RUNBOOK.md`](docs/TESTNET_DEPLOYMENT_RUNBOOK.md) and [`docs/BASE_SEPOLIA_SMOKE_TEST.md`](docs/BASE_SEPOLIA_SMOKE_TEST.md).
+The local lifecycle procedure is in [`docs/LOCAL_LIFECYCLE_SMOKE_TEST.md`](docs/LOCAL_LIFECYCLE_SMOKE_TEST.md). Base Sepolia deployment and smoke procedures are in [`docs/TESTNET_DEPLOYMENT_RUNBOOK.md`](docs/TESTNET_DEPLOYMENT_RUNBOOK.md) and [`docs/BASE_SEPOLIA_SMOKE_TEST.md`](docs/BASE_SEPOLIA_SMOKE_TEST.md). The accepted bounded run record is in [`docs/evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md`](docs/evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md).
 
 ## Historical MVP Checkpoint
 
@@ -235,7 +235,7 @@ npm run smoke:local:lifecycle
 
 The command runs pure Node guard/calculation tests first, reuses the existing local deployment, deployment JSON validation and read-only on-chain verification, then exercises NFT approval and custody, three bids including a delta-only step-up, finalization, every pull claim and withdrawal, final accounting, and duplicate-action rejection.
 
-This command is **LOCAL ANVIL ONLY**. It uses only the standard public Anvil development accounts, refuses non-loopback RPC hosts and any chain ID other than `31337`, and does not start or stop Anvil. It uses no real funds and does not replace the partial Base Sepolia multi-wallet smoke test.
+This command is **LOCAL ANVIL ONLY**. It uses only the standard public Anvil development accounts, refuses non-loopback RPC hosts and any chain ID other than `31337`, and does not start or stop Anvil. It uses no real funds. It is separate from the one validated canonical Base Sepolia cycle and does not prove public-chain behavior.
 
 Detailed prerequisites, expected economics and failure handling are documented in:
 

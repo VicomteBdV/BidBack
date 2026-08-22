@@ -2,6 +2,8 @@
 
 This document defines the read-only checks required after a controlled Base Sepolia deployment and during its canonical smoke. It does not authorize a broadcast or transaction.
 
+**Current status — 22 August 2026: One complete canonical Base Sepolia cycle validated.** The accepted auction `#2` record is [`evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md`](./evidence/base-sepolia/2026-08-22-auction-2-bd56f90/REPORT.md). This checklist remains reusable; every future deployment and run requires its own verification and evidence review.
+
 ## 1. Deployment Manifest
 
 Validate `frontend/public/deployments/84532.json`:
@@ -129,6 +131,8 @@ Before changing product status, a reviewer must reconcile:
 - absence of secrets and `/api/dev/*` usage.
 
 Only then may status documentation record one dated canonical Base Sepolia multi-wallet lifecycle. It must not imply production readiness or guaranteed rewards.
+
+For the 22 August 2026 run, the lifecycle result, successive interactive verifier checks, final-state reconciliation, duplicate simulations, and a second passing `final` check are confirmed. P1/T1–T11 hashes, blocks, exact timestamps, deployment hashes, checksums, BaseScan source-verification status, and persisted intermediate snapshots remain explicitly pending or unavailable in the accepted report and must not be inferred.
 
 ## 10. Local/Public Distinction
 

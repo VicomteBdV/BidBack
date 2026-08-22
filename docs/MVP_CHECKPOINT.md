@@ -1,6 +1,6 @@
 # BidBack MVP Checkpoint
 
-> **Historical checkpoint:** This document is retained for detailed MVP history. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md) for the current product status and evidence authority.
+> **Historical checkpoint:** This document is retained for detailed MVP history. Its statements that Base Sepolia validation was partial describe this earlier checkpoint, not the current state. One complete canonical Base Sepolia cycle was later validated on 22 August 2026. See [`PRODUCT_STATUS.md`](./PRODUCT_STATUS.md) for the current product status and evidence authority.
 
 This document summarizes the MVP state captured for the BidBack smart contracts, local Codespaces workflow, frontend, local-dev actions, wallet-signed flows, testnet readiness, and CI.
 
@@ -64,7 +64,7 @@ The auction detail page now exposes a read-only `Economic transparency / Settlem
 
 The homepage now includes a short MVP onboarding layer. It explains the ERC-721 auction flow, separates refunds from rewards, states that rewards are conditional and can be zero, and reminds testers that the current app is a controlled MVP/testnet interface rather than a production product.
 
-Base Sepolia validation is currently partial. The automated Anvil lifecycle is exhaustive for local deterministic validation, but it does not replace the remaining public multi-wallet transactions and manual review required to complete the Base Sepolia smoke test.
+At this historical checkpoint, Base Sepolia validation was partial. The automated Anvil lifecycle was exhaustive for local deterministic validation, but it did not replace the public multi-wallet transactions and manual review then still required. One complete canonical Base Sepolia cycle was subsequently validated on 22 August 2026; see `PRODUCT_STATUS.md` and the retained run report for the bounded current claim.
 
 ---
 
@@ -244,7 +244,7 @@ cd /workspaces/BidBack
 npm run smoke:local:lifecycle
 ```
 
-This command is LOCAL ANVIL ONLY. It deploys a fresh local environment, verifies exact premium-funded accounting, and completes every claim and withdrawal without assets of real value. Base Sepolia validation remains partial; this deterministic local result does not replace a public multi-wallet lifecycle.
+This command is LOCAL ANVIL ONLY. It deploys a fresh local environment, verifies exact premium-funded accounting, and completes every claim and withdrawal without assets of real value. At this historical checkpoint, Base Sepolia validation remained partial; this deterministic local result did not replace a public multi-wallet lifecycle. One bounded canonical public cycle was later validated on 22 August 2026.
 
 ---
 
@@ -274,7 +274,7 @@ CI does not require:
 * MetaMask may not be able to reach Anvil through Codespaces port forwarding.
 * Local-dev actions use known Anvil test private keys.
 * Local-dev actions are not production architecture.
-* Base Sepolia validation remains partial and is not completed by the local Anvil lifecycle.
+* At this historical checkpoint, Base Sepolia validation remained partial and was not completed by the local Anvil lifecycle. One bounded canonical public cycle was later validated on 22 August 2026.
 * No backend or persistent event indexer exists yet.
 * Read-only auction discovery uses contract events and a bounded fallback, but it is not a production indexing layer.
 * Auction browsing filters and sorting apply only to the currently loaded bounded auction window, not to complete historical auction data.
@@ -299,7 +299,7 @@ CI does not require:
 
 Recommended next steps:
 
-* Complete the controlled Base Sepolia multi-wallet smoke and retain transaction evidence.
+* Historical next step at this checkpoint: complete the controlled Base Sepolia multi-wallet smoke and retain transaction evidence. One canonical cycle was later completed; some archival transaction metadata remains pending in its evidence report.
 * Re-run deployment and on-chain verification checks for any replacement deployment.
 * Broadcast any redeployment only after human review of deployment variables and dry-run output.
 * Sync, validate, and verify the generated deployment JSON.

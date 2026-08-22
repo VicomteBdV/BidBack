@@ -4,7 +4,7 @@
 
 `npm run smoke:local:lifecycle` performs a deterministic, exhaustive BidBack auction lifecycle on a local Anvil chain. It deploys a fresh local contract set, validates the generated deployment, and exercises every custody and pull-payment action with valueless development ETH and a local mock ERC-721.
 
-This workflow is **LOCAL ANVIL ONLY**. It does not replace the partial Base Sepolia multi-wallet smoke test, and no asset of real value should ever be used.
+This workflow is **LOCAL ANVIL ONLY**. It is separate from the one complete canonical Base Sepolia cycle validated on 22 August 2026, and no asset of real value should ever be used. Neither run proves the other environment or any production-readiness claim.
 
 ## Prerequisites
 
@@ -165,4 +165,4 @@ Failures use this form and set a non-zero process exit code:
 
 ## Base Sepolia Distinction
 
-The automated local lifecycle is exhaustive and deterministic for Anvil, where time can be advanced safely and development accounts have no value. The Base Sepolia smoke remains partial and requires public multi-wallet transactions, a real external test NFT and manual transaction review. Passing this local command is not evidence that the public lifecycle has completed.
+The automated local lifecycle is exhaustive and deterministic for Anvil, where time can be advanced safely and development accounts have no value. One bounded canonical Base Sepolia multi-wallet lifecycle completed on 22 August 2026 with a separately deployed valueless test-only NFT and manual transaction review. Passing this local command is not evidence for that public run, and the single public run does not replace deterministic local coverage or prove repeatability.

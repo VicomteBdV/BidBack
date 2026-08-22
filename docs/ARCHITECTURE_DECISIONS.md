@@ -31,7 +31,7 @@ The current MVP is centered on a local Anvil workflow and a modular smart contra
 Current baseline:
 
 * local Anvil deployment on chain ID `31337`;
-* Base Sepolia deployment and verification checks partially validated, with the complete public multi-wallet smoke still incomplete;
+* one complete canonical Base Sepolia cycle validated on 22 August 2026 for auction `#2`, with five distinct public role wallets, a separately deployed valueless test-only NFT, reconciled final economics, and duplicate-action simulations; repeatability and archival transaction metadata remain incomplete;
 * modular Foundry contracts;
 * Next.js frontend under `frontend/`;
 * read-only auction views through Next.js server routes;
@@ -589,7 +589,7 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
 | Bidding authorization model       | Wallet-signed bids plus local-dev server actions for testing                                                          | Session keys, account abstraction, auction-scoped delegation, signed intents, hybrid model | Unauthorized bids, poor UX, relayer trust, replay risk                                | `AuctionHouse`, wallet layer, frontend, future backend  | Before production UX; prototype before public beta |
 | Multi-wallet support              | Wallet-signed panels exist; MetaMask-oriented testing so far                                                          | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps                              | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                  |
-| Chain selection                   | Local Anvil `31337` plus partial Base Sepolia validation; production chain remains open                                | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before public beta and production                  |
+| Chain selection                   | Local Anvil `31337` plus one validated canonical Base Sepolia `84532` cycle; production chain remains open              | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before public beta and production                  |
 | Redistribution computation model  | Deterministic on-chain SCR in MVP                                                                                     | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors                             | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data         |
 | Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before controlled/public beta progression          |
 | Auction parameter snapshots       | Params, modules, and fee recipient are snapshotted, tested, and visible read-only                                      | Richer events, auction-level verification, richer indexer schema                           | User cannot inspect all rules, stale module confusion, incomplete verification         | `AuctionHouse`, frontend, indexer, verification scripts | Snapshot visibility done; verify each deployment   |
@@ -633,7 +633,7 @@ Areas likely to evolve before production:
 * persistent indexer and backend persistence for scalable reads;
 * production-grade auction browsing, pagination, and historical search;
 * NFT metadata caching, media proxying, and content safety;
-* completion and retained evidence of the Base Sepolia multi-wallet lifecycle;
+* repetition and completion of archival evidence beyond the single validated canonical Base Sepolia multi-wallet lifecycle;
 * multi-wallet and network configuration;
 * production monitoring and incident response;
 * final product UX and trust surfaces.
