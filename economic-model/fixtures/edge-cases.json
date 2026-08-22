@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "fixtureRole": "Solidity-authoritative branch, threshold, rounding, timing, and revert vectors",
+  "authority": "test/EconomicModelParity.t.sol",
+  "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven.",
+  "vectors": [
+    {
+      "id": "no-bids-v1",
+      "description": "Finalization without bids creates no escrow settlement or distribution and leaves the NFT claimable by the seller.",
+      "sourceTest": "EconomicModelParityTest.testVectorNoBids",
+      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
+      "params": { "profile": "ParamsController defaults" },
+      "participants": [],
+      "bidTrace": [],
+      "expected": {
+        "minimumBid": "1000000000000000000",
+        "capDelta": null,
+        "finalPrice": "0",
+        "grossPremium": "0",
+        "feeAmount": "0",
+        "netPremium": "0",
+        "candidatePool": "0",
+        "EF": null,
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null,
+        "totalScore": null,
+        "rawReward": null,
+        "perUserCap": null,
+        "reward": null,
+        "assignedDistribution": "0",
+        "refunds": {},
+        "sellerProceeds": null,
+        "finalLiabilities": "0",
+        "escrowSettlementOpened": false,
+        "distributionOpened": false,
+        "nftClaimant": "SELLER"
+      }
+    },
+    {
+      "id": "one-bidder-zero-premium-v1",
+      "description": "A single bidder bids exactly the start price: fee and distribution are zero.",
+      "sourceTest": "EconomicModelParityTest.testVectorOneBidderZeroPremium",
+      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
+      "params": { "profile": "ParamsController defaults" },
+      "participants": ["BIDDER_A"],
+      "bidTrace": [
+        {
+          "bidder": "BIDDER_A",
+          "newCap": "1000000000000000000",
+          "capDelta": "1000000000000000000",
+          "observedPriceLift": "1000000000000000000",
+          "premiumLift": "0"
+        }
+      ],
+      "expected": {
+        "minimumBid": "1000000000000000000",
+        "capDelta": "1000000000000000000",
+        "finalPrice": "1000000000000000000",
+        "grossPremium": "0",
+        "feeAmount": "0",
+        "netPremium": "0",
+        "candidatePool": "0",
+        "EF": null,
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null,
+        "totalScore": "0",
+        "rawReward": null,
+        "perUserCap": "0",
+        "reward": { "BIDDER_A": "0" },
+        "assignedDistribution": "0",
+        "refunds": { "BIDDER_A": "0" },
+        "sellerProceeds": "1000000000000000000",
+        "finalLiabilities": "1000000000000000000"
+      }
+    },
+    {
+      "id": "minimum-bid-ceil-and-delta-v1",
+      "description": "The minimum increment rounds upward and a returning bidder deposits only its cap delta.",
+      "sourceTest": "EconomicModelParityTest.testVectorMinimumBidCeilAndCapDelta",
+      "inputs": { "startPrice": "10000" },
+      "params": { "minBidIncrementBps": "500", "BPS": "10000" },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "10001", "capDelta": "10001", "observedPriceLift": "10001", "premiumLift": "1" },
+        { "bidder": "BIDDER_B", "newCap": "10502", "capDelta": "10502", "observedPriceLift": "501", "premiumLift": "501" },
+        { "bidder": "BIDDER_A", "newCap": "11028", "capDelta": "1027", "observedPriceLift": "526", "premiumLift": "526" }
+      ],
+      "expected": {
+        "minimumBid": ["10000", "10502", "11028"],
+        "capDelta": ["10001", "10502", "1027"],
+        "finalPrice": "11028",
+        "grossPremium": "1028",
+        "feeAmount": null,
+        "netPremium": null,
+        "candidatePool": null,
+        "EF": null,
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null,
+        "totalScore": null,
+        "rawReward": null,
+        "perUserCap": null,
+        "reward": null,
+        "assignedDistribution": null,
+        "refunds": null,
+        "sellerProceeds": null,
+        "finalLiabilities": null
+      }
+    },
+    {
+      "id": "premium-below-threshold-v1",
+      "description": "Net premium one wei below minPremiumNet produces no candidate pool.",
+      "sourceTest": "EconomicModelParityTest.testVectorPremiumBelowThreshold",
+      "inputs": { "startPrice": "1000000000000000000", "premium": "9999999999999999" },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "5000",
+        "minPremiumNet": "10000000000000000",
+        "perUserRewardCapBps": "10000",
+        "minBidIncrementBps": "1"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
+        { "bidder": "BIDDER_B", "newCap": "1009999999999999999", "capDelta": "1009999999999999999" }
+      ],
+      "expected": {
+        "finalPrice": "1009999999999999999",
+        "grossPremium": "9999999999999999",
+        "feeAmount": "0",
+        "netPremium": "9999999999999999",
+        "candidatePool": "0",
+        "perUserCap": "0",
+        "reward": { "BIDDER_A": "0", "BIDDER_B": "0" },
+        "assignedDistribution": "0",
+        "refunds": { "BIDDER_A": "1000000000000000000", "BIDDER_B": "0" },
+        "sellerProceeds": "1009999999999999999",
+        "finalLiabilities": "2009999999999999999"
+      }
+    },
+    {
+      "id": "premium-at-threshold-v1",
+      "description": "Net premium exactly equal to minPremiumNet is eligible.",
+      "sourceTest": "EconomicModelParityTest.testVectorPremiumAtThreshold",
+      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000000" },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "5000",
+        "minPremiumNet": "10000000000000000",
+        "perUserRewardCapBps": "10000",
+        "minBidIncrementBps": "1"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
+        { "bidder": "BIDDER_B", "newCap": "1010000000000000000", "capDelta": "1010000000000000000" }
+      ],
+      "expected": {
+        "finalPrice": "1010000000000000000",
+        "grossPremium": "10000000000000000",
+        "feeAmount": "0",
+        "netPremium": "10000000000000000",
+        "candidatePool": "5000000000000000",
+        "rawReward": "5000000000000000",
+        "perUserCap": "5000000000000000",
+        "reward": { "BIDDER_A": "5000000000000000", "BIDDER_B": "0" },
+        "assignedDistribution": "5000000000000000",
+        "refunds": { "BIDDER_A": "1000000000000000000", "BIDDER_B": "0" },
+        "sellerProceeds": "1005000000000000000",
+        "finalLiabilities": "2010000000000000000"
+      }
+    },
+    {
+      "id": "premium-above-threshold-rounding-v1",
+      "description": "One wei above the threshold is eligible but the 50 percent candidate pool remains unchanged because of floor division.",
+      "sourceTest": "EconomicModelParityTest.testVectorPremiumAboveThreshold",
+      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000001" },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "5000",
+        "minPremiumNet": "10000000000000000",
+        "perUserRewardCapBps": "10000",
+        "minBidIncrementBps": "1"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
+        { "bidder": "BIDDER_B", "newCap": "1010000000000000001", "capDelta": "1010000000000000001" }
+      ],
+      "expected": {
+        "finalPrice": "1010000000000000001",
+        "grossPremium": "10000000000000001",
+        "feeAmount": "0",
+        "netPremium": "10000000000000001",
+        "candidatePool": "5000000000000000",
+        "rawReward": "5000000000000000",
+        "perUserCap": "5000000000000000",
+        "reward": { "BIDDER_A": "5000000000000000", "BIDDER_B": "0" },
+        "assignedDistribution": "5000000000000000",
+        "refunds": { "BIDDER_A": "1000000000000000000", "BIDDER_B": "0" },
+        "sellerProceeds": "1005000000000000001",
+        "finalLiabilities": "2010000000000000001"
+      }
+    },
+    {
+      "id": "allocation-rounds-to-zero-v1",
+      "description": "A one-wei candidate pool divided among multiple positive scores rounds every allocation to zero.",
+      "sourceTest": "EconomicModelParityTest.testVectorAllocationRoundsToZero",
+      "inputs": { "startPrice": "0", "finalPrice": "10000" },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "1",
+        "alphaBps": "9999",
+        "betaBps": "1",
+        "gammaBps": "0",
+        "perUserRewardCapBps": "10000",
+        "minPremiumNet": "10000"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500" },
+        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000" },
+        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500" },
+        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000" }
+      ],
+      "expected": {
+        "finalPrice": "10000",
+        "grossPremium": "10000",
+        "feeAmount": "0",
+        "netPremium": "10000",
+        "candidatePool": "1",
+        "totalScore": "874912500000000000",
+        "rawReward": { "BIDDER_A": "0", "BIDDER_B": "0", "BIDDER_C": "0" },
+        "perUserCap": "1",
+        "reward": { "BIDDER_A": "0", "BIDDER_B": "0", "BIDDER_C": "0", "BIDDER_D": "0" },
+        "assignedDistribution": "0",
+        "refunds": { "BIDDER_A": "2500", "BIDDER_B": "5000", "BIDDER_C": "7500", "BIDDER_D": "0" },
+        "sellerProceeds": "10000",
+        "finalLiabilities": "25000"
+      }
+    },
+    {
+      "id": "zero-score-v1",
+      "description": "A tiny losing cap relative to a very large final price rounds EF and the final score to zero.",
+      "sourceTest": "EconomicModelParityTest.testVectorZeroScore",
+      "inputs": { "startPrice": "0", "losingCap": "1", "finalPrice": "2000000000000000000" },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "10000",
+        "alphaBps": "10000",
+        "betaBps": "0",
+        "gammaBps": "0",
+        "perUserRewardCapBps": "10000",
+        "minPremiumNet": "0"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "1", "capDelta": "1" },
+        { "bidder": "BIDDER_B", "newCap": "2000000000000000000", "capDelta": "2000000000000000000" }
+      ],
+      "expected": {
+        "finalPrice": "2000000000000000000",
+        "grossPremium": "2000000000000000000",
+        "candidatePool": "2000000000000000000",
+        "EF": { "BIDDER_A": "0" },
+        "ET": { "BIDDER_A": "0" },
+        "II": { "BIDDER_A": "0" },
+        "weightedScore": { "BIDDER_A": "0" },
+        "reputation": { "BIDDER_A": "10000" },
+        "finalScore": { "BIDDER_A": "0" },
+        "totalScore": "0",
+        "rawReward": null,
+        "perUserCap": "2000000000000000000",
+        "reward": { "BIDDER_A": "0", "BIDDER_B": "0" },
+        "assignedDistribution": "0",
+        "refunds": { "BIDDER_A": "1", "BIDDER_B": "0" },
+        "sellerProceeds": "2000000000000000000",
+        "finalLiabilities": "2000000000000000001"
+      }
+    },
+    {
+      "id": "first-bid-after-initial-end-v1",
+      "description": "A new bidder can bid during an anti-sniping extension but receives ET zero when its first bid is after initialEndTime.",
+      "sourceTest": "EconomicModelParityTest.testVectorFirstBidAfterInitialEndDuringExtensionHasZeroEt",
+      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
+      "params": {
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "300"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000", "timestampOffsetSeconds": "3599" },
+        { "bidder": "BIDDER_B", "newCap": "1100000000000000000", "capDelta": "1100000000000000000", "timestampOffsetSeconds": "3601" }
+      ],
+      "expected": {
+        "finalPrice": null,
+        "EF": null,
+        "ET": { "BIDDER_B": "0" },
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null,
+        "initialEndTimeOffsetSeconds": "3600",
+        "endTimeAfterFirstExtensionOffsetSeconds": "4200"
+      }
+    },
+    {
+      "id": "checked-overflow-revert-v1",
+      "description": "The inherited EF multiplication reverts under Solidity checked arithmetic instead of wrapping.",
+      "sourceTest": "EconomicModelParityTest.testVectorCheckedOverflowReverts",
+      "inputs": {
+        "maxCap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "finalPrice": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "params": { "efCap": "1000000000000000000", "SCALE": "1000000000000000000" },
+      "participants": [],
+      "bidTrace": [],
+      "expected": {
+        "EF": null,
+        "revert": true,
+        "revertClass": "Solidity checked arithmetic overflow"
+      }
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "fixtureRole": "Canonical Anvil settlement vector; not a scoring-discriminating vector",
+  "authority": "EconomicModelParityTest.testVectorCanonicalAnvilSettlement and docs/LOCAL_LIFECYCLE_SMOKE_TEST.md",
+  "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven by this vector.",
+  "vectors": [
+    {
+      "id": "canonical-anvil-settlement-v1",
+      "description": "Deterministic local settlement replay with one loser whose reward is capped at 40 percent of the candidate pool.",
+      "sourceTest": "EconomicModelParityTest.testVectorCanonicalAnvilSettlement",
+      "inputs": {
+        "chainId": "31337",
+        "startPrice": "1000000000000000000",
+        "initialDurationSeconds": "7200",
+        "scoringParityProven": false,
+        "scoringLimitation": "The only loser has a positive score and the per-user cap masks EF/ET/II differences."
+      },
+      "params": {
+        "bidbackFeeBps": "500",
+        "redistributionBps": "5000",
+        "minParticipants": "2",
+        "alphaBps": "6000",
+        "betaBps": "3000",
+        "gammaBps": "1000",
+        "minBidIncrementBps": "500",
+        "perUserRewardCapBps": "4000",
+        "maxParticipants": "64",
+        "maxInteractionCount": "5",
+        "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "300",
+        "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000",
+        "iiCap": "1000000000000000000"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        {
+          "bidder": "BIDDER_A",
+          "newCap": "1200000000000000000",
+          "capDelta": "1200000000000000000",
+          "observedPriceLift": "1200000000000000000",
+          "premiumLift": "200000000000000000",
+          "timestampOffsetSeconds": "0"
+        },
+        {
+          "bidder": "BIDDER_B",
+          "newCap": "1500000000000000000",
+          "capDelta": "1500000000000000000",
+          "observedPriceLift": "300000000000000000",
+          "premiumLift": "300000000000000000",
+          "timestampOffsetSeconds": "600"
+        },
+        {
+          "bidder": "BIDDER_A",
+          "newCap": "2000000000000000000",
+          "capDelta": "800000000000000000",
+          "observedPriceLift": "500000000000000000",
+          "premiumLift": "500000000000000000",
+          "timestampOffsetSeconds": "1200"
+        }
+      ],
+      "expected": {
+        "minimumBid": null,
+        "capDelta": ["1200000000000000000", "1500000000000000000", "800000000000000000"],
+        "finalPrice": "2000000000000000000",
+        "grossPremium": "1000000000000000000",
+        "feeAmount": "50000000000000000",
+        "netPremium": "950000000000000000",
+        "candidatePool": "475000000000000000",
+        "EF": null,
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": "10000",
+        "finalScore": null,
+        "totalScore": null,
+        "rawReward": "475000000000000000",
+        "perUserCap": "190000000000000000",
+        "reward": { "BIDDER_A": "0", "BIDDER_B": "190000000000000000" },
+        "assignedDistribution": "190000000000000000",
+        "refunds": { "BIDDER_A": "0", "BIDDER_B": "1500000000000000000" },
+        "sellerProceeds": "1760000000000000000",
+        "finalLiabilities": "3500000000000000000"
+      }
+    }
+  ]
+}

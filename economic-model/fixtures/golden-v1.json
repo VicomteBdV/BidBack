@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "fixtureRole": "Solidity-authoritative scoring and allocation vectors",
+  "authority": "test/EconomicModelParity.t.sol",
+  "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven.",
+  "vectors": [
+    {
+      "id": "ef-boundaries-v1",
+      "description": "Financial engagement low, intermediate, and capped values through the inherited Solidity implementation.",
+      "sourceTest": "EconomicModelParityTest.testVectorFinancialEngagementBoundaries",
+      "inputs": {
+        "cases": [
+          { "maxCap": "1", "finalPrice": "4", "efCap": "1000000000000000000" },
+          { "maxCap": "1", "finalPrice": "2", "efCap": "1000000000000000000" },
+          { "maxCap": "2", "finalPrice": "1", "efCap": "800000000000000000" }
+        ]
+      },
+      "params": { "SCALE": "1000000000000000000" },
+      "participants": [],
+      "bidTrace": [],
+      "expected": {
+        "minimumBid": null,
+        "capDelta": null,
+        "finalPrice": null,
+        "grossPremium": null,
+        "feeAmount": null,
+        "netPremium": null,
+        "candidatePool": null,
+        "EF": ["62500000000000000", "250000000000000000", "800000000000000000"],
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null,
+        "totalScore": null,
+        "rawReward": null,
+        "perUserCap": null,
+        "reward": null,
+        "assignedDistribution": null,
+        "refunds": null,
+        "sellerProceeds": null,
+        "finalLiabilities": null
+      }
+    },
+    {
+      "id": "et-boundaries-v1",
+      "description": "Time engagement uses the first bid and initial end time, with a hard minimum-exposure cutoff.",
+      "sourceTest": "EconomicModelParityTest.testVectorTimeEngagementBoundaries",
+      "inputs": {
+        "startTime": "1000",
+        "initialEndTime": "2000",
+        "firstBidTimes": ["1000", "1500", "1800", "2001"]
+      },
+      "params": {
+        "minExposure": "300",
+        "etCap": "1000000000000000000",
+        "SCALE": "1000000000000000000"
+      },
+      "participants": [],
+      "bidTrace": [],
+      "expected": {
+        "EF": null,
+        "ET": ["1000000000000000000", "500000000000000000", "0", "0"],
+        "II": null,
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null
+      }
+    },
+    {
+      "id": "ii-boundaries-v1",
+      "description": "Interaction intensity for zero, one, maximum, and above-maximum takeover counts.",
+      "sourceTest": "EconomicModelParityTest.testVectorInteractionIntensityBoundaries",
+      "inputs": { "significantOverbids": ["0", "1", "5", "6"] },
+      "params": {
+        "maxInteractionCount": "5",
+        "iiCap": "1000000000000000000",
+        "SCALE": "1000000000000000000"
+      },
+      "participants": [],
+      "bidTrace": [],
+      "expected": {
+        "EF": null,
+        "ET": null,
+        "II": ["0", "200000000000000000", "1000000000000000000", "1000000000000000000"],
+        "weightedScore": null,
+        "reputation": null,
+        "finalScore": null
+      }
+    },
+    {
+      "id": "reputation-live-bounds-v1",
+      "description": "The snapshotted adapter reads reputation live after auction creation.",
+      "sourceTest": "EconomicModelParityTest.testVectorReputationBoundsAndLiveRead",
+      "inputs": {
+        "startPrice": "0",
+        "losingCap": "5000",
+        "finalPrice": "10000"
+      },
+      "params": {
+        "alphaBps": "10000",
+        "betaBps": "0",
+        "gammaBps": "0",
+        "efCap": "1000000000000000000"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "5000", "capDelta": "5000", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "10000", "capDelta": "10000", "timestampOffsetSeconds": "1" }
+      ],
+      "expected": {
+        "EF": { "BIDDER_A": "250000000000000000" },
+        "ET": null,
+        "II": null,
+        "weightedScore": { "BIDDER_A": "250000000000000000" },
+        "reputation": ["5000", "10000", "15000"],
+        "finalScore": ["125000000000000000", "250000000000000000", "375000000000000000"]
+      }
+    },
+    {
+      "id": "multi-loser-uncapped-normalization-v1",
+      "description": "Three unequal losing scores produce non-saturated proportional rewards and one wei of allocation dust.",
+      "sourceTest": "EconomicModelParityTest.testVectorMultipleLosersNonSaturatedNormalizationAndDust",
+      "inputs": {
+        "startPrice": "0",
+        "initialDurationSeconds": "3600"
+      },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "10000",
+        "minParticipants": "2",
+        "alphaBps": "9999",
+        "betaBps": "1",
+        "gammaBps": "0",
+        "minBidIncrementBps": "1",
+        "perUserRewardCapBps": "10000",
+        "maxParticipants": "64",
+        "maxInteractionCount": "5",
+        "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "3600",
+        "minPremiumNet": "10000",
+        "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000",
+        "iiCap": "1000000000000000000"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500", "observedPriceLift": "2500", "premiumLift": "2500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000", "observedPriceLift": "2500", "premiumLift": "2500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500", "observedPriceLift": "2500", "premiumLift": "2500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000", "observedPriceLift": "2500", "premiumLift": "2500", "timestampOffsetSeconds": "1" }
+      ],
+      "expected": {
+        "minimumBid": null,
+        "capDelta": ["2500", "5000", "7500", "10000"],
+        "finalPrice": "10000",
+        "grossPremium": "10000",
+        "feeAmount": "0",
+        "netPremium": "10000",
+        "candidatePool": "10000",
+        "EF": {
+          "BIDDER_A": "62500000000000000",
+          "BIDDER_B": "250000000000000000",
+          "BIDDER_C": "562500000000000000",
+          "BIDDER_D": null
+        },
+        "ET": { "BIDDER_A": "0", "BIDDER_B": "0", "BIDDER_C": "0", "BIDDER_D": null },
+        "II": {
+          "BIDDER_A": "0",
+          "BIDDER_B": "200000000000000000",
+          "BIDDER_C": "200000000000000000",
+          "BIDDER_D": null
+        },
+        "weightedScore": {
+          "BIDDER_A": "62493750000000000",
+          "BIDDER_B": "249975000000000000",
+          "BIDDER_C": "562443750000000000",
+          "BIDDER_D": null
+        },
+        "reputation": { "BIDDER_A": "10000", "BIDDER_B": "10000", "BIDDER_C": "10000", "BIDDER_D": null },
+        "finalScore": {
+          "BIDDER_A": "62493750000000000",
+          "BIDDER_B": "249975000000000000",
+          "BIDDER_C": "562443750000000000",
+          "BIDDER_D": null
+        },
+        "totalScore": "874912500000000000",
+        "rawReward": { "BIDDER_A": "714", "BIDDER_B": "2857", "BIDDER_C": "6428", "BIDDER_D": null },
+        "perUserCap": "10000",
+        "reward": { "BIDDER_A": "714", "BIDDER_B": "2857", "BIDDER_C": "6428", "BIDDER_D": "0" },
+        "assignedDistribution": "9999",
+        "refunds": { "BIDDER_A": "2500", "BIDDER_B": "5000", "BIDDER_C": "7500", "BIDDER_D": "0" },
+        "sellerProceeds": "1",
+        "finalLiabilities": "25000"
+      }
+    },
+    {
+      "id": "multi-loser-cap-active-v1",
+      "description": "The largest raw allocation is capped and the removed amount is not reallocated.",
+      "sourceTest": "EconomicModelParityTest.testVectorMultipleLosersPerUserCapAndSellerRemainder",
+      "inputs": { "baseVector": "multi-loser-uncapped-normalization-v1" },
+      "params": {
+        "perUserRewardCapBps": "4000",
+        "otherParameters": "same as multi-loser-uncapped-normalization-v1"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500" },
+        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000" },
+        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500" },
+        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000" }
+      ],
+      "expected": {
+        "finalPrice": "10000",
+        "grossPremium": "10000",
+        "candidatePool": "10000",
+        "totalScore": "874912500000000000",
+        "rawReward": { "BIDDER_A": "714", "BIDDER_B": "2857", "BIDDER_C": "6428" },
+        "perUserCap": "4000",
+        "reward": { "BIDDER_A": "714", "BIDDER_B": "2857", "BIDDER_C": "4000", "BIDDER_D": "0" },
+        "assignedDistribution": "7571",
+        "refunds": { "BIDDER_A": "2500", "BIDDER_B": "5000", "BIDDER_C": "7500", "BIDDER_D": "0" },
+        "sellerProceeds": "2429",
+        "finalLiabilities": "25000"
+      }
+    },
+    {
+      "id": "reputation-change-normalization-v1",
+      "description": "A post-creation, pre-finalization reputation update changes a multi-loser normalized allocation.",
+      "sourceTest": "EconomicModelParityTest.testVectorReputationChangeBeforeFinalizationChangesNormalization",
+      "inputs": { "startPrice": "0", "reputationChangedAfterCreation": true },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "10000",
+        "alphaBps": "10000",
+        "betaBps": "0",
+        "gammaBps": "0",
+        "perUserRewardCapBps": "10000",
+        "minPremiumNet": "0"
+      },
+      "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
+      "bidTrace": [
+        { "bidder": "BIDDER_A", "newCap": "7250", "capDelta": "7250" },
+        { "bidder": "BIDDER_B", "newCap": "14500", "capDelta": "14500" },
+        { "bidder": "BIDDER_C", "newCap": "21750", "capDelta": "21750" },
+        { "bidder": "BIDDER_D", "newCap": "29000", "capDelta": "29000" }
+      ],
+      "expected": {
+        "finalPrice": "29000",
+        "grossPremium": "29000",
+        "candidatePool": "29000",
+        "EF": {
+          "BIDDER_A": "62500000000000000",
+          "BIDDER_B": "250000000000000000",
+          "BIDDER_C": "562500000000000000"
+        },
+        "weightedScore": {
+          "BIDDER_A": "62500000000000000",
+          "BIDDER_B": "250000000000000000",
+          "BIDDER_C": "562500000000000000"
+        },
+        "reputation": { "BIDDER_A": "15000", "BIDDER_B": "10000", "BIDDER_C": "10000" },
+        "finalScore": {
+          "BIDDER_A": "93750000000000000",
+          "BIDDER_B": "250000000000000000",
+          "BIDDER_C": "562500000000000000"
+        },
+        "totalScore": "906250000000000000",
+        "rawReward": { "BIDDER_A": "3000", "BIDDER_B": "8000", "BIDDER_C": "18000" },
+        "perUserCap": "29000",
+        "reward": { "BIDDER_A": "3000", "BIDDER_B": "8000", "BIDDER_C": "18000", "BIDDER_D": "0" },
+        "assignedDistribution": "29000",
+        "sellerProceeds": "0",
+        "finalLiabilities": "72500"
+      }
+    }
+  ]
+}

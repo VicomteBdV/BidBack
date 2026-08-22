@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "fixtureRole": "Canonical Base Sepolia settlement vector; retained public facts only",
+  "authority": "EconomicModelParityTest.testVectorCanonicalBaseSepoliaSettlement and docs/evidence/base-sepolia/2026-08-22-auction-2-bd56f90/",
+  "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven by retained public evidence.",
+  "vectors": [
+    {
+      "id": "canonical-base-sepolia-auction-2-settlement-v1",
+      "description": "Bounded public settlement facts for Base Sepolia auction 2. Missing timestamps prevent authoritative EF/ET/II reconstruction.",
+      "sourceTest": "EconomicModelParityTest.testVectorCanonicalBaseSepoliaSettlement",
+      "inputs": {
+        "completionDate": "2026-08-22",
+        "chainId": "84532",
+        "auctionId": "2",
+        "startPrice": "10000000000000000",
+        "initialDurationSeconds": "7200",
+        "exactBidTimestamps": null,
+        "scoringParityProven": false,
+        "scoringLimitation": "Retained public evidence has no exact bid timestamps or persisted score components, and the single loser reward is masked by the 40 percent per-user cap."
+      },
+      "params": {
+        "bidbackFeeBps": "500",
+        "redistributionBps": "5000",
+        "minParticipants": "2",
+        "alphaBps": "6000",
+        "betaBps": "3000",
+        "gammaBps": "1000",
+        "minBidIncrementBps": "500",
+        "perUserRewardCapBps": "4000",
+        "maxParticipants": "64",
+        "maxInteractionCount": "5",
+        "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "300",
+        "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000",
+        "iiCap": "1000000000000000000"
+      },
+      "participants": [
+        {
+          "role": "W_A",
+          "address": "0x594bFc4c748f1feBf1C4C81d0949D000B5745256",
+          "outcome": "winner"
+        },
+        {
+          "role": "W_B",
+          "address": "0x7d8f0090A5ddfFC136bc5aAB154C12666562f1f3",
+          "outcome": "loser"
+        }
+      ],
+      "bidTrace": [
+        {
+          "bidder": "W_A",
+          "newCap": "12000000000000000",
+          "capDelta": "12000000000000000",
+          "observedPriceLift": "12000000000000000",
+          "premiumLift": "2000000000000000",
+          "timestampUtc": null
+        },
+        {
+          "bidder": "W_B",
+          "newCap": "15000000000000000",
+          "capDelta": "15000000000000000",
+          "observedPriceLift": "3000000000000000",
+          "premiumLift": "3000000000000000",
+          "timestampUtc": null
+        },
+        {
+          "bidder": "W_A",
+          "newCap": "30000000000000000",
+          "capDelta": "18000000000000000",
+          "observedPriceLift": "15000000000000000",
+          "premiumLift": "15000000000000000",
+          "timestampUtc": null
+        }
+      ],
+      "expected": {
+        "minimumBid": null,
+        "capDelta": ["12000000000000000", "15000000000000000", "18000000000000000"],
+        "finalPrice": "30000000000000000",
+        "grossPremium": "20000000000000000",
+        "feeAmount": "1000000000000000",
+        "netPremium": "19000000000000000",
+        "candidatePool": "9500000000000000",
+        "EF": null,
+        "ET": null,
+        "II": null,
+        "weightedScore": null,
+        "reputation": "10000",
+        "finalScore": null,
+        "totalScore": null,
+        "rawReward": "9500000000000000",
+        "perUserCap": "3800000000000000",
+        "reward": { "W_A": "0", "W_B": "3800000000000000" },
+        "assignedDistribution": "3800000000000000",
+        "refunds": { "W_A": "0", "W_B": "15000000000000000" },
+        "sellerProceeds": "25200000000000000",
+        "finalLiabilities": "45000000000000000",
+        "finalEscrowAfterAllClaims": "0"
+      }
+    }
+  ]
+}
