@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "lot-c-catalog-v1",
+  "economicModelVersion": "solidity-baseline-v1",
+  "params": {
+    "alpha_bps": "6000",
+    "anti_snipe_extension": "600",
+    "anti_snipe_window": "600",
+    "beta_bps": "3000",
+    "bidback_fee_bps": "500",
+    "ef_cap": "1000000000000000000",
+    "et_cap": "1000000000000000000",
+    "gamma_bps": "1000",
+    "ii_cap": "1000000000000000000",
+    "max_anti_snipe_extensions": "6",
+    "max_interaction_count": "5",
+    "max_participants": "64",
+    "min_auction_duration": "3600",
+    "min_bid_increment_bps": "500",
+    "min_exposure": "300",
+    "min_participants": "2",
+    "min_premium_net": "10000000000000000",
+    "per_user_reward_cap_bps": "4000",
+    "redistribution_bps": "5000"
+  },
+  "scenarios": [
+    {
+      "id": "s01-no-competition",
+      "family": "S1",
+      "description": "One value-capped bidder establishes the no-competition seller outcome and zero redistribution.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "15000000000000000",
+          "budget": null,
+          "profile": "value-capped-once"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"}
+      ]
+    },
+    {
+      "id": "s02-clear-gap",
+      "family": "S2",
+      "description": "Two fixed-cap bidders with a clear valuation gap produce an eligible premium and a loser outcome.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "15000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "15000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "40000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "500", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s03-close-valuations",
+      "family": "S3",
+      "description": "Two bidders with close valuations create competition near the available winner surplus.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "29000000000000000",
+          "budget": "28000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "28000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "30000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "200", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "700", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s04-heterogeneous",
+      "family": "S4",
+      "description": "Three heterogeneous losers exercise discriminating EF, ET, II, and uncapped raw allocation.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "16000000000000000",
+          "budget": "15000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "15000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "19000000000000000",
+          "budget": "18000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "18000000000000000"
+        },
+        {
+          "id": "BIDDER_C",
+          "valuation": "22000000000000000",
+          "budget": "21000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "21000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "400", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "800", "bidder": "BIDDER_C"},
+        {"offsetSeconds": "1200", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s05-et-early",
+      "family": "S5",
+      "description": "Controlled ET pair, early variant: only the focal loser's first-bid timing differs from its pair.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_F",
+      "bidders": [
+        {
+          "id": "BIDDER_F",
+          "valuation": "13000000000000000",
+          "budget": "12000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "12000000000000000"
+        },
+        {
+          "id": "BIDDER_A",
+          "valuation": "19000000000000000",
+          "budget": "18000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "18000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "23000000000000000",
+          "budget": "22000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "22000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "1800", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "2200", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "2500", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s05-et-late",
+      "family": "S5",
+      "description": "Controlled ET pair, late variant: only the focal loser's first-bid timing differs from its pair.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_F",
+      "bidders": [
+        {
+          "id": "BIDDER_F",
+          "valuation": "13000000000000000",
+          "budget": "12000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "12000000000000000"
+        },
+        {
+          "id": "BIDDER_A",
+          "valuation": "19000000000000000",
+          "budget": "18000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "18000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "23000000000000000",
+          "budget": "22000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "22000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "1500", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "1800", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "2200", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "2500", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s06-ii-low",
+      "family": "S6",
+      "description": "Focal II component controlled comparison with one focal takeover.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_F",
+      "bidders": [
+        {
+          "id": "BIDDER_F",
+          "valuation": "20000000000000000",
+          "budget": "15000000000000000",
+          "profile": "persistent-value-capped"
+        },
+        {
+          "id": "BIDDER_A",
+          "valuation": "13000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "12200000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "17000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "16000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "200", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "300", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "400", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "600", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s06-ii-high",
+      "family": "S6",
+      "description": "Focal II component controlled comparison with two focal takeovers; other bidder scores may differ.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_F",
+      "bidders": [
+        {
+          "id": "BIDDER_F",
+          "valuation": "20000000000000000",
+          "budget": "15000000000000000",
+          "profile": "persistent-value-capped"
+        },
+        {
+          "id": "BIDDER_A",
+          "valuation": "13000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "11000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "17000000000000000",
+          "budget": null,
+          "profile": "fixed-cap-once",
+          "fixedCap": "12200000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "200", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "300", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "400", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "500", "bidder": "BIDDER_F"},
+        {"offsetSeconds": "600", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s07-reputation-neutral",
+      "family": "S7",
+      "description": "Controlled reputation pair with neutral reputation for every loser.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_A",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "16000000000000000",
+          "budget": "15000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "15000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "19000000000000000",
+          "budget": "18000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "18000000000000000"
+        },
+        {
+          "id": "BIDDER_C",
+          "valuation": "22000000000000000",
+          "budget": "21000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "21000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {
+        "BIDDER_A": "10000",
+        "BIDDER_B": "10000",
+        "BIDDER_C": "10000",
+        "BIDDER_W": "10000"
+      },
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "400", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "800", "bidder": "BIDDER_C"},
+        {"offsetSeconds": "1200", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s07-reputation-differential",
+      "family": "S7",
+      "description": "Controlled reputation pair changing only the focal loser's final reputation multiplier.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_A",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "16000000000000000",
+          "budget": "15000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "15000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "19000000000000000",
+          "budget": "18000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "18000000000000000"
+        },
+        {
+          "id": "BIDDER_C",
+          "valuation": "22000000000000000",
+          "budget": "21000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "21000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {
+        "BIDDER_A": "15000",
+        "BIDDER_B": "10000",
+        "BIDDER_C": "10000",
+        "BIDDER_W": "10000"
+      },
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "400", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "800", "bidder": "BIDDER_C"},
+        {"offsetSeconds": "1200", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s08-per-user-cap-saturation",
+      "family": "S8",
+      "description": "Two losers expose one capped raw reward, one positive uncapped reward, and seller-retained remainder.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "BIDDER_A",
+      "bidders": [
+        {
+          "id": "BIDDER_B",
+          "valuation": "12000000000000000",
+          "budget": "11000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "11000000000000000"
+        },
+        {
+          "id": "BIDDER_A",
+          "valuation": "26000000000000000",
+          "budget": "25000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "25000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "1800", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "2400", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s09-below-threshold",
+      "family": "S9",
+      "description": "Threshold pair below variant with net premium exactly minPremiumNet minus one wei.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "11000000000000000",
+          "budget": "10000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "10000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "22000000000000000",
+          "budget": "20526315789473683",
+          "profile": "fixed-cap-once",
+          "fixedCap": "20526315789473683"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "200", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s09-at-threshold",
+      "family": "S9",
+      "description": "Threshold pair at variant with net premium exactly equal to minPremiumNet.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "11000000000000000",
+          "budget": "10000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "10000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "22000000000000000",
+          "budget": "20526315789473684",
+          "profile": "fixed-cap-once",
+          "fixedCap": "20526315789473684"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "200", "bidder": "BIDDER_W"}
+      ]
+    },
+    {
+      "id": "s10-anti-sniping",
+      "family": "S10",
+      "description": "Late bids trigger extensions and allow accepted bids after initialEndTime but before current endTime.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "bidders": [
+        {
+          "id": "BIDDER_A",
+          "valuation": "16000000000000000",
+          "budget": "15000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "15000000000000000"
+        },
+        {
+          "id": "BIDDER_B",
+          "valuation": "21000000000000000",
+          "budget": "20000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "20000000000000000"
+        },
+        {
+          "id": "BIDDER_W",
+          "valuation": "35000000000000000",
+          "budget": "30000000000000000",
+          "profile": "fixed-cap-once",
+          "fixedCap": "30000000000000000"
+        }
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "3100", "bidder": "BIDDER_A"},
+        {"offsetSeconds": "3700", "bidder": "BIDDER_B"},
+        {"offsetSeconds": "4300", "bidder": "BIDDER_W"}
+      ]
+    }
+  ]
+}

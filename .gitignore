@@ -23,6 +23,9 @@ frontend/public/deployments/*.json
 coverage/
 lcov.info
 
+__pycache__/
+*.py[cod]
+
 .DS_Store
 Thumbs.db
 frontend/tsconfig.tsbuildinfo
