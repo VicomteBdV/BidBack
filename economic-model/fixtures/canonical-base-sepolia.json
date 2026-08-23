@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fixtureRole": "Canonical Base Sepolia settlement vector; retained public facts only",
   "authority": "EconomicModelParityTest.testVectorCanonicalBaseSepoliaSettlement and docs/evidence/base-sepolia/2026-08-22-auction-2-bd56f90/",
   "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven by retained public evidence.",
@@ -8,6 +8,29 @@
       "id": "canonical-base-sepolia-auction-2-settlement-v1",
       "description": "Bounded public settlement facts for Base Sepolia auction 2. Missing timestamps prevent authoritative EF/ET/II reconstruction.",
       "sourceTest": "EconomicModelParityTest.testVectorCanonicalBaseSepoliaSettlement",
+      "fixtureKind": "settlement-projection",
+      "verification": {
+        "recompute": [
+          "capDelta",
+          "finalPrice",
+          "grossPremium",
+          "feeAmount",
+          "netPremium",
+          "candidatePool",
+          "perUserCap",
+          "refunds",
+          "sellerProceeds",
+          "finalLiabilities"
+        ],
+        "retained": [
+          "reputation",
+          "rawReward",
+          "reward",
+          "assignedDistribution",
+          "finalEscrowAfterAllClaims"
+        ],
+        "nullPolicy": "preserve"
+      },
       "inputs": {
         "completionDate": "2026-08-22",
         "chainId": "84532",
@@ -18,6 +41,7 @@
         "scoringParityProven": false,
         "scoringLimitation": "Retained public evidence has no exact bid timestamps or persisted score components, and the single loser reward is masked by the 40 percent per-user cap."
       },
+      "reputations": null,
       "params": {
         "bidbackFeeBps": "500",
         "redistributionBps": "5000",

@@ -1,0 +1,10 @@
+[project]
+name = "bidback-economics"
+version = "0.1.0"
+description = "Deterministic Python parity baseline for BidBack Economic Model V1"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.bidback-economics]
+schema-version = 2
+model-version = "solidity-baseline-v1"

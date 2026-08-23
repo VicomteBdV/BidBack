@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fixtureRole": "Solidity-authoritative branch, threshold, rounding, timing, and revert vectors",
   "authority": "test/EconomicModelParity.t.sol",
   "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven.",
@@ -8,8 +8,19 @@
       "id": "no-bids-v1",
       "description": "Finalization without bids creates no escrow settlement or distribution and leaves the NFT claimable by the seller.",
       "sourceTest": "EconomicModelParityTest.testVectorNoBids",
-      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
-      "params": { "profile": "ParamsController defaults" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "seller": "SELLER", "startPrice": "1000000000000000000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "3601" },
+      "params": {
+        "bidbackFeeBps": "500", "redistributionBps": "5000", "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
+        "minBidIncrementBps": "500", "perUserRewardCapBps": "4000",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
+      },
+      "reputations": {},
       "participants": [],
       "bidTrace": [],
       "expected": {
@@ -43,8 +54,19 @@
       "id": "one-bidder-zero-premium-v1",
       "description": "A single bidder bids exactly the start price: fee and distribution are zero.",
       "sourceTest": "EconomicModelParityTest.testVectorOneBidderZeroPremium",
-      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
-      "params": { "profile": "ParamsController defaults" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "1000000000000000000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "3601" },
+      "params": {
+        "bidbackFeeBps": "500", "redistributionBps": "5000", "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
+        "minBidIncrementBps": "500", "perUserRewardCapBps": "4000",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
+      },
+      "reputations": {},
       "participants": ["BIDDER_A"],
       "bidTrace": [
         {
@@ -52,7 +74,8 @@
           "newCap": "1000000000000000000",
           "capDelta": "1000000000000000000",
           "observedPriceLift": "1000000000000000000",
-          "premiumLift": "0"
+          "premiumLift": "0",
+          "timestampOffsetSeconds": "0"
         }
       ],
       "expected": {
@@ -83,13 +106,24 @@
       "id": "minimum-bid-ceil-and-delta-v1",
       "description": "The minimum increment rounds upward and a returning bidder deposits only its cap delta.",
       "sourceTest": "EconomicModelParityTest.testVectorMinimumBidCeilAndCapDelta",
-      "inputs": { "startPrice": "10000" },
-      "params": { "minBidIncrementBps": "500", "BPS": "10000" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "10000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": null },
+      "params": {
+        "bidbackFeeBps": "500", "redistributionBps": "5000", "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
+        "minBidIncrementBps": "500", "perUserRewardCapBps": "4000",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
+      },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "10001", "capDelta": "10001", "observedPriceLift": "10001", "premiumLift": "1" },
-        { "bidder": "BIDDER_B", "newCap": "10502", "capDelta": "10502", "observedPriceLift": "501", "premiumLift": "501" },
-        { "bidder": "BIDDER_A", "newCap": "11028", "capDelta": "1027", "observedPriceLift": "526", "premiumLift": "526" }
+        { "bidder": "BIDDER_A", "newCap": "10001", "capDelta": "10001", "observedPriceLift": "10001", "premiumLift": "1", "timestampOffsetSeconds": "0" },
+        { "bidder": "BIDDER_B", "newCap": "10502", "capDelta": "10502", "observedPriceLift": "501", "premiumLift": "501", "timestampOffsetSeconds": "0" },
+        { "bidder": "BIDDER_A", "newCap": "11028", "capDelta": "1027", "observedPriceLift": "526", "premiumLift": "526", "timestampOffsetSeconds": "0" }
       ],
       "expected": {
         "minimumBid": ["10000", "10502", "11028"],
@@ -119,18 +153,27 @@
       "id": "premium-below-threshold-v1",
       "description": "Net premium one wei below minPremiumNet produces no candidate pool.",
       "sourceTest": "EconomicModelParityTest.testVectorPremiumBelowThreshold",
-      "inputs": { "startPrice": "1000000000000000000", "premium": "9999999999999999" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "1000000000000000000", "premium": "9999999999999999", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "7200" },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "5000",
+        "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
         "minPremiumNet": "10000000000000000",
         "perUserRewardCapBps": "10000",
-        "minBidIncrementBps": "1"
+        "minBidIncrementBps": "1",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
-        { "bidder": "BIDDER_B", "newCap": "1009999999999999999", "capDelta": "1009999999999999999" }
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000", "timestampOffsetSeconds": "0" },
+        { "bidder": "BIDDER_B", "newCap": "1009999999999999999", "capDelta": "1009999999999999999", "timestampOffsetSeconds": "0" }
       ],
       "expected": {
         "finalPrice": "1009999999999999999",
@@ -150,18 +193,27 @@
       "id": "premium-at-threshold-v1",
       "description": "Net premium exactly equal to minPremiumNet is eligible.",
       "sourceTest": "EconomicModelParityTest.testVectorPremiumAtThreshold",
-      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000000" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "7200" },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "5000",
+        "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
         "minPremiumNet": "10000000000000000",
         "perUserRewardCapBps": "10000",
-        "minBidIncrementBps": "1"
+        "minBidIncrementBps": "1",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
-        { "bidder": "BIDDER_B", "newCap": "1010000000000000000", "capDelta": "1010000000000000000" }
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000", "timestampOffsetSeconds": "0" },
+        { "bidder": "BIDDER_B", "newCap": "1010000000000000000", "capDelta": "1010000000000000000", "timestampOffsetSeconds": "0" }
       ],
       "expected": {
         "finalPrice": "1010000000000000000",
@@ -182,18 +234,27 @@
       "id": "premium-above-threshold-rounding-v1",
       "description": "One wei above the threshold is eligible but the 50 percent candidate pool remains unchanged because of floor division.",
       "sourceTest": "EconomicModelParityTest.testVectorPremiumAboveThreshold",
-      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000001" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "1000000000000000000", "premium": "10000000000000001", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "7200" },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "5000",
+        "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
         "minPremiumNet": "10000000000000000",
         "perUserRewardCapBps": "10000",
-        "minBidIncrementBps": "1"
+        "minBidIncrementBps": "1",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000" },
-        { "bidder": "BIDDER_B", "newCap": "1010000000000000001", "capDelta": "1010000000000000001" }
+        { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000", "timestampOffsetSeconds": "0" },
+        { "bidder": "BIDDER_B", "newCap": "1010000000000000001", "capDelta": "1010000000000000001", "timestampOffsetSeconds": "0" }
       ],
       "expected": {
         "finalPrice": "1010000000000000001",
@@ -214,22 +275,30 @@
       "id": "allocation-rounds-to-zero-v1",
       "description": "A one-wei candidate pool divided among multiple positive scores rounds every allocation to zero.",
       "sourceTest": "EconomicModelParityTest.testVectorAllocationRoundsToZero",
-      "inputs": { "startPrice": "0", "finalPrice": "10000" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "0", "finalPrice": "10000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "7201" },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "1",
+        "minParticipants": "2",
         "alphaBps": "9999",
         "betaBps": "1",
         "gammaBps": "0",
+        "minBidIncrementBps": "1",
         "perUserRewardCapBps": "10000",
-        "minPremiumNet": "10000"
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "3600", "minPremiumNet": "10000",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500" },
-        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000" },
-        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500" },
-        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000" }
+        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000", "timestampOffsetSeconds": "1" }
       ],
       "expected": {
         "finalPrice": "10000",
@@ -251,20 +320,28 @@
       "id": "zero-score-v1",
       "description": "A tiny losing cap relative to a very large final price rounds EF and the final score to zero.",
       "sourceTest": "EconomicModelParityTest.testVectorZeroScore",
-      "inputs": { "startPrice": "0", "losingCap": "1", "finalPrice": "2000000000000000000" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "0", "losingCap": "1", "finalPrice": "2000000000000000000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": "7201" },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "10000",
+        "minParticipants": "2",
         "alphaBps": "10000",
         "betaBps": "0",
         "gammaBps": "0",
+        "minBidIncrementBps": "1",
         "perUserRewardCapBps": "10000",
-        "minPremiumNet": "0"
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "3600", "minPremiumNet": "0",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "1", "capDelta": "1" },
-        { "bidder": "BIDDER_B", "newCap": "2000000000000000000", "capDelta": "2000000000000000000" }
+        { "bidder": "BIDDER_A", "newCap": "1", "capDelta": "1", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "2000000000000000000", "capDelta": "2000000000000000000", "timestampOffsetSeconds": "1" }
       ],
       "expected": {
         "finalPrice": "2000000000000000000",
@@ -290,13 +367,19 @@
       "id": "first-bid-after-initial-end-v1",
       "description": "A new bidder can bid during an anti-sniping extension but receives ET zero when its first bid is after initialEndTime.",
       "sourceTest": "EconomicModelParityTest.testVectorFirstBidAfterInitialEndDuringExtensionHasZeroEt",
-      "inputs": { "startPrice": "1000000000000000000", "initialDurationSeconds": "3600" },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": { "startPrice": "1000000000000000000", "startTime": "86400", "initialDurationSeconds": "3600", "finalizationOffsetSeconds": null },
       "params": {
-        "antiSnipeWindow": "600",
-        "antiSnipeExtension": "600",
-        "maxAntiSnipeExtensions": "6",
-        "minExposure": "300"
+        "bidbackFeeBps": "500", "redistributionBps": "5000", "minParticipants": "2",
+        "alphaBps": "6000", "betaBps": "3000", "gammaBps": "1000",
+        "minBidIncrementBps": "500", "perUserRewardCapBps": "4000",
+        "maxParticipants": "64", "maxInteractionCount": "5", "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600", "antiSnipeExtension": "600", "maxAntiSnipeExtensions": "6",
+        "minExposure": "300", "minPremiumNet": "10000000000000000",
+        "efCap": "1000000000000000000", "etCap": "1000000000000000000", "iiCap": "1000000000000000000"
       },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B"],
       "bidTrace": [
         { "bidder": "BIDDER_A", "newCap": "1000000000000000000", "capDelta": "1000000000000000000", "timestampOffsetSeconds": "3599" },
@@ -318,6 +401,9 @@
       "id": "checked-overflow-revert-v1",
       "description": "The inherited EF multiplication reverts under Solidity checked arithmetic instead of wrapping.",
       "sourceTest": "EconomicModelParityTest.testVectorCheckedOverflowReverts",
+      "fixtureKind": "revert",
+      "fixtureFunction": "financial_engagement",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": {
         "maxCap": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
         "finalPrice": "115792089237316195423570985008687907853269984665640564039457584007913129639935"

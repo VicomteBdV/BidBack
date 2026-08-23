@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fixtureRole": "Canonical Anvil settlement vector; not a scoring-discriminating vector",
   "authority": "EconomicModelParityTest.testVectorCanonicalAnvilSettlement and docs/LOCAL_LIFECYCLE_SMOKE_TEST.md",
   "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven by this vector.",
@@ -8,13 +8,22 @@
       "id": "canonical-anvil-settlement-v1",
       "description": "Deterministic local settlement replay with one loser whose reward is capped at 40 percent of the candidate pool.",
       "sourceTest": "EconomicModelParityTest.testVectorCanonicalAnvilSettlement",
+      "fixtureKind": "state-machine",
+      "verification": {
+        "recompute": "all-non-null",
+        "retained": [],
+        "nullPolicy": "preserve"
+      },
       "inputs": {
         "chainId": "31337",
         "startPrice": "1000000000000000000",
+        "startTime": "86400",
         "initialDurationSeconds": "7200",
+        "finalizationOffsetSeconds": "12000",
         "scoringParityProven": false,
         "scoringLimitation": "The only loser has a positive score and the per-user cap masks EF/ET/II differences."
       },
+      "reputations": {},
       "params": {
         "bidbackFeeBps": "500",
         "redistributionBps": "5000",

@@ -455,20 +455,43 @@ Absolute coalition profit alone is insufficient because the coalition may have e
 
 ## 17. Golden-Vector Policy
 
-Every fixture vector has:
+Fixture transport schema version `2` makes replay scope explicit without changing the
+Solidity-authoritative expected values. Every fixture vector has:
 
 ```text
 id
 description
 sourceTest
+fixtureKind
+verification
 inputs
 params
+reputations (state-machine and settlement-projection)
 participants
 bidTrace
 expected
 ```
 
-The top-level fixture object has `schemaVersion`. Non-applicable or unproven values are `null`.
+`fixtureKind` is one of:
+
+- `pure-function`: only the declared function arguments are required;
+- `state-machine`: the complete parameter snapshot, timing, bid deposits, finalization timing,
+  participants, and finalization-time reputations required by `simulate_auction` are carried by
+  the vector;
+- `settlement-projection`: retained facts and time-independent accounting are checked without
+  claiming a complete historical replay;
+- `revert`: the declared call must fail with the expected structured error class.
+
+`verification.recompute` identifies values that the Python baseline must calculate. It may be
+`all-non-null` when every non-null expected field is recomputable. `verification.retained`
+identifies evidence facts that are checked for structural and accounting consistency but are not
+presented as independently reconstructed historical state. `verification.nullPolicy` is
+`preserve`: a `null` expected value is never filled by an assumption.
+
+The top-level fixture object has `schemaVersion: 2`. Non-applicable or unproven values are `null`.
+State-machine vectors are self-contained; they do not inherit undocumented defaults or test setup.
+Pure-function vectors carry only the operands needed by their declared function. Decimal strings
+remain the only encoding for uint and wei values.
 
 Fixture roles:
 
@@ -477,7 +500,14 @@ Fixture roles:
 - `canonical-base-sepolia.json`: retained public settlement facts, with unproven timing and scoring explicitly null;
 - `edge-cases.json`: no-bid, threshold, zero-score, rounding, extension and overflow vectors.
 
-The Solidity tests named by `sourceTest` assert the authoritative expected values. A future Python baseline must consume the fixtures and match them exactly, but the JSON files do not override the Solidity behavior.
+The Solidity tests named by `sourceTest` assert the authoritative expected values. The Python
+baseline consumes schema-v2 fixtures and matches every recomputable value exactly, but the JSON
+files do not override the Solidity behavior.
+
+The canonical Base Sepolia vector is permanently classified as `settlement-projection`. Missing
+timestamps and scoring components remain `null`; its bid order must not be used to present
+EF, ET, II, weighted score, or final score as historical proof. Its retained distribution facts
+may be used as inputs to verify seller proceeds, liabilities, and final escrow consistency.
 
 ## 18. Canonical Settlement vs Scoring Evidence
 

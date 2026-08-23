@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "fixtureRole": "Solidity-authoritative scoring and allocation vectors",
   "authority": "test/EconomicModelParity.t.sol",
   "integerEncoding": "All uint and wei values are base-10 strings; null means not applicable or not proven.",
@@ -8,6 +8,9 @@
       "id": "ef-boundaries-v1",
       "description": "Financial engagement low, intermediate, and capped values through the inherited Solidity implementation.",
       "sourceTest": "EconomicModelParityTest.testVectorFinancialEngagementBoundaries",
+      "fixtureKind": "pure-function",
+      "fixtureFunction": "financial_engagement",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": {
         "cases": [
           { "maxCap": "1", "finalPrice": "4", "efCap": "1000000000000000000" },
@@ -46,6 +49,9 @@
       "id": "et-boundaries-v1",
       "description": "Time engagement uses the first bid and initial end time, with a hard minimum-exposure cutoff.",
       "sourceTest": "EconomicModelParityTest.testVectorTimeEngagementBoundaries",
+      "fixtureKind": "pure-function",
+      "fixtureFunction": "time_engagement",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": {
         "startTime": "1000",
         "initialEndTime": "2000",
@@ -71,6 +77,9 @@
       "id": "ii-boundaries-v1",
       "description": "Interaction intensity for zero, one, maximum, and above-maximum takeover counts.",
       "sourceTest": "EconomicModelParityTest.testVectorInteractionIntensityBoundaries",
+      "fixtureKind": "pure-function",
+      "fixtureFunction": "interaction_intensity",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": { "significantOverbids": ["0", "1", "5", "6"] },
       "params": {
         "maxInteractionCount": "5",
@@ -92,10 +101,15 @@
       "id": "reputation-live-bounds-v1",
       "description": "The snapshotted adapter reads reputation live after auction creation.",
       "sourceTest": "EconomicModelParityTest.testVectorReputationBoundsAndLiveRead",
+      "fixtureKind": "pure-function",
+      "fixtureFunction": "score_with_reputation",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": {
+        "bidder": "BIDDER_A",
         "startPrice": "0",
         "losingCap": "5000",
-        "finalPrice": "10000"
+        "finalPrice": "10000",
+        "reputationCases": ["5000", "10000", "15000"]
       },
       "params": {
         "alphaBps": "10000",
@@ -121,10 +135,15 @@
       "id": "multi-loser-uncapped-normalization-v1",
       "description": "Three unequal losing scores produce non-saturated proportional rewards and one wei of allocation dust.",
       "sourceTest": "EconomicModelParityTest.testVectorMultipleLosersNonSaturatedNormalizationAndDust",
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
       "inputs": {
         "startPrice": "0",
-        "initialDurationSeconds": "3600"
+        "startTime": "86400",
+        "initialDurationSeconds": "3600",
+        "finalizationOffsetSeconds": "7201"
       },
+      "reputations": {},
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "10000",
@@ -201,17 +220,42 @@
       "id": "multi-loser-cap-active-v1",
       "description": "The largest raw allocation is capped and the removed amount is not reallocated.",
       "sourceTest": "EconomicModelParityTest.testVectorMultipleLosersPerUserCapAndSellerRemainder",
-      "inputs": { "baseVector": "multi-loser-uncapped-normalization-v1" },
-      "params": {
-        "perUserRewardCapBps": "4000",
-        "otherParameters": "same as multi-loser-uncapped-normalization-v1"
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": {
+        "startPrice": "0",
+        "startTime": "86400",
+        "initialDurationSeconds": "3600",
+        "finalizationOffsetSeconds": "7201"
       },
+      "params": {
+        "bidbackFeeBps": "0",
+        "redistributionBps": "10000",
+        "minParticipants": "2",
+        "alphaBps": "9999",
+        "betaBps": "1",
+        "gammaBps": "0",
+        "minBidIncrementBps": "1",
+        "perUserRewardCapBps": "4000",
+        "maxParticipants": "64",
+        "maxInteractionCount": "5",
+        "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "3600",
+        "minPremiumNet": "10000",
+        "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000",
+        "iiCap": "1000000000000000000"
+      },
+      "reputations": {},
       "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500" },
-        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000" },
-        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500" },
-        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000" }
+        { "bidder": "BIDDER_A", "newCap": "2500", "capDelta": "2500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "5000", "capDelta": "5000", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_C", "newCap": "7500", "capDelta": "7500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_D", "newCap": "10000", "capDelta": "10000", "timestampOffsetSeconds": "1" }
       ],
       "expected": {
         "finalPrice": "10000",
@@ -231,22 +275,43 @@
       "id": "reputation-change-normalization-v1",
       "description": "A post-creation, pre-finalization reputation update changes a multi-loser normalized allocation.",
       "sourceTest": "EconomicModelParityTest.testVectorReputationChangeBeforeFinalizationChangesNormalization",
-      "inputs": { "startPrice": "0", "reputationChangedAfterCreation": true },
+      "fixtureKind": "state-machine",
+      "verification": { "recompute": "all-non-null", "retained": [], "nullPolicy": "preserve" },
+      "inputs": {
+        "startPrice": "0",
+        "startTime": "86400",
+        "initialDurationSeconds": "3600",
+        "finalizationOffsetSeconds": "7201",
+        "reputationChangedAfterCreation": true
+      },
       "params": {
         "bidbackFeeBps": "0",
         "redistributionBps": "10000",
+        "minParticipants": "2",
         "alphaBps": "10000",
         "betaBps": "0",
         "gammaBps": "0",
+        "minBidIncrementBps": "1",
         "perUserRewardCapBps": "10000",
-        "minPremiumNet": "0"
+        "maxParticipants": "64",
+        "maxInteractionCount": "5",
+        "minAuctionDuration": "3600",
+        "antiSnipeWindow": "600",
+        "antiSnipeExtension": "600",
+        "maxAntiSnipeExtensions": "6",
+        "minExposure": "3600",
+        "minPremiumNet": "0",
+        "efCap": "1000000000000000000",
+        "etCap": "1000000000000000000",
+        "iiCap": "1000000000000000000"
       },
+      "reputations": { "BIDDER_A": "15000" },
       "participants": ["BIDDER_A", "BIDDER_B", "BIDDER_C", "BIDDER_D"],
       "bidTrace": [
-        { "bidder": "BIDDER_A", "newCap": "7250", "capDelta": "7250" },
-        { "bidder": "BIDDER_B", "newCap": "14500", "capDelta": "14500" },
-        { "bidder": "BIDDER_C", "newCap": "21750", "capDelta": "21750" },
-        { "bidder": "BIDDER_D", "newCap": "29000", "capDelta": "29000" }
+        { "bidder": "BIDDER_A", "newCap": "7250", "capDelta": "7250", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_B", "newCap": "14500", "capDelta": "14500", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_C", "newCap": "21750", "capDelta": "21750", "timestampOffsetSeconds": "1" },
+        { "bidder": "BIDDER_D", "newCap": "29000", "capDelta": "29000", "timestampOffsetSeconds": "1" }
       ],
       "expected": {
         "finalPrice": "29000",
