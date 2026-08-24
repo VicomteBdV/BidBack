@@ -1,0 +1,450 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "lot-d-branches-v1",
+  "economicModelVersion": "solidity-baseline-v1",
+  "params": {
+    "alpha_bps": "6000",
+    "anti_snipe_extension": "600",
+    "anti_snipe_window": "600",
+    "beta_bps": "3000",
+    "bidback_fee_bps": "500",
+    "ef_cap": "1000000000000000000",
+    "et_cap": "1000000000000000000",
+    "gamma_bps": "1000",
+    "ii_cap": "1000000000000000000",
+    "max_anti_snipe_extensions": "6",
+    "max_interaction_count": "5",
+    "max_participants": "64",
+    "min_auction_duration": "3600",
+    "min_bid_increment_bps": "500",
+    "min_exposure": "300",
+    "min_participants": "2",
+    "min_premium_net": "10000000000000000",
+    "per_user_reward_cap_bps": "4000",
+    "redistribution_bps": "5000"
+  },
+  "scenarios": [
+    {
+      "id": "d01-reference",
+      "family": "D1",
+      "description": "Reference with an existing external loser and the attacker opportunity after auction end.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "ATTACKER_ID",
+      "bidders": [
+        {"id": "ATTACKER_ID", "valuation": "15000000000000000", "budget": "10000000000000000", "profile": "fixed-cap-once", "fixedCap": "10000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "200", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"},
+        {"offsetSeconds": "4000", "bidder": "ATTACKER_ID"}
+      ]
+    },
+    {
+      "id": "d01-attack",
+      "family": "D1",
+      "description": "Attack adds a deliberate losing bid at the start price before unchanged external bids.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "ATTACKER_ID",
+      "bidders": [
+        {"id": "ATTACKER_ID", "valuation": "15000000000000000", "budget": "10000000000000000", "profile": "fixed-cap-once", "fixedCap": "10000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "ATTACKER_ID"},
+        {"offsetSeconds": "200", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d02-reference",
+      "family": "D2",
+      "description": "Reference uses a low realized focal losing cap while preserving its ex-ante capacity.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "26000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "12000000000000000"},
+        {"id": "OTHER_LOSER_ID", "valuation": "28000000000000000", "budget": "27000000000000000", "profile": "fixed-cap-once", "fixedCap": "27000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "300", "bidder": "OTHER_LOSER_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d02-attack",
+      "family": "D2",
+      "description": "Attack changes only the focal fixed cap to a higher losing cap within the same max bid cap.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "26000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "25000000000000000"},
+        {"id": "OTHER_LOSER_ID", "valuation": "28000000000000000", "budget": "27000000000000000", "profile": "fixed-cap-once", "fixedCap": "27000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "300", "bidder": "OTHER_LOSER_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d03-reference",
+      "family": "D3",
+      "description": "Reference places the focal losing bid later while preserving caps and bid order.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "13000000000000000", "budget": "12000000000000000", "profile": "fixed-cap-once", "fixedCap": "12000000000000000"},
+        {"id": "LOSER_A_ID", "valuation": "19000000000000000", "budget": "18000000000000000", "profile": "fixed-cap-once", "fixedCap": "18000000000000000"},
+        {"id": "LOSER_B_ID", "valuation": "23000000000000000", "budget": "22000000000000000", "profile": "fixed-cap-once", "fixedCap": "22000000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "1500", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "1800", "bidder": "LOSER_A_ID"},
+        {"offsetSeconds": "2200", "bidder": "LOSER_B_ID"},
+        {"offsetSeconds": "2500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d03-attack",
+      "family": "D3",
+      "description": "Attack moves only the focal first-bid timing earlier without entering anti-sniping.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "13000000000000000", "budget": "12000000000000000", "profile": "fixed-cap-once", "fixedCap": "12000000000000000"},
+        {"id": "LOSER_A_ID", "valuation": "19000000000000000", "budget": "18000000000000000", "profile": "fixed-cap-once", "fixedCap": "18000000000000000"},
+        {"id": "LOSER_B_ID", "valuation": "23000000000000000", "budget": "22000000000000000", "profile": "fixed-cap-once", "fixedCap": "22000000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "1800", "bidder": "LOSER_A_ID"},
+        {"offsetSeconds": "2200", "bidder": "LOSER_B_ID"},
+        {"offsetSeconds": "2500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d04-reference",
+      "family": "D4",
+      "description": "Reference gives the focal persistent bidder one takeover before the same terminal caps.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "persistent-value-capped"},
+        {"id": "LOSER_A_ID", "valuation": "13000000000000000", "budget": "11000000000000000", "profile": "fixed-cap-once", "fixedCap": "11000000000000000"},
+        {"id": "LOSER_B_ID", "valuation": "17000000000000000", "budget": "12200000000000000", "profile": "fixed-cap-once", "fixedCap": "12200000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "200", "bidder": "LOSER_A_ID"},
+        {"offsetSeconds": "300", "bidder": "LOSER_B_ID"},
+        {"offsetSeconds": "400", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d04-attack",
+      "family": "D4",
+      "description": "Attack adds one valid focal takeover while preserving shared bids and final caps.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "FOCAL_ID",
+      "bidders": [
+        {"id": "FOCAL_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "persistent-value-capped"},
+        {"id": "LOSER_A_ID", "valuation": "13000000000000000", "budget": "11000000000000000", "profile": "fixed-cap-once", "fixedCap": "11000000000000000"},
+        {"id": "LOSER_B_ID", "valuation": "17000000000000000", "budget": "12200000000000000", "profile": "fixed-cap-once", "fixedCap": "12200000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "200", "bidder": "LOSER_A_ID"},
+        {"offsetSeconds": "250", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "300", "bidder": "LOSER_B_ID"},
+        {"offsetSeconds": "400", "bidder": "FOCAL_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d05-reference",
+      "family": "D5",
+      "description": "Reference realizes one coalition identity at the individual reward cap and leaves its sibling inactive.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SYBIL_A_ID",
+      "bidders": [
+        {"id": "SYBIL_A_ID", "valuation": "26000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "25000000000000000"},
+        {"id": "SYBIL_B_ID", "valuation": "26000000000000000", "budget": "13000000000000000", "profile": "fixed-cap-once", "fixedCap": "13000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SYBIL_A_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"},
+        {"offsetSeconds": "4000", "bidder": "SYBIL_B_ID"}
+      ]
+    },
+    {
+      "id": "d05-attack",
+      "family": "D5",
+      "description": "Attack splits the same realized coalition cap across two participating identities.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SYBIL_A_ID",
+      "bidders": [
+        {"id": "SYBIL_A_ID", "valuation": "26000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "12000000000000000"},
+        {"id": "SYBIL_B_ID", "valuation": "26000000000000000", "budget": "13000000000000000", "profile": "fixed-cap-once", "fixedCap": "13000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SYBIL_A_ID"},
+        {"offsetSeconds": "200", "bidder": "SYBIL_B_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d06-reference",
+      "family": "D6",
+      "description": "Reference has one participating identity of the buyer actor and no candidate distribution pool.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SIBLING_ID",
+      "bidders": [
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"},
+        {"id": "SIBLING_ID", "valuation": "40000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"},
+        {"offsetSeconds": "4000", "bidder": "SIBLING_ID"}
+      ]
+    },
+    {
+      "id": "d06-attack",
+      "family": "D6",
+      "description": "Attack activates a sibling identity of the same actor to cross the participant threshold.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SIBLING_ID",
+      "bidders": [
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"},
+        {"id": "SIBLING_ID", "valuation": "40000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SIBLING_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d07-reference",
+      "family": "D7",
+      "description": "Reference includes competitive participation by coalition actor A before actor B wins.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "COLLUDER_A_ID",
+      "bidders": [
+        {"id": "COLLUDER_A_ID", "valuation": "30000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "25000000000000000"},
+        {"id": "COLLUDER_B_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "value-capped-once"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "COLLUDER_A_ID"},
+        {"offsetSeconds": "500", "bidder": "COLLUDER_B_ID"}
+      ]
+    },
+    {
+      "id": "d07-attack",
+      "family": "D7",
+      "description": "Attack moves actor A after auction end so actor B faces suppressed coalition competition.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "COLLUDER_A_ID",
+      "bidders": [
+        {"id": "COLLUDER_A_ID", "valuation": "30000000000000000", "budget": "25000000000000000", "profile": "fixed-cap-once", "fixedCap": "25000000000000000"},
+        {"id": "COLLUDER_B_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "value-capped-once"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "500", "bidder": "COLLUDER_B_ID"},
+        {"offsetSeconds": "4000", "bidder": "COLLUDER_A_ID"}
+      ]
+    },
+    {
+      "id": "d08a-reference",
+      "family": "D8A",
+      "description": "Reference keeps the seller-controlled shill inactive while external bidders determine settlement.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SHILL_ID",
+      "bidders": [
+        {"id": "SHILL_ID", "valuation": "12000000000000000", "budget": "10000000000000000", "profile": "fixed-cap-once", "fixedCap": "10000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"},
+        {"offsetSeconds": "4000", "bidder": "SHILL_ID"}
+      ]
+    },
+    {
+      "id": "d08a-attack",
+      "family": "D8A",
+      "description": "Attack activates a seller-controlled losing shill without changing the external terminal bid.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SHILL_ID",
+      "bidders": [
+        {"id": "SHILL_ID", "valuation": "12000000000000000", "budget": "10000000000000000", "profile": "fixed-cap-once", "fixedCap": "10000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "fixed-cap-once", "fixedCap": "15000000000000000"},
+        {"id": "WINNER_ID", "valuation": "40000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "50", "bidder": "SHILL_ID"},
+        {"offsetSeconds": "100", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "500", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d08b-reference",
+      "family": "D8B",
+      "description": "Reference no-bid branch leaves the NFT terminal claim with the seller endpoint.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SELLER_BID_ID",
+      "bidders": [
+        {"id": "SELLER_BID_ID", "valuation": "30000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "4000", "bidder": "SELLER_BID_ID"}
+      ]
+    },
+    {
+      "id": "d08b-attack",
+      "family": "D8B",
+      "description": "Attack has the seller actor win through its bidder identity at a premium-bearing cap.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SELLER_BID_ID",
+      "bidders": [
+        {"id": "SELLER_BID_ID", "valuation": "30000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SELLER_BID_ID"}
+      ]
+    },
+    {
+      "id": "d09-reference",
+      "family": "D9",
+      "description": "Reference uses two identities of one actor with one focal takeover and fixed terminal caps.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SYBIL_F_ID",
+      "bidders": [
+        {"id": "SYBIL_F_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "persistent-value-capped"},
+        {"id": "SYBIL_A_ID", "valuation": "20000000000000000", "budget": "11000000000000000", "profile": "fixed-cap-once", "fixedCap": "11000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "17000000000000000", "budget": "12200000000000000", "profile": "fixed-cap-once", "fixedCap": "12200000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SYBIL_F_ID"},
+        {"offsetSeconds": "200", "bidder": "SYBIL_A_ID"},
+        {"offsetSeconds": "300", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "400", "bidder": "SYBIL_F_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    },
+    {
+      "id": "d09-attack",
+      "family": "D9",
+      "description": "Attack adds an alternating focal takeover with the same identities and final caps.",
+      "startPrice": "10000000000000000",
+      "startTime": "1000000",
+      "duration": "3600",
+      "seller": "SELLER",
+      "focalBidder": "SYBIL_F_ID",
+      "bidders": [
+        {"id": "SYBIL_F_ID", "valuation": "20000000000000000", "budget": "15000000000000000", "profile": "persistent-value-capped"},
+        {"id": "SYBIL_A_ID", "valuation": "20000000000000000", "budget": "11000000000000000", "profile": "fixed-cap-once", "fixedCap": "11000000000000000"},
+        {"id": "EXTERNAL_LOSER_ID", "valuation": "17000000000000000", "budget": "12200000000000000", "profile": "fixed-cap-once", "fixedCap": "12200000000000000"},
+        {"id": "WINNER_ID", "valuation": "35000000000000000", "budget": "30000000000000000", "profile": "fixed-cap-once", "fixedCap": "30000000000000000"}
+      ],
+      "reputations": {},
+      "opportunities": [
+        {"offsetSeconds": "100", "bidder": "SYBIL_F_ID"},
+        {"offsetSeconds": "200", "bidder": "SYBIL_A_ID"},
+        {"offsetSeconds": "250", "bidder": "SYBIL_F_ID"},
+        {"offsetSeconds": "300", "bidder": "EXTERNAL_LOSER_ID"},
+        {"offsetSeconds": "400", "bidder": "SYBIL_F_ID"},
+        {"offsetSeconds": "600", "bidder": "WINNER_ID"}
+      ]
+    }
+  ]
+}

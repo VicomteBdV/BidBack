@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "reportSchemaVersion": 1,
+  "catalogVersion": "adversarial-catalog-v1",
+  "economicModelVersion": "solidity-baseline-v1",
+  "scenarioCatalog": "scenarios-v1.json",
+  "cases": [
+    {
+      "caseId": "d01-deliberate-loser",
+      "threatClass": "strategic-losing",
+      "description": "Compare attacker absence with a deliberate losing bid while external winner, price, fee, and candidate pool remain controlled.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "ATTACKER_ACTOR", "nftValuation": "15000000000000000", "actorCapitalBudget": "10000000000000000"},
+        {"actorId": "EXTERNAL_LOSER_ACTOR", "nftValuation": "20000000000000000", "actorCapitalBudget": "15000000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "ATTACKER_ID": "ATTACKER_ACTOR",
+        "EXTERNAL_LOSER_ID": "EXTERNAL_LOSER_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["ATTACKER_ACTOR"],
+      "reference": {"scenarioId": "d01-reference"},
+      "attack": {"scenarioId": "d01-attack"},
+      "intervention": {
+        "kind": "activate-deliberate-losing-bid",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "ATTACKER_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-params", "selector": {"field": "scenario.params"}, "operator": "equal"},
+        {"id": "same-external-loser-opportunities", "selector": {"field": "bidder.opportunities", "subject": "EXTERNAL_LOSER_ID"}, "operator": "equal"},
+        {"id": "same-winner-opportunities", "selector": {"field": "bidder.opportunities", "subject": "WINNER_ID"}, "operator": "equal"},
+        {"id": "same-winner-identity", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-winner-actor", "selector": {"field": "winner.actor"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-gross-premium", "selector": {"field": "auction.grossPremium"}, "operator": "equal"},
+        {"id": "same-fee", "selector": {"field": "auction.feeAmount"}, "operator": "equal"},
+        {"id": "same-candidate-pool", "selector": {"field": "auction.candidatePool"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "attacker-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "The reference attacker does not participate while the attack locks its losing cap."},
+        {"id": "attacker-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "Activating the attacker's bid creates capital-time exposure absent from the reference."},
+        {"id": "participant-count", "selector": {"field": "auction.participantCount"}, "reason": "The intervention adds one participating identity."},
+        {"id": "seller-revenue", "selector": {"field": "auction.sellerRevenue"}, "reason": "Adding a scored loser can change assigned distribution and seller proceeds."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-attacker-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d02-losing-cap-ef",
+      "threatClass": "financial-engagement",
+      "description": "Change only a fixed losing cap within unchanged actor valuation, budget, max bid cap, timing, and bidder profile.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "FOCAL_ACTOR", "nftValuation": "26000000000000000", "actorCapitalBudget": "25000000000000000"},
+        {"actorId": "OTHER_LOSER_ACTOR", "nftValuation": "28000000000000000", "actorCapitalBudget": "27000000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "FOCAL_ID": "FOCAL_ACTOR",
+        "OTHER_LOSER_ID": "OTHER_LOSER_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["FOCAL_ACTOR"],
+      "reference": {"scenarioId": "d02-reference"},
+      "attack": {"scenarioId": "d02-attack"},
+      "intervention": {
+        "kind": "increase-fixed-losing-cap",
+        "changedInputs": [{"field": "bidder.fixedCap", "subject": "FOCAL_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-focal-valuation", "selector": {"field": "bidder.valuation", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-budget", "selector": {"field": "bidder.budget", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-max-cap", "selector": {"field": "bidder.maxBidCap", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-profile", "selector": {"field": "bidder.profile", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-first-bid", "selector": {"field": "bidder.firstBidTime", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-ii", "selector": {"field": "bidder.ii", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-reputation", "selector": {"field": "bidder.reputation", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "focal-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "The intervention deliberately changes the focal realized cap while ex-ante capacity remains fixed."},
+        {"id": "focal-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The higher deposit at the same time creates greater unpriced capital-time exposure."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-focal-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d03-early-et",
+      "threatClass": "time-engagement",
+      "description": "Move only the focal first bid earlier while preserving cap order, realized capital, and non-extension settlement.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "FOCAL_ACTOR", "nftValuation": "13000000000000000", "actorCapitalBudget": "12000000000000000"},
+        {"actorId": "LOSER_A_ACTOR", "nftValuation": "19000000000000000", "actorCapitalBudget": "18000000000000000"},
+        {"actorId": "LOSER_B_ACTOR", "nftValuation": "23000000000000000", "actorCapitalBudget": "22000000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "35000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "FOCAL_ID": "FOCAL_ACTOR",
+        "LOSER_A_ID": "LOSER_A_ACTOR",
+        "LOSER_B_ID": "LOSER_B_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["FOCAL_ACTOR"],
+      "reference": {"scenarioId": "d03-reference"},
+      "attack": {"scenarioId": "d03-attack"},
+      "intervention": {
+        "kind": "move-focal-first-bid-earlier",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "FOCAL_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-focal-valuation", "selector": {"field": "bidder.valuation", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-budget", "selector": {"field": "bidder.budget", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-fixed-cap", "selector": {"field": "bidder.fixedCap", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-final-cap", "selector": {"field": "bidder.finalCap", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-ii", "selector": {"field": "bidder.ii", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-candidate-pool", "selector": {"field": "auction.candidatePool"}, "operator": "equal"},
+        {"id": "same-extensions", "selector": {"field": "auction.extensionsUsed"}, "operator": "equal"},
+        {"id": "same-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "focal-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "Earlier timing increases capital-time even though peak realized capital is matched."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-early-bid-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d04-interaction-ii",
+      "threatClass": "interaction-intensity",
+      "description": "Add one valid focal takeover while preserving first bid, terminal cap, EF, ET, reputation, and winner.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "FOCAL_ACTOR", "nftValuation": "20000000000000000", "actorCapitalBudget": "15000000000000000"},
+        {"actorId": "LOSER_A_ACTOR", "nftValuation": "13000000000000000", "actorCapitalBudget": "11000000000000000"},
+        {"actorId": "LOSER_B_ACTOR", "nftValuation": "17000000000000000", "actorCapitalBudget": "12200000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "35000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "FOCAL_ID": "FOCAL_ACTOR",
+        "LOSER_A_ID": "LOSER_A_ACTOR",
+        "LOSER_B_ID": "LOSER_B_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["FOCAL_ACTOR"],
+      "reference": {"scenarioId": "d04-reference"},
+      "attack": {"scenarioId": "d04-attack"},
+      "intervention": {
+        "kind": "add-focal-takeover-opportunity",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "FOCAL_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-focal-first-bid", "selector": {"field": "bidder.firstBidTime", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-final-cap", "selector": {"field": "bidder.finalCap", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-ef", "selector": {"field": "bidder.ef", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-et", "selector": {"field": "bidder.et", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-focal-reputation", "selector": {"field": "bidder.reputation", "subject": "FOCAL_ID"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "focal-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The extra step-up changes deposit timing while preserving terminal caps."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-interaction-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d05-sybil-cap-bypass",
+      "threatClass": "sybil-per-user-cap",
+      "description": "Compare one participating identity with two participating identities of the same actor under matched aggregate realized capital.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "SYBIL_ACTOR", "nftValuation": "26000000000000000", "actorCapitalBudget": "38000000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "SYBIL_A_ID": "SYBIL_ACTOR",
+        "SYBIL_B_ID": "SYBIL_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["SYBIL_ACTOR"],
+      "reference": {"scenarioId": "d05-reference"},
+      "attack": {"scenarioId": "d05-attack"},
+      "intervention": {
+        "kind": "split-realized-cap-across-identities",
+        "changedInputs": [
+          {"field": "bidder.fixedCap", "subject": "SYBIL_A_ID"},
+          {"field": "bidder.opportunities", "subject": "SYBIL_B_ID"}
+        ]
+      },
+      "matchedControls": [
+        {"id": "same-actor-configured-cap", "selector": {"field": "actor.aggregateConfiguredMaxBidCap", "subject": "SYBIL_ACTOR"}, "operator": "equal"},
+        {"id": "same-actor-realized-capital", "selector": {"field": "actor.aggregateLockedCapital", "subject": "SYBIL_ACTOR"}, "operator": "equal"},
+        {"id": "same-coalition-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-gross-premium", "selector": {"field": "auction.grossPremium"}, "operator": "equal"},
+        {"id": "same-fee", "selector": {"field": "auction.feeAmount"}, "operator": "equal"},
+        {"id": "same-candidate-pool", "selector": {"field": "auction.candidatePool"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "coalition-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The same peak capital is deposited on a different identity-time schedule."},
+        {"id": "participant-count", "selector": {"field": "auction.participantCount"}, "reason": "The attack activates the sibling identity by design."}
+      ],
+      "diagnosticRelations": [
+        {"id": "coalition-level-cap-bypass", "selector": {"field": "flag.perUserCapBypassedAtCoalitionLevel"}, "operator": "equal", "expected": true}
+      ]
+    },
+    {
+      "caseId": "d06-sybil-threshold",
+      "threatClass": "sybil-participant-threshold",
+      "description": "Activate a sibling identity controlled by the same buyer actor to test the identity-count pool threshold.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "BUYER_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "45000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "WINNER_ID": "BUYER_ACTOR",
+        "SIBLING_ID": "BUYER_ACTOR"
+      },
+      "coalitionActorIds": ["BUYER_ACTOR"],
+      "reference": {"scenarioId": "d06-reference"},
+      "attack": {"scenarioId": "d06-attack"},
+      "intervention": {
+        "kind": "activate-sibling-participant-identity",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "SIBLING_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-sibling-owner-valuation", "selector": {"field": "bidder.valuation", "subject": "SIBLING_ID"}, "operator": "equal"},
+        {"id": "same-actor-configured-cap", "selector": {"field": "actor.aggregateConfiguredMaxBidCap", "subject": "BUYER_ACTOR"}, "operator": "equal"},
+        {"id": "same-winner-identity", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-winner-actor", "selector": {"field": "winner.actor"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-gross-premium", "selector": {"field": "auction.grossPremium"}, "operator": "equal"},
+        {"id": "same-fee", "selector": {"field": "auction.feeAmount"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "coalition-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "The sibling identity adds a refundable realized cap in the attack."},
+        {"id": "coalition-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The sibling deposit adds capital-time exposure."},
+        {"id": "participant-count", "selector": {"field": "auction.participantCount"}, "reason": "The participant identity threshold is the intervention target."},
+        {"id": "candidate-pool", "selector": {"field": "auction.candidatePool"}, "reason": "The candidate pool is expected to differ only as a derived consequence of participant count."}
+      ],
+      "diagnosticRelations": [
+        {"id": "candidate-pool-unlocked", "selector": {"field": "flag.candidatePoolUnlocked"}, "operator": "equal", "expected": true},
+        {"id": "participant-threshold-unlocked", "selector": {"field": "flag.participantThresholdUnlocked"}, "operator": "equal", "expected": true}
+      ]
+    },
+    {
+      "caseId": "d07-collusive-suppression",
+      "threatClass": "coordinated-demand-suppression",
+      "description": "Compare deterministic competitive coalition participation with actor A abstaining before actor B wins.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "COLLUDER_A_ACTOR", "nftValuation": "30000000000000000", "actorCapitalBudget": "25000000000000000"},
+        {"actorId": "COLLUDER_B_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "COLLUDER_A_ID": "COLLUDER_A_ACTOR",
+        "COLLUDER_B_ID": "COLLUDER_B_ACTOR"
+      },
+      "coalitionActorIds": ["COLLUDER_A_ACTOR", "COLLUDER_B_ACTOR"],
+      "reference": {"scenarioId": "d07-reference"},
+      "attack": {"scenarioId": "d07-attack"},
+      "intervention": {
+        "kind": "suppress-coalition-member-participation",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "COLLUDER_A_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-a-definition", "selector": {"field": "bidder.maxBidCap", "subject": "COLLUDER_A_ID"}, "operator": "equal"},
+        {"id": "same-b-definition", "selector": {"field": "bidder.maxBidCap", "subject": "COLLUDER_B_ID"}, "operator": "equal"},
+        {"id": "same-winner-actor", "selector": {"field": "winner.actor"}, "operator": "equal"},
+        {"id": "same-terminal-claimant-actor", "selector": {"field": "terminalNftClaimant.actor"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "final-price", "selector": {"field": "auction.finalPrice"}, "reason": "Demand suppression deliberately changes the price faced by coalition actor B."},
+        {"id": "gross-premium", "selector": {"field": "auction.grossPremium"}, "reason": "Gross premium follows from the changed final price."},
+        {"id": "seller-revenue", "selector": {"field": "auction.sellerRevenue"}, "reason": "Seller proceeds change with price and any reference reward."},
+        {"id": "coalition-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "Actor A does not lock its cap in the attack."},
+        {"id": "coalition-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "Actor A's abstention removes its capital-time exposure."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-coalition-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d08a-seller-losing-shill",
+      "threatClass": "seller-controlled-losing-identity",
+      "description": "Activate a losing identity owned by the seller actor while preserving the external winner and terminal price.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "12000000000000000", "actorCapitalBudget": "10000000000000000"},
+        {"actorId": "EXTERNAL_LOSER_ACTOR", "nftValuation": "20000000000000000", "actorCapitalBudget": "15000000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "40000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "12000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "SHILL_ID": "SELLER_ACTOR",
+        "EXTERNAL_LOSER_ID": "EXTERNAL_LOSER_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["SELLER_ACTOR"],
+      "reference": {"scenarioId": "d08a-reference"},
+      "attack": {"scenarioId": "d08a-attack"},
+      "intervention": {
+        "kind": "activate-seller-controlled-losing-bid",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "SHILL_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-external-loser-opportunities", "selector": {"field": "bidder.opportunities", "subject": "EXTERNAL_LOSER_ID"}, "operator": "equal"},
+        {"id": "same-winner-opportunities", "selector": {"field": "bidder.opportunities", "subject": "WINNER_ID"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-gross-premium", "selector": {"field": "auction.grossPremium"}, "operator": "equal"},
+        {"id": "same-fee", "selector": {"field": "auction.feeAmount"}, "operator": "equal"},
+        {"id": "same-candidate-pool", "selector": {"field": "auction.candidatePool"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "seller-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "The seller actor locks the shill cap only in the attack."},
+        {"id": "seller-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The shill bid creates seller-actor capital-time exposure."},
+        {"id": "participant-count", "selector": {"field": "auction.participantCount"}, "reason": "The shill adds a participant identity."},
+        {"id": "seller-revenue", "selector": {"field": "auction.sellerRevenue"}, "reason": "Seller proceeds change with the distribution assigned after adding the shill."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-seller-actor-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d08b-seller-self-purchase",
+      "threatClass": "seller-self-purchase",
+      "description": "Compare seller no-bid retention with the same seller actor winning through a bidder identity.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "30000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "30000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "SELLER_BID_ID": "SELLER_ACTOR"
+      },
+      "coalitionActorIds": ["SELLER_ACTOR"],
+      "reference": {"scenarioId": "d08b-reference"},
+      "attack": {"scenarioId": "d08b-attack"},
+      "intervention": {
+        "kind": "activate-seller-self-purchase",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "SELLER_BID_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-seller-bidder-definition", "selector": {"field": "bidder.maxBidCap", "subject": "SELLER_BID_ID"}, "operator": "equal"},
+        {"id": "same-terminal-claimant-actor", "selector": {"field": "terminalNftClaimant.actor"}, "operator": "equal"},
+        {"id": "same-configured-cap", "selector": {"field": "actor.aggregateConfiguredMaxBidCap", "subject": "SELLER_ACTOR"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "final-price", "selector": {"field": "auction.finalPrice"}, "reason": "No-bid has zero final price while self-purchase submits the configured cap."},
+        {"id": "protocol-fee", "selector": {"field": "auction.feeAmount"}, "reason": "Only the premium-bearing self-purchase branch creates a protocol fee."},
+        {"id": "seller-realized-capital", "selector": {"field": "coalition.aggregateLockedCapital"}, "reason": "The seller actor locks no bidder cap in the reference."},
+        {"id": "seller-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The self-purchase deposit exists only in the attack."}
+      ],
+      "diagnosticRelations": [
+        {"id": "negative-modeled-self-purchase-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "lessThan", "expected": "0"}
+      ]
+    },
+    {
+      "caseId": "d09-alternating-identities",
+      "threatClass": "multi-identity-interaction",
+      "description": "Add an alternating takeover while preserving the same identities, ownership, final caps, winner, price, and peak capital.",
+      "actors": [
+        {"actorId": "SELLER_ACTOR", "nftValuation": "10000000000000000", "actorCapitalBudget": "0"},
+        {"actorId": "SYBIL_ACTOR", "nftValuation": "20000000000000000", "actorCapitalBudget": "26000000000000000"},
+        {"actorId": "EXTERNAL_LOSER_ACTOR", "nftValuation": "17000000000000000", "actorCapitalBudget": "12200000000000000"},
+        {"actorId": "WINNER_ACTOR", "nftValuation": "35000000000000000", "actorCapitalBudget": "30000000000000000"}
+      ],
+      "sellerActorId": "SELLER_ACTOR",
+      "initialNftEndowment": {"ownerActorId": "SELLER_ACTOR", "value": "10000000000000000"},
+      "protocolFeeRecipientActorId": null,
+      "identityOwnership": {
+        "SELLER": "SELLER_ACTOR",
+        "SYBIL_F_ID": "SYBIL_ACTOR",
+        "SYBIL_A_ID": "SYBIL_ACTOR",
+        "EXTERNAL_LOSER_ID": "EXTERNAL_LOSER_ACTOR",
+        "WINNER_ID": "WINNER_ACTOR"
+      },
+      "coalitionActorIds": ["SYBIL_ACTOR"],
+      "reference": {"scenarioId": "d09-reference"},
+      "attack": {"scenarioId": "d09-attack"},
+      "intervention": {
+        "kind": "add-alternating-controlled-takeover",
+        "changedInputs": [{"field": "bidder.opportunities", "subject": "SYBIL_F_ID"}]
+      },
+      "matchedControls": [
+        {"id": "same-focal-first-bid", "selector": {"field": "bidder.firstBidTime", "subject": "SYBIL_F_ID"}, "operator": "equal"},
+        {"id": "same-focal-final-cap", "selector": {"field": "bidder.finalCap", "subject": "SYBIL_F_ID"}, "operator": "equal"},
+        {"id": "same-sibling-final-cap", "selector": {"field": "bidder.finalCap", "subject": "SYBIL_A_ID"}, "operator": "equal"},
+        {"id": "same-focal-ef", "selector": {"field": "bidder.ef", "subject": "SYBIL_F_ID"}, "operator": "equal"},
+        {"id": "same-focal-et", "selector": {"field": "bidder.et", "subject": "SYBIL_F_ID"}, "operator": "equal"},
+        {"id": "same-actor-realized-capital", "selector": {"field": "actor.aggregateLockedCapital", "subject": "SYBIL_ACTOR"}, "operator": "equal"},
+        {"id": "same-winner", "selector": {"field": "winner.identity"}, "operator": "equal"},
+        {"id": "same-final-price", "selector": {"field": "auction.finalPrice"}, "operator": "equal"},
+        {"id": "same-candidate-pool", "selector": {"field": "auction.candidatePool"}, "operator": "equal"}
+      ],
+      "knownUnmatchedDimensions": [
+        {"id": "coalition-capital-time", "selector": {"field": "coalition.capitalTimeExposureWeiSeconds"}, "reason": "The additional step-up changes deposit timing under matched terminal caps."}
+      ],
+      "diagnosticRelations": [
+        {"id": "positive-modeled-alternation-utility", "selector": {"field": "delta.coalitionUtility"}, "operator": "greaterThan", "expected": "0"}
+      ]
+    }
+  ]
+}
