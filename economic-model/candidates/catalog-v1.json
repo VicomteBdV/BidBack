@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "reportSchemaVersion": 1,
+  "catalogVersion": "candidate-catalog-v1",
+  "baselineEconomicModelVersion": "solidity-baseline-v1",
+  "candidates": [
+    {
+      "id": "candidate-v1-a",
+      "description": "Mechanical premium lift normalized among positive-contribution bidder identities, with the baseline per-user reward cap.",
+      "allocationSubject": "bidder-identity",
+      "poolPolicy": "net-premium-threshold",
+      "eligibilityPolicy": "positive-contribution",
+      "contributionPolicy": "mechanical-premium-lift",
+      "allocationPolicy": "normalized",
+      "rewardCapPolicy": "baseline-per-user",
+      "secondaryWeightPolicy": "none"
+    },
+    {
+      "id": "candidate-v1-b",
+      "description": "Mechanical premium lift allocated directly against gross premium, without a per-identity reward cap.",
+      "allocationSubject": "bidder-identity",
+      "poolPolicy": "net-premium-threshold",
+      "eligibilityPolicy": "positive-contribution",
+      "contributionPolicy": "mechanical-premium-lift",
+      "allocationPolicy": "gross-premium-direct",
+      "rewardCapPolicy": "none",
+      "secondaryWeightPolicy": "none"
+    },
+    {
+      "id": "candidate-v1-c",
+      "description": "Mechanical premium lift normalized among positive-contribution bidder identities, without a per-identity reward cap.",
+      "allocationSubject": "bidder-identity",
+      "poolPolicy": "net-premium-threshold",
+      "eligibilityPolicy": "positive-contribution",
+      "contributionPolicy": "mechanical-premium-lift",
+      "allocationPolicy": "normalized",
+      "rewardCapPolicy": "none",
+      "secondaryWeightPolicy": "none"
+    },
+    {
+      "id": "candidate-v1-d",
+      "description": "Positive mechanical premium lift gates eligibility before baseline final score weighting and the baseline per-user reward cap.",
+      "allocationSubject": "bidder-identity",
+      "poolPolicy": "net-premium-threshold",
+      "eligibilityPolicy": "positive-contribution",
+      "contributionPolicy": "mechanical-premium-lift",
+      "allocationPolicy": "normalized",
+      "rewardCapPolicy": "baseline-per-user",
+      "secondaryWeightPolicy": "baseline-final-score"
+    },
+    {
+      "id": "candidate-v1-e",
+      "description": "Identity-level policy-replay counterfactual contribution normalized among positive-contribution bidder identities.",
+      "allocationSubject": "bidder-identity",
+      "poolPolicy": "net-premium-threshold",
+      "eligibilityPolicy": "positive-contribution",
+      "contributionPolicy": "identity-counterfactual-policy-replay",
+      "allocationPolicy": "normalized",
+      "rewardCapPolicy": "none",
+      "secondaryWeightPolicy": "none"
+    }
+  ]
+}

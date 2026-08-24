@@ -353,12 +353,227 @@ JSON reports use sorted keys, compact separators, ASCII escaping, caller-supplie
 and no ambient timestamp. Repeated runs with the same inputs are byte-for-byte deterministic. The
 CLI writes only to stdout.
 
+## Lot E candidate economic models
+
+Lot E is a separate, hypothetical allocation layer over authoritative Lot B/C traces and Lot D
+actor declarations. It does not change bidding, caps, anti-sniping, the winner, final price,
+premium, fee, refunds, NFT ownership, or either baseline settlement branch. The baseline version
+remains `solidity-baseline-v1`; neutral candidate IDs do not imply that a model is secure,
+production-ready, or recommended.
+
+Candidate definitions live in `candidates/catalog-v1.json`. Every candidate uses bidder identity
+as its allocation subject. The five initial models are:
+
+| ID | Contribution and allocation | EF / ET / II |
+| --- | --- | --- |
+| `candidate-v1-a` | positive mechanical premium lift, normalized among eligible losers, then the baseline per-identity cap | removed |
+| `candidate-v1-b` | positive mechanical premium lift allocated directly against gross premium, without an identity cap | removed |
+| `candidate-v1-c` | positive mechanical premium lift normalized among eligible losers, without an identity cap | removed |
+| `candidate-v1-d` | positive mechanical premium lift as an eligibility gate, then the current final score and per-identity cap | retained only as secondary weights |
+| `candidate-v1-e` | positive identity-level policy-rematerialization counterfactual price contribution, normalized without an identity cap | removed |
+
+Candidate D calls the existing Lot B EF, ET, II, weighted-score, reputation, and final-score
+helpers. This matters when its hypothetical pool is positive but the baseline pool was zero:
+finalized baseline results intentionally omit scores when baseline pool eligibility short-circuits.
+Lot E does not copy those formulas or change Lot B.
+
+### Pool size and allocation are separate
+
+Every candidate removes participant-identity count from the economic pool gate. At the current
+duration-valid scenarios, its pool is:
+
+```text
+candidatePool = 0                                      when netPremium < minPremiumNet
+candidatePool = min(
+    floor(netPremium * redistributionBps / 10_000),
+    netPremium
+)                                                       otherwise
+```
+
+The pool may be positive while assignment is zero. That unused amount is not reserved and remains
+in seller proceeds. Raising `minParticipants` from two wallets to N wallets would only raise the
+number of identities needed to cross the gate; it would not create actor-level sybil resistance.
+An identity count may still have a future UX or safety role, but the Lot E candidates do not let it
+unlock economic value.
+
+For a losing identity `i`, mechanical contribution is:
+
+```text
+mechanicalContribution_i = sum(BidAudit.premium_lift for bids by i)
+```
+
+Candidates A and C normalize this quantity over eligible losers. Candidate A then applies the
+current per-identity cap; Candidate C does not. Candidate B deliberately uses a global denominator:
+
+```text
+reward_i = floor(candidatePool * mechanicalContribution_i / grossPremium)
+```
+
+It does not redistribute the portion mechanically attributed to the winner, cap remainder, or
+integer dust. For a fixed total contribution and fixed external contributions, direct linear
+allocation and floor division are additive or subadditive under identity splitting. This formula
+property does not show that sybils cannot change the observed trace or manufacture additional
+mechanical attribution.
+
+### Baseline and hypothetical settlement
+
+Candidate output keeps baseline and hypothetical settlement explicitly separate. For every
+candidate branch:
+
+```text
+candidateAssignedDistribution = sum(candidate rewards)
+candidateUnassignedRemainder = candidatePool - candidateAssignedDistribution
+candidateSellerProceeds = finalPrice - fee - candidateAssignedDistribution
+
+candidateSellerPremiumCapture = 0                       when winner is null
+candidateSellerPremiumCapture = candidateSellerProceeds - startPrice
+                                                        otherwise
+```
+
+Only rewards, assigned distribution, seller proceeds, and unassigned remainder differ. Deposits,
+refunds, fee, terminal NFT claimant, endowment, ownership, locked capital, capital-time exposure,
+and valuations remain authoritative baseline/Lot D values.
+
+Lot D actor accounting is reused through a cash-flow overlay rather than reimplemented. For each
+authoritative baseline actor or coalition, Lot E applies only:
+
+```text
+economicChangeDelta = candidateRewardDelta + candidateSellerProceedsDelta
+```
+
+All other actor and coalition fields are retained from Lot D. This preserves seller/shill
+consolidation and the D8b self-purchase convention instead of treating internal transfers as gains.
+
+### Counterfactual contribution
+
+Candidate E always allocates at bidder-identity level, whether or not Lot D actor declarations are
+available. For identity `i`, it builds a new independent scenario without that identity and its
+opportunities, rematerializes the remaining declared Lot C policies through the existing Lot B/C
+machinery, and measures:
+
+```text
+signedContribution_i = observedFinalPrice - finalPriceWithoutIdentity_i
+eligibleContribution_i = max(signedContribution_i, 0)
+```
+
+The source `Scenario`, `ScenarioReport`, and `SimulationResult` are snapshotted and must remain
+byte-for-byte unchanged. A second fixed-action diagnostic removes the identity's accepted bids and
+replays the remaining recorded actions. It is reported as invalid rather than repaired if removal
+invalidates later timing, anti-sniping, minimum-bid, or deposit conditions.
+
+For Lot D only, the comparison report may additionally remove all bidder identities declared for
+one economic actor. This actor-aware counterfactual is a separate analytical diagnostic and never
+changes Candidate E allocation. Actor ownership is declared experimental input, not an on-chain
+identity capability.
+
+Both counterfactual conventions have limitations. Fixed-action deletion omits replacement bids;
+policy rematerialization assumes the small declared Lot C policies remain behaviorally valid. In
+the current first-price, fixed-cap scenarios, removing a loser can leave the later winner's cap
+unchanged and assign that loser zero counterfactual price contribution. Final price alone can
+therefore be too narrow a definition of useful support.
+
+### Identity-splitting standard and limitations
+
+Lot E reports both reward and modeled-utility splitting gains:
+
+```text
+identitySplittingGainReward = coalitionReward_split - actorReward_unsplit
+identitySplittingGainUtility = coalitionUtility_split - actorUtility_unsplit
+```
+
+Interpretation requires matched pool, aggregate contribution, terminal NFT ownership, external
+bidders, and final price/premium where attainable. D5 matches aggregate locked capital but does
+not match coalition mechanical premium lift, so it remains an empirical cap-bypass test rather
+than a universal contribution-invariance proof. Deterministic pure partition vectors separately
+test formula behavior at exactly matched aggregate contribution.
+
+Without external identity, a non-refundable identity cost, strong anti-sybil reputation, or a
+similar constraint, the protocol cannot determine whether two wallets share one economic actor.
+Lot E therefore targets invariant or subadditive allocation for economically equivalent traces;
+it does not implement or claim a sybil-proof identity layer. In particular, removing the
+participant-count gate does not by itself prevent a winner actor from receiving value through a
+losing sibling identity. Lot D reports that indirect reward explicitly.
+
+### Metrics and feasibility
+
+Normal comparisons report loser rewards, assigned distribution, seller proceeds and premium
+capture, redistribution and pool-utilization ratios, rewarded-loser count, exact maximum reward
+share, unassigned remainder, and confirmation that allocation efficiency and all underlying
+auction outputs are unchanged. Concentration uses a reduced integer `Rational`; it is `null` when
+nothing is assigned. Lot D comparisons additionally report candidate actor/coalition utility,
+reward and seller deltas, identity-splitting gain, participant-threshold effects, indirect
+winner-actor rewards, interaction sensitivity, locked capital, and capital-time.
+
+No composite score selects a winner. Reports keep adversarial resistance, normal redistribution,
+seller economics, and concentration separate. Implementation complexity and known weaknesses are
+documented per candidate rather than folded into a weighted score:
+
+| Candidate | Future state and per-bid work | Finalization and history | Classification and principal limitation |
+| --- | --- | --- | --- |
+| A | additive mechanical contribution per bounded participant | bounded normalization loop; no full-history replay | moderate on-chain; the per-identity cap is profitable to split in the pure partition test |
+| B | additive mechanical contribution per bounded participant | bounded direct-allocation loop; no full-history replay | simple on-chain; formula-level splitting is subadditive, but sybils may still alter the trace and attribution |
+| C | additive mechanical contribution per bounded participant | bounded normalization loop; no full-history replay | moderate on-chain; no cap-splitting gain, but reward concentration can increase |
+| D | mechanical contribution plus the existing EF/ET/II/reputation scoring state | bounded normalization/cap loop; no full-history replay | moderate on-chain; retains identity-level cap and interaction/reputation assumptions |
+| E | complete declared scenario/policy input for each removed identity | one policy rematerialization per identity; actor removal also needs declared ownership | impractical on the current architecture; behavioral validity and real-world identity remain external assumptions |
+
+None of A-D needs an oracle or external identity provider for its formula. That fact does not make
+wallets actor-neutral. Candidate E's actor-aware diagnostic consumes declared Lot D ownership only
+off-chain and never changes its identity-level allocation.
+
+The comparison properties are intentionally atomic:
+
+| Property | Meaning |
+| --- | --- |
+| P1 | a D1-like deliberate loser with zero mechanical contribution gains no incremental reward |
+| P2a | empirical D5 split-versus-unsplit reward, evaluated only when the declared controls match |
+| P2b | pure formula partition with fixed pool and matched aggregate contribution/weight is non-profitable |
+| P3 | participant identity count does not unlock a larger pool in D6 |
+| P4 | the winner actor receives no redistribution through a sibling identity |
+| P5 | a funded representative auction can reward a mechanically contributing loser |
+| P6 | `assignedDistribution <= candidatePool <= netPremium` |
+| P7 | the winner identity is excluded |
+| P8 | candidate uint outputs are non-negative integers |
+| P9 | seller proceeds stay non-negative and final price stays authoritative |
+| P10 | winner, price, premium, fee, net premium, and NFT claimant remain baseline-authoritative |
+| P11 | source `Scenario`, `ScenarioReport`, and `SimulationResult` remain unchanged |
+| P12 | behavior is independent of scenario and adversarial case IDs |
+| P13 | D8b seller self-purchase changes consolidated actor utility only by the protocol fee |
+| P14 | zero or below-threshold premium cannot fund candidate rewards |
+| P15 | counterfactual convention, changed dimensions, validity, and errors are explicit |
+| P16 | canonical JSON serialization is byte-stable |
+
+P2a can be `non-comparable`, and scenario-specific properties can be `non-applicable`; neither
+status is silently converted into a pass. P2b is the separate formula-only control. In its declared
+40/60 partition vector, A and D expose a cap-splitting gain while B, C, and E are subadditive or
+invariant. This is not a universal sybil-resistance proof for any model.
+
+### Lot E runner and CLI
+
+```powershell
+python -m bidback_economics.candidate_runner --list-models
+python -m bidback_economics.candidate_runner --model candidate-v1-b --scenario s04-heterogeneous
+python -m bidback_economics.candidate_runner --compare --scenario s04-heterogeneous --json
+python -m bidback_economics.candidate_runner --adversarial d05-sybil-cap-bypass --json
+python -m bidback_economics.candidate_runner --all --json
+```
+
+The runner uses exact integers, checked unsigned arithmetic for candidate formulas intended as
+on-chain feasible, sorted compact JSON, caller-supplied source commits, and explicit deterministic
+ordering. Signed counterfactual and attack-minus-reference deltas remain analytical signed
+integers. It writes only to stdout and uses no system time, randomness, Git subprocess, or results
+directory.
+
 ## Explicit exclusions
 
 Lot D contains no random or stochastic engine, parameter sweep, Monte Carlo, optimizer,
 alternative scoring, mitigation, parameter recommendation, plotting, or production exploitability
 classification. Its matched pairs are bounded diagnostics, not causal claims about behavior beyond
 their declared assumptions and controls.
+
+Lot E adds bounded mitigation candidates and comparisons only. It contains no Solidity candidate,
+production parameter recommendation, optimizer, Monte Carlo process, random strategy, dashboard,
+deployment, external identity system, entry fee, slashing, non-refundable deposit, KYC, or
+proof-of-personhood.
 
 ## Manual validation
 
@@ -371,6 +586,10 @@ python -m compileall economic-model\src economic-model\tests
 python -m unittest discover -s economic-model\tests -p "test_counterfactuals.py" -v
 python -m unittest discover -s economic-model\tests -p "test_adversarial_metrics.py" -v
 python -m unittest discover -s economic-model\tests -p "test_adversarial_runner.py" -v
+python -m unittest discover -s economic-model\tests -p "test_candidates.py" -v
+python -m unittest discover -s economic-model\tests -p "test_candidate_models.py" -v
+python -m unittest discover -s economic-model\tests -p "test_model_comparison.py" -v
+python -m unittest discover -s economic-model\tests -p "test_candidate_runner.py" -v
 python -m unittest discover -s economic-model\tests -p "test_*.py" -v
 python -m bidback_economics.runner --list
 python -m bidback_economics.runner --scenario s10-anti-sniping --json
@@ -379,6 +598,14 @@ python -m bidback_economics.adversarial_runner --list
 python -m bidback_economics.adversarial_runner --case d01-deliberate-loser
 python -m bidback_economics.adversarial_runner --case d05-sybil-cap-bypass --json
 python -m bidback_economics.adversarial_runner --all --json
+python -m bidback_economics.candidate_runner --list-models
+python -m bidback_economics.candidate_runner --compare --scenario s04-heterogeneous --json
+python -m bidback_economics.candidate_runner --adversarial d01-deliberate-loser --json
+python -m bidback_economics.candidate_runner --adversarial d05-sybil-cap-bypass --json
+python -m bidback_economics.candidate_runner --adversarial d06-sybil-threshold --json
+python -m bidback_economics.candidate_runner --adversarial d08b-seller-self-purchase --json
+python -m bidback_economics.candidate_runner --adversarial d09-alternating-identities --json
+python -m bidback_economics.candidate_runner --all --json
 ```
 
 Python 3.12 standard library is sufficient. No package installation or external runtime dependency
