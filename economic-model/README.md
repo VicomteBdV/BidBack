@@ -606,8 +606,10 @@ python -m bidback_economics.decision_runner --source-commit $lotFSourceCommit --
 ```
 
 Both modes write only to stdout. JSON is compact, sorted, ASCII, and deterministic. The decision
-record scaffold is `docs/ECONOMIC_MODEL_V1_DECISION.md` and remains `PENDING VALIDATED EVIDENCE`
-until Lot F2 manually reviews validated output.
+record is `docs/ECONOMIC_MODEL_V1_DECISION.md`. Lot F2 is complete, the record is final, and its
+outcome is `no-current-candidate-acceptable`. Economic Model V1 evaluation is complete without an
+approved parameter or Solidity change. The P4/P5 observability boundary is a conditional reopening
+topic only, not a current implementation workstream.
 
 ## Explicit exclusions
 

@@ -1,6 +1,6 @@
 # BidBack Product Status
 
-**Checkpoint date:** 22 August 2026
+**Checkpoint date:** 25 August 2026
 
 **Status authority:** This document is the current source of truth for BidBack product status. Procedure documents and older checkpoints must not override it.
 
@@ -10,15 +10,16 @@ BidBack is a functional NFT auction MVP with modular on-chain custody, bidding, 
 
 At this checkpoint:
 
-- the `main` CI workflow was reported green on 31 July 2026 and was confirmed green before the 22 August 2026 public smoke; the later CI run URL and archival metadata remain pending evidence, and neither observation is a permanent guarantee;
+- after Lot F integration at commit `607442b6c2da985a373866163fc3cdda8e6ac116`, the `main` CI workflow was reported and confirmed green during the project validation workflow on 25 August 2026; the retained run URL and archival metadata are not recorded here, and this dated observation is not a future guarantee;
 - the complete automated local lifecycle was successfully executed in GitHub Codespaces on 31 July 2026 against a fresh Anvil chain on `31337`;
 - the local run confirmed deployment, three bids across two bidders, delta-only step-up, finalization, all claims and withdrawals, duplicate-action rejection, and verified final balances;
 - **One complete canonical Base Sepolia cycle validated:** on 22 August 2026, auction `#2` completed the wallet-signed lifecycle on Base Sepolia (`84532`) across five distinct public role wallets and a separately deployed valueless test-only NFT; the final verifier passed, five duplicate-action `eth_call` simulations reverted as expected, and the final verifier still passed afterward;
+- **Economic Model V1 — Completed / evaluated:** the executable specification, exact Python baseline twin, 14 deterministic normal scenarios, 10 adversarial pairs, Candidates A-E, deterministic Lot F decision reduction, and final decision record produced the outcome `no-current-candidate-acceptable`;
 - no hosted demonstration frontend, production indexer, external audit, production governance, monitoring, user research, or legal review is confirmed.
 
 BidBack therefore meets the documented **Demo-ready** gate for a controlled local demonstration. The canonical public-testnet cycle criterion is satisfied for this one bounded run, but the remaining Controlled beta criteria are not. BidBack does not meet **Controlled beta-ready**, **Public beta-ready**, or **Production-ready**.
 
-The next major workstream is **BidBack Economic Model V1**: formalize the current mechanism and design an off-chain simulation and adversarial-comparison program before deciding between retaining the model, changing parameters, or proposing a bounded Solidity evolution. No simulator, Solidity change, on-chain parameter change, proxy, or upgradeability decision is part of this checkpoint.
+The economic evaluation is closed without selecting the baseline or Candidates A-E, without a parameter-only approval, and without approving a Solidity evolution or automatic application change. The next short checkpoint is a bounded, research-oriented **GBM / Competitive & Prior-Art Review**. The next major product workstream is **Premium Controlled-Experience Readiness**, combining a premium user experience with the minimum controlled environment needed for credible external sessions.
 
 ## Status Legend
 
@@ -44,6 +45,18 @@ Status claims use the following evidence classes:
 | Canonical public validation | One named public-testnet scenario completed with distinct actors, reconciled economics, final-state verification, and duplicate-action simulations. | Repeatability, a support matrix, hosted-beta operations, broad adversarial coverage, audit assurance, or production readiness. |
 | No evidence | No reliable repository or confirmed execution evidence was identified. | That work has never happened outside the inspected record. |
 
+## Economic Model V1 Closure
+
+**Status:** `Economic Model V1 — Completed / evaluated`
+
+**Recorded outcome:** `no-current-candidate-acceptable`
+
+The current Solidity mechanism remains functional bounded MVP behavior, but its presence in the repository is not approval of it as the selected Economic Model V1 direction. The baseline and Candidates A-D were not selected. Candidate E remains an analytical counterfactual benchmark that is impractical in the current architecture. P2a remains `non-comparable`; `parameter-only` was rejected; and no Solidity evolution, parameter change, or automatic application change was approved.
+
+The P4/P5 observability boundary is a known economic limitation and an explicit conditional research boundary only. It is not an open V1 decision, an automatic workstream, or a reason to modify Solidity now. Reopening requires a later targeted decision supported by evidence.
+
+Authoritative sources are [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC.md), [`ECONOMIC_MODEL_V1_DECISION.md`](./ECONOMIC_MODEL_V1_DECISION.md), and the versioned specification, scenario, diagnostic, candidate, and decision-reduction artifacts under [`economic-model/`](../economic-model/). This closure does not advance any Controlled beta, Public beta, or Production gate automatically.
+
 ## Smart Contracts
 
 | Capability | Status | Evidence | Limits / next proof required |
@@ -56,7 +69,7 @@ Status claims use the following evidence classes:
 | Finalization | Completed; validated locally and in one canonical Base Sepolia cycle | Solidity integration tests, Anvil lifecycle, Base Sepolia auction `#2` | No repeated public matrix or production-load evidence. |
 | Winner NFT claim | Completed; validated locally | Pull-based claim implementation, double-claim test, Anvil lifecycle | No independent audit. |
 | Losing bidder refunds | Completed; validated locally | Full-cap refund accounting, tests, `1.5 ETH` Anvil refund | Production-scale solvency assurance still requires invariants and audit. |
-| Conditional rewards | Completed; validated locally | Premium-derived calculation tests and `0.19 ETH` Anvil reward | Rewards remain conditional and can be zero outside the deterministic scenario. |
+| Conditional rewards | Completed; validated locally as bounded MVP behavior | Premium-derived calculation tests and `0.19 ETH` Anvil reward | Rewards remain conditional and can be zero outside the deterministic scenario; Economic Model V1 did not select the current mechanism as the future economic direction. |
 | Seller proceeds | Completed; validated locally | Pull withdrawal tests and `1.76 ETH` Anvil withdrawal | Historical attribution needs an indexer or richer event model. |
 | Protocol fees | Completed; validated locally | Premium-only fee logic, snapshot tests, `0.05 ETH` Anvil withdrawal | Governance and production recipient policy are open. |
 | Parameter, module, and fee-recipient snapshots | Completed | Dedicated Solidity suites, read-only frontend display, canonical Base Sepolia verifier | Future deployments still require their own verification. |
@@ -114,6 +127,7 @@ Status claims use the following evidence classes:
 | Frontend Vitest suite | Passed in CI at checkpoint | `main` CI reported green on 31 July 2026; CI runs `npm --prefix frontend run test` | The standalone `.mjs` deployment-validator test is outside current Vitest discovery. |
 | Frontend typecheck | Passed in CI at checkpoint | Dated green `main` CI | Not a future guarantee. |
 | Frontend production build | Passed in CI at checkpoint | Dated green `main` CI | Does not prove hosted runtime behavior. |
+| Economic Model V1 validation and integration | Completed / evaluated | Full Python and Foundry validation was reported complete in Windows and Codespaces; Lot F was integrated at `607442b6c2da985a373866163fc3cdda8e6ac116`; `main` CI was reported green on 25 August 2026 | The retained CI run URL and archival metadata are not recorded here; the result does not approve a candidate or guarantee future CI health. |
 | Local deployment | Validated locally | `DeployLocal.s.sol`, sync tooling, successful Codespaces lifecycle | Uses known local accounts and valueless mock assets. |
 | Automated local lifecycle | Validated locally | Successful Codespaces run on 31 July 2026: `31337`, fresh deployment, 2 bidders, 3 bids, delta step-up, finalization, NFT/refund/reward/proceeds/fees, duplicate rejection, final balances | Does not replace a Base Sepolia public multi-wallet cycle. |
 | Base Sepolia deployment and verification | One complete canonical Base Sepolia cycle validated | Six-contract deployment in `frontend/public/deployments/84532.json`, final lifecycle verifier, evidence report | Deployment transaction hashes, BaseScan source-verification status, checksums, and exact block metadata remain pending evidence. |
@@ -148,6 +162,7 @@ Status claims use the following evidence classes:
 - EOA ownership is not acceptable production governance.
 - There is no monitoring, alerting, incident response, hosted runtime, or operational support model.
 - Local-development server actions must never be exposed in a hosted non-Anvil environment.
+- The current Solidity mechanism is functional bounded MVP behavior but was not selected as the Economic Model V1 direction; P4/P5 remains a conditional observability-related reopening boundary.
 - Documentation can drift if older checkpoints are treated as current status.
 
 ## Open Decisions
@@ -165,13 +180,12 @@ The following decisions remain explicitly open and must not be inferred from the
 - policy for assets with real value;
 - legal and regulatory framework;
 - strict exclusion or build-time removal of local-dev actions from hosted environments.
-- BidBack Economic Model V1 outcome: retain the current model, change configurable parameters, or propose a bounded Solidity evolution only after reproducible simulation and adversarial analysis.
 
 Options, criteria, dependencies, and gate impacts are tracked in [`ROADMAP.md`](./ROADMAP.md) and [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md).
 
 ## Limits of This Checkpoint
 
-- CI status is accurate only for the reported state on 31 July 2026.
+- The latest CI claim is limited to the reported and confirmed green `main` state on 25 August 2026 after Lot F integration; its retained run URL and archival metadata are not recorded here, and it is not a future guarantee.
 - Local lifecycle evidence proves behavior on deterministic Anvil with known development accounts, not public-chain reliability.
 - Base Sepolia evidence proves one complete canonical public smoke on 22 August 2026 only; it does not prove broad testnet validation or any higher readiness gate.
 - Generated deployment files are intentionally ignored and are not repository evidence by themselves.
@@ -188,6 +202,9 @@ Options, criteria, dependencies, and gate impacts are tracked in [`ROADMAP.md`](
 - [`TESTNET_DEPLOYMENT_RUNBOOK.md`](./TESTNET_DEPLOYMENT_RUNBOOK.md) — controlled testnet deployment and redeployment procedure.
 - [`POST_DEPLOYMENT_VERIFICATION.md`](./POST_DEPLOYMENT_VERIFICATION.md) — reusable deployment verification procedure.
 - [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md) — open technical decisions and options.
+- [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC.md) — closed Economic Model V1 specification and acceptance boundary.
+- [`ECONOMIC_MODEL_V1_DECISION.md`](./ECONOMIC_MODEL_V1_DECISION.md) — final decision record with outcome `no-current-candidate-acceptable`.
+- [`economic-model/README.md`](../economic-model/README.md) — executable economic-model modules, catalogues, and validation entry points.
 - [`ROADMAP.md`](./ROADMAP.md) — gated progression beyond the MVP.
 
 ## Maintenance Rule
