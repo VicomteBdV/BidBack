@@ -1,11 +1,12 @@
 # BidBack Economic Model V1 — Python baseline and deterministic scenarios
 
-This directory contains three deliberately separate layers. Lot B is a deterministic Python twin
+This directory contains several deliberately separate layers. Lot B is a deterministic Python twin
 of the current Solidity auction economics. Lot C uses that baseline to materialize small,
 interpretable bidder scenarios and calculate descriptive economic reports. Lot D pairs two
 complete Lot C reports and adds economic-actor, coalition, capital, and counterfactual accounting.
-Solidity remains authoritative; none of these layers is an alternative model or a recommendation
-of production parameters.
+Lot E overlays five bounded candidate allocation models. Lot F1 validates and reduces the complete
+A-E evidence into an analytical matrix without selecting an outcome. Solidity remains
+authoritative; none of these layers is a recommendation of production parameters.
 
 ## Authority and boundaries
 
@@ -18,6 +19,8 @@ The authority order is:
 5. the Lot B Python baseline;
 6. Lot C scenarios, decisions, and descriptive metrics;
 7. Lot D actor-aware paired diagnostics.
+8. Lot E candidate overlays and atomic property reports;
+9. Lot F1 fail-closed analytical reduction.
 
 Lot B remains the only Python authority for checked arithmetic, bidding rules, participant and
 takeover state, anti-sniping, scoring, allocation, settlement, and Solidity-parity invariants.
@@ -563,6 +566,49 @@ ordering. Signed counterfactual and attack-minus-reference deltas remain analyti
 integers. It writes only to stdout and uses no system time, randomness, Git subprocess, or results
 directory.
 
+## Lot F1 analytical decision reduction
+
+Lot F1 consumes the complete Lot E catalogue report and fails closed before reducing it. The
+integrity boundary requires the baseline plus Candidates A-E, all 14 normal scenarios, all 10
+adversarial pairs, the canonical P2b vector, coherent versions and catalogues, passing Lot B/C/D
+integrity checks, mandatory candidate invariants, and the required P6-P16 evidence. A missing,
+duplicated, mismatched, mutated, or invalid input raises a structured `DecisionAnalysisError`.
+
+The output contains six comparable rows in stable Candidate A-E then baseline order. It reports
+atomic property observations, selection eligibility and disqualification reasons, normal and
+adversarial diagnostics, exact rational concentration, seller economics, policy-signature
+feasibility evidence, and scenario-local Pareto relations. It contains no selected model, final
+outcome, recommendation, global score, ranking, cross-scenario wei sum, average, or scenario vote.
+
+P5 retains every representative scenario status and uses the declared existential aggregation:
+
+- `pass` when at least one applicable funded representative scenario rewards a mechanically
+  contributing loser;
+- `fail` when applicable representative scenarios exist but none passes;
+- `non-applicable` when no representative scenario is applicable.
+
+The representative group is S2, S3, S4, S8, S9-at-threshold, and S10. Individual P5 failures stay
+visible as redistribution-coverage diagnostics.
+
+P4 is a hard gate only for the declared D6 diagnostic and means exactly
+`winnerActorIndirectReward == 0`. It is not a universal sybil-resistance result. Wallet ownership
+cannot be inferred on-chain without an identity primitive; declared actor mappings remain
+analytical inputs. P2b baseline evidence calls the existing Lot B `allocate_distribution` helper;
+the reducer does not reimplement the baseline allocation formula and does not rename EF, ET, II,
+or `finalScore` as contribution.
+
+The CLI requires a caller-supplied evidence-base commit and propagates it unchanged:
+
+```powershell
+$lotFSourceCommit = 'cf3f447a5632591209f3610e2acff77eec10aaaf'
+python -m bidback_economics.decision_runner --source-commit $lotFSourceCommit
+python -m bidback_economics.decision_runner --source-commit $lotFSourceCommit --json
+```
+
+Both modes write only to stdout. JSON is compact, sorted, ASCII, and deterministic. The decision
+record scaffold is `docs/ECONOMIC_MODEL_V1_DECISION.md` and remains `PENDING VALIDATED EVIDENCE`
+until Lot F2 manually reviews validated output.
+
 ## Explicit exclusions
 
 Lot D contains no random or stochastic engine, parameter sweep, Monte Carlo, optimizer,
@@ -606,6 +652,11 @@ python -m bidback_economics.candidate_runner --adversarial d06-sybil-threshold -
 python -m bidback_economics.candidate_runner --adversarial d08b-seller-self-purchase --json
 python -m bidback_economics.candidate_runner --adversarial d09-alternating-identities --json
 python -m bidback_economics.candidate_runner --all --json
+$lotFSourceCommit = 'cf3f447a5632591209f3610e2acff77eec10aaaf'
+python -m unittest discover -s economic-model\tests -p "test_decision_analysis.py" -v
+python -m unittest discover -s economic-model\tests -p "test_decision_runner.py" -v
+python -m bidback_economics.decision_runner --source-commit $lotFSourceCommit
+python -m bidback_economics.decision_runner --source-commit $lotFSourceCommit --json
 ```
 
 Python 3.12 standard library is sufficient. No package installation or external runtime dependency
