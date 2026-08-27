@@ -146,10 +146,11 @@ export function CreateAuctionForm() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
+    <section className="seller-form-surface">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Local dev create auction only</h2>
+          <p className="premium-eyebrow">Controlled local route</p>
+          <h2 className="editorial-title mt-1 text-2xl">Local development creation</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
             This form uses the local Anvil seller key on the Next.js server. It approves NFTVault and calls
             AuctionHouse.createAuction for Codespaces MVP testing only.
@@ -269,7 +270,7 @@ export function CreateAuctionForm() {
 
 function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="seller-info-item">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

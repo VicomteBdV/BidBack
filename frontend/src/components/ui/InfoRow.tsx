@@ -24,7 +24,7 @@ export function InfoRow({
   className?: string;
 }) {
   return (
-    <div className={`min-w-0 rounded-md border px-4 py-3 ${toneClasses[tone]} ${className}`}>
+    <div className={`min-w-0 rounded-lg border px-4 py-3 ${toneClasses[tone]} ${className}`}>
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 text-sm ${mono ? "break-all font-mono" : "break-words"}`}>{value}</div>
       {detail ? <div className="mt-2 break-words text-xs leading-5 text-slate-500">{detail}</div> : null}

@@ -136,6 +136,9 @@ describe("AuctionList", () => {
     expect(screen.getByText("Finalize auction")).toBeInTheDocument();
     expect(screen.getByText("Demo NFT #2")).toBeInTheDocument();
     expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
+    expect(screen.getAllByText("Current price").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Next action").length).toBeGreaterThan(0);
+    expect(screen.getByText("Marketplace data source")).toBeInTheDocument();
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
     expect(screen.getByText(/Showing 2 of 2 loaded auctions/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveClass("w-full", "sm:w-auto");

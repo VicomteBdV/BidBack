@@ -3,8 +3,8 @@ import { Web3Provider } from "@/providers/Web3Provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BidBack MVP",
-  description: "BidBack MVP interface for local and controlled public-testnet validation"
+  title: "BidBack | Controlled testnet NFT auctions",
+  description: "Explore NFT auctions with transparent refunds and conditional redistribution in a controlled testnet preview."
 };
 
 export default function RootLayout({

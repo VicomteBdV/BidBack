@@ -1,32 +1,39 @@
 import Link from "next/link";
+import { AppShell } from "@/components/AppShell";
 import { CreateAuctionForm } from "@/components/CreateAuctionForm";
+import { TrustDisclosure } from "@/components/TrustDisclosure";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
-import { WalletButton } from "@/components/WalletButton";
 import { isLocalDevUiEnabled } from "@/lib/localDevUi";
 
 export default function CreateAuctionPage() {
   const localDevActionsEnabled = isLocalDevUiEnabled();
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
-        <header className="flex flex-col gap-5 border-b border-slate-800 pb-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <Link href="/" className="text-sm font-medium text-cyan-300 transition hover:text-cyan-200">
-              Back to auctions
-            </Link>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Create auction</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Use the local-dev flow for reliable Codespaces testing, or the wallet-signed flow when your wallet can
-              reach the target RPC.
-            </p>
-          </div>
-          <WalletButton />
-        </header>
+    <AppShell>
+      <header className="seller-masthead">
+        <div>
+          <Link href="/" className="text-xs font-bold text-cyan-300 transition hover:text-cyan-200">
+            ← Back to marketplace
+          </Link>
+          <p className="premium-eyebrow mt-4">Seller workspace</p>
+          <h1 className="editorial-title mt-1 text-4xl sm:text-5xl">Bring an NFT to auction</h1>
+        </div>
+        <p className="seller-masthead-note self-end text-sm leading-6 text-slate-400">
+          Set the lot terms for an existing ERC-721, then approve and list it with the owner wallet. BidBack does not mint
+          the asset.
+        </p>
+      </header>
 
-        {localDevActionsEnabled ? <CreateAuctionForm /> : null}
-        <WalletCreateAuctionForm />
+      <div className="seller-workspace-grid">
+        <aside className="seller-workspace-aside" aria-label="Seller safeguards">
+          <TrustDisclosure variant="sidebar" />
+        </aside>
+
+        <div className="seller-workspace-main">
+          {localDevActionsEnabled ? <CreateAuctionForm /> : null}
+          <WalletCreateAuctionForm />
+        </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

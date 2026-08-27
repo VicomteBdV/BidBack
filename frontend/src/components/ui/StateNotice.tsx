@@ -6,7 +6,7 @@ const toneClasses: Record<StateNoticeTone, string> = {
   loading: "border-cyan-400/30 bg-cyan-400/10 text-cyan-50",
   info: "border-slate-700 bg-slate-950 text-slate-200",
   warning: "border-amber-400/40 bg-amber-400/10 text-amber-50",
-  error: "border-rose-400/40 bg-rose-400/10 text-rose-50"
+  error: "border-slate-700 border-l-4 border-l-rose-400 bg-slate-950 text-slate-200"
 };
 
 const toneLabels: Record<StateNoticeTone, string> = {
@@ -39,7 +39,7 @@ export function StateNotice({
       id={id}
       aria-live={isError ? "assertive" : "polite"}
       aria-atomic="true"
-      className={`min-w-0 rounded-md border px-4 py-3 text-sm leading-6 ${toneClasses[tone]} ${className}`}
+      className={`min-w-0 rounded-lg border px-4 py-3 text-sm leading-6 ${toneClasses[tone]} ${className}`}
     >
       <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{toneLabels[tone]}</div>
       {title ? <div className="mt-1 font-semibold text-white">{title}</div> : null}

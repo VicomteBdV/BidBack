@@ -8,6 +8,8 @@ import { AuctionLifecyclePanel } from "@/components/AuctionLifecyclePanel";
 import { AuctionRulesSnapshot } from "@/components/AuctionRulesSnapshot";
 import { AuctionSummary } from "@/components/AuctionSummary";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
+import { TrustDisclosure } from "@/components/TrustDisclosure";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import { WalletFinalizePanel } from "@/components/WalletFinalizePanel";
@@ -104,100 +106,118 @@ export function AuctionDetail({
 
   return (
     <div aria-busy={isLoading} className="min-w-0 grid gap-5">
-      <div className="flex flex-col gap-3 sm:items-end">
-        <button
-          type="button"
-          onClick={loadAuction}
-          disabled={isLoading}
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          {isLoading ? "Refreshing auction..." : "Refresh auction"}
-        </button>
-        {isLoading ? (
-          <StateNotice tone="loading" title="Refreshing auction" className="w-full sm:max-w-md">
-            Existing read-only data remains visible while the refresh completes.
-          </StateNotice>
-        ) : null}
-        {error ? (
-          <StateNotice tone="error" title="Auction refresh failed" className="w-full sm:max-w-md">
-            {error} Existing read-only data remains available below.
-          </StateNotice>
-        ) : null}
-      </div>
-
       <AuctionSummary auction={auction} />
 
-      <SectionCard
-        title="Wallet-signed actions"
-        badges={<ModeBadge variant="wallet-signed" />}
-        description="Primary production-target actions signed by the connected wallet. No server private key is used and no /api/dev route is called."
-      >
-        <div className="grid gap-5">
-          <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
-          <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
-          <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
-        </div>
-      </SectionCard>
-
-      {localDevActionsEnabled ? (
-        <AuctionDevActions
-          auctionId={auction.auctionId}
-          auctionState={auction.state}
-          finalized={auction.finalized}
-          economics={economics}
-          onActionComplete={loadAuction}
-        />
+      {isLoading ? (
+        <StateNotice tone="loading" title="Refreshing auction">
+          Existing read-only data remains visible while the refresh completes.
+        </StateNotice>
+      ) : null}
+      {error ? (
+        <StateNotice tone="error" title="Auction refresh failed">
+          {error} Existing read-only data remains available below.
+        </StateNotice>
       ) : null}
 
       <AuctionLifecyclePanel auction={auction} />
 
-      <AuctionEconomicsPanel auction={auction} />
+      <div className="auction-detail-utility flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-5 text-slate-500">Live read-only lot data remains available without connecting a wallet.</p>
+        <button
+          type="button"
+          onClick={loadAuction}
+          disabled={isLoading}
+          className="secondary-link w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        >
+          {isLoading ? "Refreshing auction..." : "Refresh auction"}
+        </button>
+      </div>
+
+      <div className="auction-detail-layout">
+        <div className="auction-detail-main">
+          <SectionCard
+            title="Wallet-signed actions"
+            badges={<ModeBadge variant="wallet-signed" />}
+            description="Choose the action that matches the live auction state. Each transaction is signed directly by the connected wallet; no server private key is used."
+            className="premium-surface"
+          >
+            <div className="grid gap-5">
+              <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
+              <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
+              <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
+            </div>
+          </SectionCard>
+
+          {localDevActionsEnabled ? (
+            <AuctionDevActions
+              auctionId={auction.auctionId}
+              auctionState={auction.state}
+              finalized={auction.finalized}
+              economics={economics}
+              onActionComplete={loadAuction}
+            />
+          ) : null}
+
+          <AuctionEconomicsPanel auction={auction} />
+        </div>
+
+        <aside className="auction-detail-aside" aria-label="Auction status and participation rules">
+          <TrustDisclosure variant="sidebar" />
+        </aside>
+      </div>
 
       <AuctionHistoryPanel auction={auction} />
 
-      <AuctionRulesSnapshot
-        snapshot={auction.paramsSnapshot}
-        error={auction.paramsSnapshotError}
-        feeRecipientSnapshot={auction.auctionFeeRecipient}
-        feeRecipientSnapshotError={auction.auctionFeeRecipientError}
-      />
-
-      <SectionCard
-        title="Technical details"
-        badges={<ModeBadge variant="read-only" />}
-        description="Raw contract references, protocol flags, and debug-like values. These are kept below the user-facing lifecycle and settlement views."
+      <TechnicalDisclosure
+        summary="Rules, contracts, and verification details"
+        description="Auction-specific rule snapshots and raw contract references remain available for independent verification."
       >
-        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
-          <InfoRow label="AuctionHouse" value={data.auctionHouse} mono />
-          <InfoRow label="Chain ID" value={String(data.chainId)} mono />
-          <InfoRow label="Seller" value={auction.seller} mono />
-          <InfoRow label="NFT contract" value={auction.nft} mono />
-          <InfoRow label="Token ID" value={auction.tokenId} mono />
-          <InfoRow label="Start price" value={formatEth(auction.startPrice)} mono />
-          <InfoRow label="Highest bid" value={formatEth(auction.highestBid)} mono />
-          <InfoRow label="Highest bidder" value={formatAddressOrNone(auction.highestBidder)} mono />
-          <InfoRow label="Start time" value={formatTimestamp(auction.startTime)} />
-          <InfoRow label="Initial end time" value={formatTimestamp(auction.initialEndTime)} />
-          <InfoRow label="Current end time" value={formatTimestamp(auction.endTime)} />
-          <InfoRow label="Extensions used" value={String(auction.extensionsUsed)} mono />
-          <InfoRow label="Participants" value={auction.participantCount} mono />
-          <InfoRow label="Bid count" value={auction.bidCount} mono />
-          <InfoRow label="Finalized" value={auction.finalized ? "Yes" : "No"} />
-          <InfoRow label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
-          {auction.nftMetadata?.tokenUri ? <InfoRow label="NFT tokenURI" value={auction.nftMetadata.tokenUri} /> : null}
-          {auction.auctionFeeRecipient ? (
-            <InfoRow label="Auction fee recipient snapshot" value={auction.auctionFeeRecipient} mono />
-          ) : null}
-          {auction.auctionFeeRecipientError ? (
-            <InfoRow label="Auction fee recipient snapshot error" value={auction.auctionFeeRecipientError} />
-          ) : null}
-          {economics ? (
-            <InfoRow label="Current global fee recipient" value={economics.feeRecipient.currentGlobalAddress} mono />
-          ) : null}
-          <InfoRow label="Seller short" value={shortenAddress(auction.seller)} mono />
-          <InfoRow label="NFT short" value={shortenAddress(auction.nft)} mono />
+        <div className="grid gap-5">
+          <AuctionRulesSnapshot
+            snapshot={auction.paramsSnapshot}
+            error={auction.paramsSnapshotError}
+            feeRecipientSnapshot={auction.auctionFeeRecipient}
+            feeRecipientSnapshotError={auction.auctionFeeRecipientError}
+          />
+
+          <SectionCard
+            title="Technical details"
+            badges={<ModeBadge variant="read-only" />}
+            description="Raw contract references, protocol flags, and verification values."
+          >
+            <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+              <InfoRow label="AuctionHouse" value={data.auctionHouse} mono />
+              <InfoRow label="Chain ID" value={String(data.chainId)} mono />
+              <InfoRow label="Seller" value={auction.seller} mono />
+              <InfoRow label="NFT contract" value={auction.nft} mono />
+              <InfoRow label="Token ID" value={auction.tokenId} mono />
+              <InfoRow label="Start price" value={formatEth(auction.startPrice)} />
+              <InfoRow label="Highest bid" value={formatEth(auction.highestBid)} />
+              <InfoRow label="Highest bidder" value={formatAddressOrNone(auction.highestBidder)} mono />
+              <InfoRow label="Start time" value={formatTimestamp(auction.startTime)} />
+              <InfoRow label="Initial end time" value={formatTimestamp(auction.initialEndTime)} />
+              <InfoRow label="Current end time" value={formatTimestamp(auction.endTime)} />
+              <InfoRow label="Extensions used" value={String(auction.extensionsUsed)} mono />
+              <InfoRow label="Participants" value={auction.participantCount} mono />
+              <InfoRow label="Bid count" value={auction.bidCount} mono />
+              <InfoRow label="Finalized" value={auction.finalized ? "Yes" : "No"} />
+              <InfoRow label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
+              {auction.nftMetadata?.tokenUri ? <InfoRow label="NFT tokenURI" value={auction.nftMetadata.tokenUri} /> : null}
+              {auction.auctionFeeRecipient ? (
+                <InfoRow label="Auction fee recipient snapshot" value={auction.auctionFeeRecipient} mono />
+              ) : null}
+              {auction.auctionFeeRecipientError ? (
+                <InfoRow label="Auction fee recipient snapshot error" value={auction.auctionFeeRecipientError} />
+              ) : null}
+              {economics ? (
+                <InfoRow label="Current global fee recipient" value={economics.feeRecipient.currentGlobalAddress} mono />
+              ) : null}
+              <InfoRow label="Seller short" value={shortenAddress(auction.seller)} mono />
+              <InfoRow label="NFT short" value={shortenAddress(auction.nft)} mono />
+            </div>
+          </SectionCard>
         </div>
-      </SectionCard>
+      </TechnicalDisclosure>
     </div>
   );
 }

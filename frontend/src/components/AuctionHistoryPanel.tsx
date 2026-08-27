@@ -91,7 +91,7 @@ export function AuctionHistoryPanel({ auction }: { auction: SerializedAuction })
   const transparency = useMemo(() => history?.transparency ?? fallbackTransparency(auction), [auction, history]);
 
   return (
-    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+    <section aria-busy={isLoading} className="premium-surface min-w-0 rounded-xl p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">

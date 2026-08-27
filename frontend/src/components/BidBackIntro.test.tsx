@@ -4,18 +4,15 @@ import { describe, expect, it } from "vitest";
 import { BidBackIntro } from "@/components/BidBackIntro";
 
 describe("BidBackIntro", () => {
-  it("explains the MVP auction flow and testnet constraints", () => {
+  it("presents the marketplace proposition and controlled-testnet safeguards", () => {
     render(<BidBackIntro />);
 
-    expect(screen.getByRole("heading", { name: "NFT auctions with conditional redistribution" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
-    expect(screen.getByText(/Seller lists an existing ERC-721 NFT/)).toBeInTheDocument();
-    expect(screen.getByText(/Outbid bidders can claim refunds separately from rewards/)).toBeInTheDocument();
-    expect(screen.getByText(/Eligible losing bidders may claim rewards only if redistribution conditions are met/)).toBeInTheDocument();
-    expect(screen.getByText("No guaranteed reward")).toBeInTheDocument();
-    expect(screen.getByText("Not lending, derivatives, or gambling")).toBeInTheDocument();
-    expect(screen.getByText("Use test assets only")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Smoke test checklist" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "The auction matters, even when you do not win." })).toBeInTheDocument();
+    expect(screen.getByText(/Browse live NFT auctions with refundable losing caps/)).toBeInTheDocument();
+    expect(screen.getByText(/redistribution is conditional and never guaranteed/)).toBeInTheDocument();
+    expect(screen.getByText(/Test assets only/)).toBeInTheDocument();
+    expect(screen.getByText(/Gas fees are separate and/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Participation and test checklist →" })).toHaveAttribute(
       "href",
       "https://github.com/VicomteBdV/BidBack/blob/main/docs/BASE_SEPOLIA_SMOKE_TEST.md"
     );

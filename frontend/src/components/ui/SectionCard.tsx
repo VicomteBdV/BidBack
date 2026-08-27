@@ -3,7 +3,7 @@ import React, { type ReactNode } from "react";
 type SectionTone = "default" | "warning" | "info";
 
 const toneClasses: Record<SectionTone, string> = {
-  default: "border-slate-800 bg-slate-900",
+  default: "premium-surface",
   warning: "border-amber-400/30 bg-amber-400/10",
   info: "border-cyan-400/30 bg-cyan-400/10"
 };
@@ -32,7 +32,7 @@ export function SectionCard({
   const Heading = headingLevel === 3 ? "h3" : "h2";
 
   return (
-    <section className={`min-w-0 rounded-lg border p-4 sm:p-5 ${toneClasses[tone]} ${className}`}>
+    <section className={`min-w-0 rounded-xl border p-4 sm:p-5 ${toneClasses[tone]} ${className}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">

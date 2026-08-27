@@ -1,55 +1,67 @@
 import React from "react";
-import { AuctionStateBadge } from "@/components/AuctionStateBadge";
-import { ModeBadge } from "@/components/ModeBadge";
 import { NftPreview } from "@/components/NftPreview";
-import { InfoRow } from "@/components/ui/InfoRow";
-import { SectionCard } from "@/components/ui/SectionCard";
+import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
 export function AuctionSummary({ auction }: { auction: SerializedAuction }) {
-  const headlinePrice = auction.finalized ? formatEth(auction.highestBid) : formatEth(auction.highestBid);
-  const headlinePriceLabel = auction.finalized ? "Final price" : "Current price";
+  const lifecycle = getAuctionLifecycle(auction);
+  const hasBid = auction.highestBid !== "0";
+  const headlinePriceLabel = auction.finalized ? "Final price" : hasBid ? "Current price" : "Opening price";
+  const headlinePrice = hasBid ? auction.highestBid : auction.startPrice;
+  const nftIdentity = auction.nftMetadata?.metadataName ?? `Token #${auction.tokenId}`;
 
   return (
-    <SectionCard
-      title="Auction overview"
-      badges={
-        <>
-          <ModeBadge variant="read-only" />
-          <AuctionStateBadge state={auction.state} />
-        </>
-      }
-      description="Fast read-only summary of the NFT, status, counterparties, and current auction price."
-      actions={
-        <div className="rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-300">
-          <div className="text-xs text-slate-500">Auction</div>
-          <div className="mt-1 font-mono text-cyan-200">#{auction.auctionId}</div>
-        </div>
-      }
-    >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
-        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-3">
-          <InfoRow label="Seller" value={shortenAddress(auction.seller)} mono />
-          <InfoRow label="NFT" value={shortenAddress(auction.nft)} mono />
-          <InfoRow label="Token ID" value={auction.tokenId} mono />
-          <InfoRow label="Start price" value={formatEth(auction.startPrice)} mono />
-          <InfoRow label={headlinePriceLabel} value={headlinePrice} mono tone="accent" />
-          <InfoRow label="Highest bidder" value={formatAddressOrNone(auction.highestBidder)} mono />
-          <InfoRow label="Start time" value={formatTimestamp(auction.startTime)} />
-          <InfoRow label="Current end time" value={formatTimestamp(auction.endTime)} />
+    <section className="premium-surface overflow-hidden p-3 sm:p-5 lg:p-6" aria-labelledby="auction-overview-title">
+      <div className="grid gap-5 lg:grid-cols-[minmax(360px,1.18fr)_minmax(320px,0.82fr)] lg:items-center lg:gap-7">
+        <div>
+          <NftPreview
+            metadata={auction.nftMetadata}
+            contractAddress={auction.nft}
+            tokenId={auction.tokenId}
+            marketplace
+            showLinks={false}
+          />
         </div>
 
-        <div className="rounded-md border border-slate-800 bg-slate-950 p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="auction-summary-status">{lifecycle.statusLabel}</span>
+          </div>
+
+          <p className="premium-eyebrow mt-5">Lot {auction.auctionId}</p>
+          <h1 id="auction-overview-title" className="editorial-title mt-2 text-4xl leading-none sm:text-5xl">
+            {nftIdentity}
+          </h1>
+          <p className="mt-2 text-sm text-slate-400">Auction #{auction.auctionId}</p>
+
+          <div className="mt-7 grid gap-5 border-y border-slate-800 py-5 sm:grid-cols-2">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">NFT preview</div>
-              <div className="mt-1 text-sm text-slate-300">Metadata preview never affects auction settlement.</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{headlinePriceLabel}</div>
+              <div className="auction-price mt-2">{formatEth(headlinePrice)}</div>
+              <div className="mt-2 text-xs text-slate-500">Start price {formatEth(auction.startPrice)}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Time status</div>
+              <div className="mt-2 text-lg font-bold text-white">{lifecycle.timeStatusLabel}</div>
+              <div className="mt-2 text-xs text-slate-500">Ends {formatTimestamp(auction.endTime)}</div>
             </div>
           </div>
-          <NftPreview metadata={auction.nftMetadata} contractAddress={auction.nft} tokenId={auction.tokenId} compact showLinks={false} />
+
+          <div className="auction-summary-parties mt-5 grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <div className="text-xs text-slate-500">Seller</div>
+              <div className="mt-1 break-all font-mono text-slate-300" title={auction.seller}>{shortenAddress(auction.seller)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Highest bidder</div>
+              <div className="mt-1 break-all font-mono text-slate-300" title={auction.highestBidder}>
+                {formatAddressOrNone(auction.highestBidder)}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </SectionCard>
+    </section>
   );
 }

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
-import { AuctionStateBadge } from "@/components/AuctionStateBadge";
 import { NftPreview } from "@/components/NftPreview";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { getAuctionLifecycle, type AuctionLifecycleTone } from "@/lib/auctionLifecycle";
@@ -16,7 +16,7 @@ import {
   type AuctionSortOption,
   type AuctionStatusFilter
 } from "@/lib/auctionFilters";
-import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
+import { formatEth, shortenAddress } from "@/lib/format";
 
 const DEFAULT_AUCTION_LIST_LIMIT = 25;
 const AUCTION_LIST_LIMIT_OPTIONS = [10, 25, 50, 100] as const;
@@ -105,13 +105,13 @@ export function AuctionList() {
   const metadataUnavailableCount = data?.auctions.filter((auction) => auction.nftMetadata?.status !== "loaded").length ?? 0;
 
   return (
-    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section aria-busy={isLoading} className="min-w-0">
+      <div className="catalog-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">Auctions</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Read by Next.js server routes from the configured target RPC. Auction discovery uses on-chain
-            AuctionCreated events with a bounded fallback.
+          <p className="premium-eyebrow">Marketplace</p>
+          <h2 className="editorial-title mt-1 text-3xl sm:text-4xl">Live auctions</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-400">
+            Browse real auctions from the configured controlled-testnet catalogue.
           </p>
         </div>
 
@@ -119,64 +119,55 @@ export function AuctionList() {
           type="button"
           onClick={loadAuctions}
           disabled={isLoading}
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          className="secondary-link w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isLoading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       {isLoading ? (
-        <StateNotice tone="loading" title="Loading auctions" className="mt-5">
-          Reading the currently configured on-chain discovery window.
-        </StateNotice>
+        <div className="catalog-unavailable mt-4">
+          <div className="w-full max-w-xl">
+            <StateNotice tone="loading" title="Loading auctions" className="text-left">
+              Opening the currently configured on-chain catalogue.
+            </StateNotice>
+          </div>
+        </div>
       ) : null}
 
       {!isLoading && error ? (
-        <StateNotice
-          tone="error"
-          title="Auctions could not be loaded"
-          className="mt-5"
-          action={
-            <button
-              type="button"
-              onClick={loadAuctions}
-              className="inline-flex min-h-9 items-center justify-center rounded-md border border-rose-200/50 px-3 text-xs font-semibold text-white transition hover:border-white"
+        <div className="catalog-unavailable mt-4">
+          <div className="w-full max-w-xl text-left">
+            <p className="premium-eyebrow">Temporary catalogue notice</p>
+            <h3 className="editorial-title mt-1 text-2xl">The live catalogue is temporarily unavailable</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              The marketplace remains available while the configured environment is restored. No auction data is being simulated.
+            </p>
+            <StateNotice
+              tone="error"
+              title="Auctions could not be loaded"
+              className="mt-4 text-left"
+              action={
+                <button
+                  type="button"
+                  onClick={loadAuctions}
+                  className="secondary-link min-h-9"
+                >
+                  Try again
+                </button>
+              }
             >
-              Try again
-            </button>
-          }
-        >
-          {error}
-        </StateNotice>
-      ) : null}
-
-      {!isLoading && data ? (
-        <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-4">
-          <div className="rounded-md bg-slate-950 px-4 py-3">
-            <div className="text-slate-500">Chain ID</div>
-            <div className="mt-1 font-mono text-cyan-200">{data.chainId}</div>
-          </div>
-          <div className="rounded-md bg-slate-950 px-4 py-3">
-            <div className="text-slate-500">AuctionHouse</div>
-            <div className="mt-1 font-mono text-cyan-200" title={data.auctionHouse}>{shortenAddress(data.auctionHouse)}</div>
-          </div>
-          <div className="rounded-md bg-slate-950 px-4 py-3">
-            <div className="text-slate-500">Loaded / shown auctions</div>
-            <div className="mt-1 font-mono text-cyan-200">
-              {filteredAuctions.length} / {data.count}
-            </div>
-          </div>
-          <div className="rounded-md bg-slate-950 px-4 py-3">
-            <div className="text-slate-500">Discovery</div>
-            <div className="mt-1 font-mono text-cyan-200">
-              {data.discovery.strategy === "events" ? "Events" : "Fallback"} / {data.discovery.limit}
-            </div>
+              <details>
+                <summary className="cursor-pointer font-semibold">View infrastructure error</summary>
+                <p className="mt-2 break-all font-mono text-xs">{error}</p>
+              </details>
+            </StateNotice>
           </div>
         </div>
       ) : null}
 
       {!isLoading && data ? (
-        <div className="mt-5 rounded-lg border border-slate-800 bg-slate-950 p-4">
+        <div className="catalog-toolbar mt-4 p-3">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_120px]">
             <label className="grid gap-2 text-sm">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
@@ -279,9 +270,14 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data && data.auctions.length === 0 ? (
-        <EmptyState className="mt-5">
-          No auctions found yet. Create an auction with a test ERC-721 NFT, or run the local demo deployment and refresh this list.
-        </EmptyState>
+        <div className="catalog-unavailable mt-4">
+          <div className="w-full max-w-xl text-left">
+            <p className="premium-eyebrow">Catalogue notice</p>
+            <EmptyState title="The catalogue is ready for its first lot" className="mt-2 text-left">
+              No auctions found yet. Create an auction with a test ERC-721 NFT, or run the local demo deployment and refresh this list.
+            </EmptyState>
+          </div>
+        </div>
       ) : null}
 
       {!isLoading && data && data.auctions.length > 0 && filteredAuctions.length === 0 ? (
@@ -291,74 +287,95 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data && filteredAuctions.length > 0 ? (
-        <div className="mt-5 grid gap-4">
+        <div className="auction-catalog-grid mt-4">
           {filteredAuctions.map((auction) => {
             const lifecycle = getAuctionLifecycle(auction);
+            const hasBid = auction.highestBid !== "0";
+            const priceLabel = auction.finalized ? "Final price" : hasBid ? "Current price" : "Opening price";
+            const displayPrice = hasBid ? auction.highestBid : auction.startPrice;
 
             return (
               <Link
                 key={auction.auctionId}
                 href={`/auctions/${auction.auctionId}`}
-                className="block min-w-0 rounded-lg border border-slate-800 bg-slate-950 p-4 transition hover:border-cyan-500/60"
+                className="auction-market-card group"
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-base font-semibold text-white">Auction #{auction.auctionId}</h3>
-                      <AuctionStateBadge state={auction.state} />
-                      <span
-                        className={`inline-flex min-h-7 items-center rounded-md border px-2.5 text-xs font-semibold ${lifecycleToneClasses[lifecycle.statusTone]}`}
-                      >
-                        {lifecycle.statusLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-left text-sm sm:text-right">
-                    <div className="text-slate-500">Next action</div>
-                    <div className="font-semibold text-cyan-100">{lifecycle.nextActionLabel}</div>
-                  </div>
-                </div>
-
-                <div className="mt-4">
+                <div className="auction-card-art relative">
                   <NftPreview
                     metadata={auction.nftMetadata}
                     contractAddress={auction.nft}
                     tokenId={auction.tokenId}
-                    compact
+                    marketplace
                     showLinks={false}
                   />
-                </div>
-
-                <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-5">
-                  <div>
-                    <div className="text-slate-500">Seller</div>
-                    <div className="break-all font-mono" title={auction.seller}>{shortenAddress(auction.seller)}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500">Start price</div>
-                    <div className="font-mono">{formatEth(auction.startPrice)}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500">Highest bid</div>
-                    <div className="font-mono">{formatEth(auction.highestBid)}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500">Highest bidder</div>
-                    <div className="break-all font-mono" title={auction.highestBidder}>{formatAddressOrNone(auction.highestBidder)}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500">Time</div>
-                    <div>{lifecycle.timeStatusLabel}</div>
+                  <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex min-h-7 items-center rounded-md border px-2.5 text-xs font-semibold ${lifecycleToneClasses[lifecycle.statusTone]}`}
+                    >
+                      {lifecycle.statusLabel}
+                    </span>
                   </div>
                 </div>
 
-                <div className="mt-3 text-xs leading-5 text-slate-500">{lifecycle.nextActionReason}</div>
-                <div className="mt-1 text-xs text-slate-600">End time: {formatTimestamp(auction.endTime)}</div>
+                <div className="flex flex-1 flex-col p-3.5 pt-3">
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                    Auction #{auction.auctionId}
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500">
+                        {priceLabel}
+                      </div>
+                      <div className="auction-price mt-1">{formatEth(displayPrice)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-semibold text-slate-500">Time</div>
+                      <div className="mt-1 text-sm font-bold leading-5 text-white">{lifecycle.timeStatusLabel}</div>
+                    </div>
+                  </div>
+
+                  <div className="auction-card-next mt-3 border-t border-slate-800 pt-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next action</div>
+                    <div className="mt-1 font-editorial text-base font-semibold text-cyan-100">{lifecycle.nextActionLabel}</div>
+                  </div>
+
+                  <span className="brush-link mt-3 w-full">View lot →</span>
+                </div>
               </Link>
             );
           })}
         </div>
+      ) : null}
+
+      {!isLoading && data ? (
+        <TechnicalDisclosure
+          summary="Marketplace data source"
+          description="Technical discovery details for this bounded read-only marketplace window."
+          className="mt-6"
+        >
+          <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md bg-slate-950 px-4 py-3">
+              <div className="text-slate-500">Chain ID</div>
+              <div className="mt-1 font-mono text-cyan-200">{data.chainId}</div>
+            </div>
+            <div className="rounded-md bg-slate-950 px-4 py-3">
+              <div className="text-slate-500">AuctionHouse</div>
+              <div className="mt-1 font-mono text-cyan-200" title={data.auctionHouse}>{shortenAddress(data.auctionHouse)}</div>
+            </div>
+            <div className="rounded-md bg-slate-950 px-4 py-3">
+              <div className="text-slate-500">Loaded / shown auctions</div>
+              <div className="mt-1 font-mono text-cyan-200">
+                {filteredAuctions.length} / {data.count}
+              </div>
+            </div>
+            <div className="rounded-md bg-slate-950 px-4 py-3">
+              <div className="text-slate-500">Discovery</div>
+              <div className="mt-1 font-mono text-cyan-200">
+                {data.discovery.strategy === "events" ? "Events" : "Fallback"} / {data.discovery.limit}
+              </div>
+            </div>
+          </div>
+        </TechnicalDisclosure>
       ) : null}
     </section>
   );

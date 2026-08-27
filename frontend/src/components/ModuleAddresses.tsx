@@ -59,11 +59,11 @@ export function ModuleAddresses() {
   const statusLabel = deployment?.chainId === anvilChainId ? "Local deployment loaded" : "Deployment loaded";
 
   return (
-    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+    <section aria-busy={isLoading} className="min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">Read-only deployment</h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <h2 className="font-editorial text-lg font-semibold text-white">Read-only protocol deployment</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
             Loaded from frontend/public/deployments/{deploymentFileName}. Wallet network is not required for this view.
           </p>
         </div>
@@ -94,7 +94,7 @@ export function ModuleAddresses() {
 
       {!isLoading && deployment ? (
         <>
-          <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
+          <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
             <div className="rounded-md bg-slate-950 px-4 py-3">
               <div className="text-slate-500">Status</div>
               <div className="mt-1 font-medium text-emerald-200">{statusLabel}</div>
@@ -109,7 +109,7 @@ export function ModuleAddresses() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
             {orderedCoreContractKeys.map((key) => (
               <ContractAddressItem key={key} contractKey={key} address={deployment.contracts[key]} />
             ))}

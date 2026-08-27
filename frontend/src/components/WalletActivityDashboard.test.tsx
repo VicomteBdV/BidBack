@@ -95,7 +95,7 @@ describe("WalletActivityDashboard", () => {
 
     render(<WalletActivityDashboard />);
 
-    expect(screen.getByText("My activity / My actions")).toBeInTheDocument();
+    expect(screen.getByText("My activity")).toBeInTheDocument();
     expect(screen.getByText(/Connect a wallet to see auctions and actions related to your address/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -152,7 +152,7 @@ describe("WalletActivityDashboard", () => {
     expect(actionLink).toHaveAttribute("href", "/auctions/1");
     expect(screen.getByRole("heading", { name: "Action required" })).toBeInTheDocument();
     expect(screen.getByText("Auction #1")).toBeInTheDocument();
-    expect(screen.getByText("Available actions").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("Actions available").parentElement).toHaveTextContent("1");
     expect(screen.getByText("Won")).toBeInTheDocument();
   });
 
@@ -179,8 +179,7 @@ describe("WalletActivityDashboard", () => {
     expect(watchingHeading.closest("section")).toHaveTextContent("Auction #1");
     expect(screen.getByText(/not the current highest bidder/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Bid again/i })).not.toBeInTheDocument();
-    expect(screen.getByText("Available actions").parentElement).toHaveTextContent("0");
-    expect(screen.getByText("Auction-specific actions").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("Actions available").parentElement).toHaveTextContent("0");
     expect(screen.queryByRole("link", { name: "Finalize auction" })).not.toBeInTheDocument();
   });
 

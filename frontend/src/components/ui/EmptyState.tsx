@@ -20,7 +20,7 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={`min-w-0 rounded-md border px-4 py-4 text-sm leading-6 ${toneClasses[tone]} ${className}`}>
+    <div className={`min-w-0 rounded-lg border px-4 py-4 text-sm leading-6 ${toneClasses[tone]} ${className}`}>
       {title ? <p className="font-semibold text-white">{title}</p> : null}
       <div className={`${title ? "mt-1" : ""} break-words`}>{children}</div>
     </div>

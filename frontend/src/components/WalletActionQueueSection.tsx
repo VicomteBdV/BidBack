@@ -57,11 +57,11 @@ export function WalletActionQueueSection({
       {items.length === 0 && globalActions.length === 0 ? (
         <EmptyState title={emptyTitle}>{emptyMessage}</EmptyState>
       ) : (
-        <div className="grid min-w-0 gap-3">
+        <div className="activity-queue grid min-w-0">
           {globalActions.map((action) => (
             <article
               key={action.kind}
-              className="min-w-0 rounded-md border border-violet-400/30 bg-violet-400/10 px-4 py-4"
+              className="activity-queue-row activity-queue-credit min-w-0"
             >
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -94,7 +94,7 @@ export function WalletActionQueueSection({
           ))}
 
           {visibleItems.map((item) => (
-            <article key={item.auctionId} className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-4 py-4">
+            <article key={item.auctionId} className="activity-queue-row min-w-0">
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <h4 className="break-words font-semibold text-white">Auction #{item.auctionId}</h4>
@@ -135,7 +135,7 @@ export function WalletActionQueueSection({
                   {item.actions.map((action) => (
                     <li
                       key={action.kind}
-                      className="flex min-w-0 flex-col gap-3 rounded-md border border-slate-800 bg-slate-900 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      className="activity-action-row flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0">
                         <div className="font-semibold text-cyan-100">{action.label}</div>

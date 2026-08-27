@@ -461,21 +461,19 @@ export function WalletCreateAuctionForm() {
   }
 
   return (
-    <section aria-busy={isContextLoading || isBusy} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+    <section aria-busy={isContextLoading || isBusy} className="seller-form-surface min-w-0">
       <div>
-        <h2 className="text-xl font-semibold text-white">Wallet-signed create auction</h2>
+        <p className="premium-eyebrow">Primary listing route</p>
+        <h2 className="editorial-title mt-1 text-2xl">Wallet-signed creation</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          This is the production-target flow. Your wallet signs both transactions: NFTVault approval first, then
-          AuctionHouse.createAuction. No server private key is used and no /api/dev route is called.
+          The owner wallet approves the NFT for custody, then signs the auction creation transaction.
         </p>
       </div>
 
-      <div className="mt-5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
+      <div className="seller-mode-note mt-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
         <p className="mt-1 text-sm leading-6 text-cyan-100/80">
-          Wallet-signed mode requires your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
-          Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev mode there or expose Anvil through a
-          reliable localhost/testnet RPC.
+          Your wallet must be connected to {targetChainLabel}. Ownership and approval are verified before listing.
         </p>
       </div>
 
@@ -622,7 +620,7 @@ export function WalletCreateAuctionForm() {
 
 function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="seller-info-item">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

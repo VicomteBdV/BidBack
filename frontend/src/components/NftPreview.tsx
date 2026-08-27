@@ -9,6 +9,7 @@ type NftPreviewProps = {
   contractAddress: `0x${string}`;
   tokenId: string;
   compact?: boolean;
+  marketplace?: boolean;
   showLinks?: boolean;
 };
 
@@ -24,7 +25,14 @@ function isHttpUrl(value?: string) {
   return Boolean(value && /^https?:\/\//i.test(value));
 }
 
-export function NftPreview({ metadata, contractAddress, tokenId, compact = false, showLinks = true }: NftPreviewProps) {
+export function NftPreview({
+  metadata,
+  contractAddress,
+  tokenId,
+  compact = false,
+  marketplace = false,
+  showLinks = true
+}: NftPreviewProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = metadata?.imageUrl;
 
@@ -45,13 +53,26 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
   const imageFallbackLabel = imageFailed ? "Image unavailable" : metadata?.status === "loaded" ? "No image" : "NFT preview";
   const tokenUriLink = isHttpUrl(metadata?.tokenUriGatewayUrl) ? metadata?.tokenUriGatewayUrl : undefined;
   const externalLink = isHttpUrl(metadata?.externalUrl) ? metadata?.externalUrl : undefined;
+  const showMetadataStatus = !marketplace || metadata?.status !== "loaded";
 
   return (
-    <div className={`min-w-0 rounded-lg border border-slate-800 bg-slate-950 ${compact ? "p-3" : "p-4"}`}>
-      <div className={`grid min-w-0 gap-4 ${compact ? "grid-cols-[64px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]" : "sm:grid-cols-[160px_minmax(0,1fr)]"}`}>
+    <div className={`min-w-0 ${marketplace ? "marketplace-preview" : `rounded-lg border border-slate-800 bg-slate-950 ${compact ? "p-3" : "p-4"}`}`}>
+      <div
+        className={`grid min-w-0 gap-4 ${
+          marketplace
+            ? ""
+            : compact
+              ? "grid-cols-[64px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]"
+              : "sm:grid-cols-[160px_minmax(0,1fr)]"
+        }`}
+      >
         <div
-          className={`flex aspect-square items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-slate-900 ${
-            compact ? "h-16 w-16 sm:h-[72px] sm:w-[72px]" : "w-full"
+          className={`flex items-center justify-center overflow-hidden border border-slate-800 bg-slate-900 ${
+            marketplace
+              ? "marketplace-media aspect-[4/3] w-full"
+              : compact
+                ? "aspect-square h-16 w-16 rounded-md sm:h-[72px] sm:w-[72px]"
+                : "aspect-square w-full rounded-md"
           }`}
         >
           {canShowImage ? (
@@ -71,18 +92,18 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className={marketplace ? "marketplace-identity min-w-0" : "min-w-0"}>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className={`${compact ? "text-sm" : "text-base"} break-words font-semibold text-white`}>{title}</h3>
-            {metadata ? (
+            <h3 className={`${compact ? "text-sm font-bold" : marketplace ? "font-editorial text-xl font-semibold" : "text-base font-bold"} break-words text-white`}>{title}</h3>
+            {metadata && showMetadataStatus ? (
               <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-[11px] font-semibold text-slate-300">
                 {statusLabels[metadata.status]}
               </span>
-            ) : (
+            ) : !metadata ? (
               <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-[11px] font-semibold text-slate-300">
                 Metadata not loaded
               </span>
-            )}
+            ) : null}
           </div>
 
           <div className="mt-1 break-words text-sm text-slate-400">{collectionLabel}</div>
@@ -91,16 +112,20 @@ export function NftPreview({ metadata, contractAddress, tokenId, compact = false
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{metadata.description}</p>
           ) : null}
 
-          <div className={`grid gap-2 text-xs text-slate-500 ${compact ? "mt-2" : "mt-4 sm:grid-cols-2"}`}>
-            <div>
-              <div>Contract</div>
-              <div className="mt-1 break-all font-mono text-slate-300" title={contractAddress}>{shortenAddress(contractAddress)}</div>
+          {marketplace ? (
+            <div className="mt-2 text-xs font-semibold text-slate-500">Token #{tokenId}</div>
+          ) : (
+            <div className={`grid gap-2 text-xs text-slate-500 ${compact ? "mt-2" : "mt-4 sm:grid-cols-2"}`}>
+              <div>
+                <div>Contract</div>
+                <div className="mt-1 break-all font-mono text-slate-300" title={contractAddress}>{shortenAddress(contractAddress)}</div>
+              </div>
+              <div>
+                <div>Token ID</div>
+                <div className="mt-1 break-all font-mono text-slate-300">#{tokenId}</div>
+              </div>
             </div>
-            <div>
-              <div>Token ID</div>
-              <div className="mt-1 break-all font-mono text-slate-300">#{tokenId}</div>
-            </div>
-          </div>
+          )}
 
           {metadata?.errorMessage ? (
             <div className="mt-3 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">

@@ -23,7 +23,7 @@ export function AuctionEconomicsPanel({ auction }: { auction: SerializedAuction 
   const summary = useMemo(() => auction.economicSummary ?? buildAuctionEconomicSummary(auction), [auction]);
 
   return (
-    <section className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+    <section className="premium-surface min-w-0 rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl font-semibold text-white">Economic transparency / Settlement breakdown</h2>
         <ModeBadge variant="read-only" />

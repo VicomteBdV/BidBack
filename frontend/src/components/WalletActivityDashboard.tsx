@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { WalletActionQueueSection } from "@/components/WalletActionQueueSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StateNotice } from "@/components/ui/StateNotice";
@@ -114,16 +115,29 @@ export function WalletActivityDashboard() {
   );
 
   return (
-    <section aria-busy={isLoading} className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:p-5">
+    <section aria-busy={isLoading} className="activity-ledger min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
+          <p className="premium-eyebrow">Collector record</p>
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg font-semibold text-white">My activity / My actions</h2>
+            <h2 className="editorial-title mt-1 text-3xl">My activity</h2>
             <ModeBadge variant="read-only" />
           </div>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Wallet-specific read-only action center. Transaction eligibility is revalidated on each auction detail page.
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+            Auctions, statuses, and available actions linked to the connected wallet.
           </p>
+          {data ? (
+            <dl className="activity-headline-stats mt-3">
+              <div>
+                <dt>Actions available</dt>
+                <dd>{data.activity.actionQueue.availableActionCount}</dd>
+              </div>
+              <div>
+                <dt>Related auctions</dt>
+                <dd>{data.activity.actionQueue.relatedAuctionCount}</dd>
+              </div>
+            </dl>
+          ) : null}
         </div>
 
         <button
@@ -140,60 +154,6 @@ export function WalletActivityDashboard() {
         <EmptyState className="mt-5">
           Connect a wallet to see auctions and actions related to your address. The read-only deployment and auction list remain available without a wallet.
         </EmptyState>
-      ) : null}
-
-      {isConnected ? (
-        <div className="mt-5 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Available actions</div>
-            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
-              {data?.activity.actionQueue.availableActionCount ?? 0}
-            </div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Related auctions</div>
-            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
-              {data?.activity.actionQueue.relatedAuctionCount ?? 0}
-            </div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Auction-specific actions</div>
-            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
-              {data?.activity.actionQueue.auctionActions.reduce((total, item) => total + item.actions.length, 0) ?? 0}
-            </div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Global wallet actions</div>
-            <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">
-              {data?.activity.actionQueue.globalActions.length ?? 0}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {isConnected ? (
-        <div className="mt-3 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Connected wallet</div>
-            <div className="mt-1 font-mono text-cyan-200">{shortenAddress(address)}</div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Target chain</div>
-            <div className="mt-1 font-mono text-cyan-200">{targetChainLabel}</div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Discovery</div>
-            <div className="mt-1 font-mono text-cyan-200">
-              {data ? discoveryLabels[data.discovery.strategy] : "Not loaded"}
-            </div>
-          </div>
-          <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-xs text-slate-500">Auction IDs scanned</div>
-            <div className="mt-1 font-mono text-cyan-200">
-              {data?.discovery.returnedIds ?? 0} / {data?.discovery.limit ?? WALLET_ACTIVITY_LIMIT}
-            </div>
-          </div>
-        </div>
       ) : null}
 
       {wrongNetwork ? (
@@ -222,10 +182,6 @@ export function WalletActivityDashboard() {
 
       {data ? (
         <>
-          <div className="mt-5 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-xs leading-5 text-slate-400">
-            This read model uses bounded on-chain event reads and direct contract reads. It is not a production indexer yet.
-          </div>
-
           {!data.activity.hasActivity ? (
             <EmptyState className="mt-5">
               No activity found for this wallet in the currently scanned auctions. Create an auction with a test ERC-721 NFT or place a bid, then refresh this panel.
@@ -258,15 +214,51 @@ export function WalletActivityDashboard() {
             </div>
           )}
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-            {cards.map((card) => (
-              <div key={card.label} className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-xs text-slate-500">{card.label}</div>
-                <div className="mt-1 font-mono text-xl font-semibold text-cyan-100">{card.value}</div>
-                {card.detail ? <div className="mt-1 font-mono text-xs text-slate-300">{card.detail}</div> : null}
+          <section className="activity-record mt-5" aria-labelledby="activity-record-title">
+            <div>
+              <p className="premium-eyebrow">Auction record</p>
+              <h3 id="activity-record-title" className="font-editorial mt-1 text-xl text-white">Position summary</h3>
+            </div>
+            <dl className="activity-record-grid mt-3">
+              {cards.map((card) => (
+                <div key={card.label}>
+                  <dt>{card.label}</dt>
+                  <dd>{card.value}</dd>
+                  {card.detail ? <span>{card.detail}</span> : null}
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <TechnicalDisclosure
+            summary="Wallet and discovery details"
+            description="Technical context for this bounded read-only activity view."
+            className="mt-5"
+          >
+            <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-md bg-slate-950 px-4 py-3">
+                <div className="text-xs text-slate-500">Connected wallet</div>
+                <div className="mt-1 font-mono text-cyan-200">{shortenAddress(address)}</div>
               </div>
-            ))}
-          </div>
+              <div className="rounded-md bg-slate-950 px-4 py-3">
+                <div className="text-xs text-slate-500">Target chain</div>
+                <div className="mt-1 font-mono text-cyan-200">{targetChainLabel}</div>
+              </div>
+              <div className="rounded-md bg-slate-950 px-4 py-3">
+                <div className="text-xs text-slate-500">Discovery</div>
+                <div className="mt-1 font-mono text-cyan-200">{discoveryLabels[data.discovery.strategy]}</div>
+              </div>
+              <div className="rounded-md bg-slate-950 px-4 py-3">
+                <div className="text-xs text-slate-500">Auction IDs scanned</div>
+                <div className="mt-1 font-mono text-cyan-200">
+                  {data.discovery.returnedIds} / {data.discovery.limit ?? WALLET_ACTIVITY_LIMIT}
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-400">
+              This view uses bounded on-chain event reads and direct contract reads. It is not a production indexer yet.
+            </p>
+          </TechnicalDisclosure>
 
           {activityWarnings.length > 0 ? (
             <StateNotice tone="warning" title="Activity warnings" className="mt-5">

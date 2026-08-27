@@ -1,75 +1,57 @@
-import Link from "next/link";
+import { AppShell } from "@/components/AppShell";
 import { AuctionList } from "@/components/AuctionList";
 import { BidBackIntro } from "@/components/BidBackIntro";
 import { ModuleAddresses } from "@/components/ModuleAddresses";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
+import { TrustDisclosure } from "@/components/TrustDisclosure";
 import { WalletActivityDashboard } from "@/components/WalletActivityDashboard";
-import { WalletButton } from "@/components/WalletButton";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
 
 export default function Home() {
   const deploymentFileName = `${targetChainId}.json`;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-8 px-4 py-6 sm:px-8">
-        <header className="flex flex-col gap-5 border-b border-slate-800 pb-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-wide text-cyan-300">BidBack MVP</p>
-            <h1 className="mt-2 text-3xl font-semibold text-white">Auction demo console</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
-              Test the full BidBack auction lifecycle with read-only auction views, wallet-signed actions, and clear settlement checks.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row lg:items-start">
-            <Link
-              href="/create"
-              className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 sm:w-auto"
-            >
-              Create auction
-            </Link>
-            <WalletButton />
-          </div>
-        </header>
+    <AppShell>
+      <BidBackIntro />
 
-        <BidBackIntro />
+      <div className="home-market-layout">
+        <div id="marketplace-auctions" className="min-w-0 scroll-mt-6">
+          <AuctionList />
+        </div>
 
-        <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-            <h2 className="text-lg font-semibold text-white">Read-only mode</h2>
-            <div className="mt-4 grid gap-3 text-sm text-slate-300">
-              <div className="flex min-w-0 flex-col gap-1 rounded-md bg-slate-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <span>Deployment file</span>
-                <span className="font-mono text-cyan-200">{deploymentFileName}</span>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1 rounded-md bg-slate-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <span>Target chain</span>
-                <span className="font-mono text-cyan-200">{targetChainLabel}</span>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1 rounded-md bg-slate-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <span>Wallet required</span>
-                <span className="font-mono text-cyan-200">No</span>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1 rounded-md bg-slate-950 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <span>Auction reads</span>
-                <span className="font-mono text-cyan-200">Next.js server</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-            <h2 className="text-lg font-semibold text-white">Demo readiness</h2>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-              <p>The read-only deployment view uses the configured server RPC and does not require a connected wallet.</p>
-              <p>Local-dev actions require Anvil 31337 and an explicit server-side enable flag.</p>
-              <p>Wallet-signed actions target {targetChainLabel}; use only valueless assets on public testnets.</p>
-            </div>
-          </div>
-        </section>
-
-        <ModuleAddresses />
-        <WalletActivityDashboard />
-        <AuctionList />
+        <aside className="home-market-aside" aria-label="Participation safeguards">
+          <TrustDisclosure variant="sidebar" />
+        </aside>
       </div>
-    </main>
+
+      <div id="wallet-activity" className="scroll-mt-6">
+        <WalletActivityDashboard />
+      </div>
+
+      <TechnicalDisclosure
+        summary="Protocol and deployment details"
+        description="Read-only verification information for people who want to inspect the configured controlled-testnet environment."
+      >
+        <div className="mb-4 grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Deployment file</div>
+            <div className="mt-1 break-all font-mono text-cyan-200">{deploymentFileName}</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Target chain</div>
+            <div className="mt-1 text-cyan-200">{targetChainLabel}</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Wallet required for browsing</div>
+            <div className="mt-1 text-cyan-200">No</div>
+          </div>
+          <div className="rounded-md bg-slate-950 px-4 py-3">
+            <div className="text-xs text-slate-500">Auction reads</div>
+            <div className="mt-1 text-cyan-200">Next.js server</div>
+          </div>
+        </div>
+        <ModuleAddresses />
+      </TechnicalDisclosure>
+    </AppShell>
   );
 }

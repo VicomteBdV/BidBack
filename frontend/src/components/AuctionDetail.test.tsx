@@ -85,16 +85,24 @@ describe("AuctionDetail", () => {
 
     render(<AuctionDetail auctionId="1" />);
 
-    expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "BidBack Demo NFT #1", level: 1 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wallet-signed actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Local dev actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Auction lifecycle" })).toBeInTheDocument();
+    const lifecycleTimeline = screen.getByRole("list", { name: "Auction lifecycle progression" });
+    expect(lifecycleTimeline).toHaveTextContent("Listed");
+    expect(lifecycleTimeline).toHaveTextContent("Bidding");
+    expect(lifecycleTimeline).toHaveTextContent("Auction ended");
+    expect(lifecycleTimeline).toHaveTextContent("Finalization");
+    expect(lifecycleTimeline).toHaveTextContent("Claims");
+    expect(lifecycleTimeline).toHaveTextContent("Settlement");
+    expect(screen.getByLabelText("Finalization: Current")).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("heading", { name: "Economic transparency / Settlement breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Rules, contracts, and verification details"));
     expect(screen.getByRole("heading", { name: "Auction rules snapshot" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Technical details" })).toBeInTheDocument();
-    expect(screen.getByText("Metadata preview never affects auction settlement.")).toBeInTheDocument();
-    expect(screen.getByText("BidBack Demo NFT #1")).toBeInTheDocument();
+    expect(screen.getAllByText("BidBack Demo NFT #1").length).toBeGreaterThan(0);
     expect(screen.getByText("BidBack Demo Collection (BID)")).toBeInTheDocument();
   });
 
@@ -128,7 +136,7 @@ describe("AuctionDetail", () => {
     );
 
     render(<AuctionDetail auctionId="1" />);
-    expect(await screen.findByRole("heading", { name: "Auction overview" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "BidBack Demo NFT #1", level: 1 })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh auction" }));
 
