@@ -46,8 +46,8 @@ describe("AuctionLifecyclePanel", () => {
     expect(screen.getByLabelText("Settlement: Upcoming")).toBeInTheDocument();
   });
 
-  it("shows the existing settled terminal state as the current milestone", () => {
-    render(
+  it("marks all six milestones completed with no current step once settled", () => {
+    const { container } = render(
       <AuctionLifecyclePanel
         auction={{
           ...baseAuction,
@@ -60,8 +60,14 @@ describe("AuctionLifecyclePanel", () => {
       />
     );
 
+    expect(screen.getByLabelText("Listed: Completed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Bidding: Completed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Auction ended: Completed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Finalization: Completed")).toBeInTheDocument();
     expect(screen.getByLabelText("Claims: Completed")).toBeInTheDocument();
-    expect(screen.getByLabelText("Settlement: Current")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByLabelText("Settlement: Completed")).toBeInTheDocument();
+    expect(container.querySelector('[aria-current="step"]')).not.toBeInTheDocument();
+    expect(screen.getByText("Settled")).toBeInTheDocument();
     expect(screen.getByText("No pending action detected")).toBeInTheDocument();
   });
 });

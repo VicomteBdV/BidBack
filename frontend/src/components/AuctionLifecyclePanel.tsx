@@ -68,7 +68,7 @@ export function AuctionLifecyclePanel({ auction }: { auction: SerializedAuction 
     {
       label: "Settlement",
       detail: isSettled ? "Settlement complete" : "Terminal state after visible claims",
-      state: isSettled ? "current" : "upcoming"
+      state: isSettled ? "completed" : "upcoming"
     }
   ];
 
