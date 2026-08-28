@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StateNotice } from "@/components/ui/StateNotice";
 import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
+import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 import { isLocalAnvilTarget } from "@/lib/chains";
 
@@ -103,6 +104,7 @@ export function AuctionDetail({
 
   const { auction } = data;
   const economics = auction.economics;
+  const lifecycle = getAuctionLifecycle(auction);
 
   return (
     <div aria-busy={isLoading} className="min-w-0 grid gap-5">
@@ -138,14 +140,24 @@ export function AuctionDetail({
           <SectionCard
             title="Wallet-signed actions"
             badges={<ModeBadge variant="wallet-signed" />}
-            description="Choose the action that matches the live auction state. Each transaction is signed directly by the connected wallet; no server private key is used."
+            description="The primary action family follows the authoritative auction lifecycle. Each transaction is reviewed and signed directly by the connected wallet."
             className="premium-surface"
           >
-            <div className="grid gap-5">
+            {lifecycle.canBid ? (
               <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
+            ) : lifecycle.canFinalize ? (
               <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
+            ) : lifecycle.isFinalized && lifecycle.statusLabel !== "Settled" ? (
               <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
-            </div>
+            ) : lifecycle.statusLabel === "Settled" ? (
+              <StateNotice tone="info" title="No pending wallet action">
+                This auction is fully settled. The lifecycle timeline remains the authoritative progression view.
+              </StateNotice>
+            ) : (
+              <StateNotice tone="warning" title="Action state unavailable">
+                Refresh the auction before choosing a wallet-signed action.
+              </StateNotice>
+            )}
           </SectionCard>
 
           {localDevActionsEnabled ? (

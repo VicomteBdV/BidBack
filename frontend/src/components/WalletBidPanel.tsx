@@ -11,11 +11,12 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
-import { getBidActionState } from "@/lib/auctionActionState";
+import { getBidActionState, sameAddress } from "@/lib/auctionActionState";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
@@ -25,6 +26,10 @@ import {
   confirmedTransactionState,
   failedTransactionState,
   pendingTransactionState,
+  receiptWasSuccessful,
+  refreshingTransactionState,
+  revertedTransactionState,
+  unknownConfirmationState,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
 
@@ -111,6 +116,7 @@ export function WalletBidPanel({
 
   const [isLoadingBidData, setIsLoadingBidData] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
+  const [isReviewingBid, setIsReviewingBid] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
@@ -165,6 +171,7 @@ export function WalletBidPanel({
     setMinimumNextBid(null);
     setCurrentCap(null);
     setTxStatus(null);
+    setIsReviewingBid(false);
   }, [address, chainId, auction.auctionId]);
 
   const bidActionState = getBidActionState({
@@ -184,7 +191,7 @@ export function WalletBidPanel({
     bidCapEth
   });
 
-  async function readWalletBidData(successMessage?: string) {
+  async function readWalletBidData(successMessage?: string, rethrow = false) {
     if (!address) throw new Error("Wallet not connected.");
     if (!deployment) throw new Error("Deployment missing or stale.");
     if (!auctionIdBigInt) throw new Error("Invalid auction ID.");
@@ -216,10 +223,13 @@ export function WalletBidPanel({
       setMinimumNextBid(minimumRequired);
       setCurrentCap(walletCap);
       setBidCapEth((current) => current || formatEther(minimumRequired));
-      setMessage(successMessage ?? "Wallet bid data loaded.");
+      if (!rethrow) {
+        setMessage(successMessage ?? "Wallet bid data loaded.");
+      }
     } catch (caught) {
       setMinimumNextBid(null);
       setCurrentCap(null);
+      if (rethrow) throw caught;
       setMessage(walletErrorMessage(caught, "Unable to load wallet bid data."));
     } finally {
       setIsLoadingBidData(false);
@@ -250,6 +260,8 @@ export function WalletBidPanel({
       setMessage("Invalid auction ID.");
       return;
     }
+
+    let submittedHash: `0x${string}` | null = null;
 
     try {
       setIsPlacingBid(true);
@@ -306,27 +318,68 @@ export function WalletBidPanel({
         args: [auctionIdBigInt, liveActionState.parsedBidCap],
         value: liveActionState.valueToSend
       });
+      submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Bid transaction submitted. Waiting for confirmation."));
-      await publicClient.waitForTransactionReceipt({ hash });
+      let receipt;
 
-      await onBidComplete();
-      await readWalletBidData("Wallet bid data refreshed after successful bid.");
-      setMessage(`Wallet-signed bid placed. Value sent: ${formatEth(liveActionState.valueToSend)}.`);
+      try {
+        receipt = await publicClient.waitForTransactionReceipt({ hash });
+      } catch (caught) {
+        setTxStatus(unknownConfirmationState(hash, caught));
+        return;
+      }
+
+      if (!receiptWasSuccessful(receipt)) {
+        setTxStatus(revertedTransactionState(hash));
+        return;
+      }
+
+      setTxStatus(refreshingTransactionState(hash, "Bid confirmed on-chain. Refreshing the auction and wallet cap."));
+      let refreshIncomplete = false;
+
+      try {
+        await onBidComplete();
+      } catch {
+        refreshIncomplete = true;
+      }
+
+      try {
+        await readWalletBidData(undefined, true);
+      } catch {
+        refreshIncomplete = true;
+      }
+
+      setIsReviewingBid(false);
       setTxStatus(
-        confirmedTransactionState(
-          hash,
-          `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Auction data refreshed.`
-        )
+        refreshIncomplete
+          ? confirmedTransactionState(
+              hash,
+              `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Displayed data could not be fully refreshed.`,
+              "Refresh the auction and wallet bid data before your next action."
+            )
+          : confirmedTransactionState(
+              hash,
+              `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Auction and wallet cap refreshed.`,
+              "Monitor the auction or review a later increase if you are outbid."
+            )
       );
     } catch (caught) {
-      const failed = failedTransactionState(caught, "Transaction reverted.");
+      const failed = submittedHash
+        ? unknownConfirmationState(submittedHash, caught)
+        : failedTransactionState(caught, "Bid transaction failed before submission.");
       setTxStatus(failed);
-      setMessage(failed.message);
     } finally {
       setIsPlacingBid(false);
     }
   }
+
+  const isStepUp = currentCap !== null && currentCap > 0n;
+  const highestBidderStatus = address && sameAddress(address, auction.highestBidder)
+    ? "Your wallet is currently the highest bidder"
+    : auction.highestBid === "0"
+      ? "No bid is currently recorded"
+      : "Another wallet is currently the highest bidder";
 
   const statusMessage = !isConnected
     ? "Wallet not connected."
@@ -339,11 +392,11 @@ export function WalletBidPanel({
   return (
     <section aria-busy={isDeploymentLoading || isLoadingBidData || isPlacingBid} className="min-w-0 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-base font-semibold text-white">Wallet-signed bid</h3>
+        <h3 className="text-base font-semibold text-white">{isStepUp ? "Increase bid" : "Place bid"}</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-cyan-100/80">
-        Your wallet signs AuctionHouse.placeBid directly. No server private key is used and no /api/dev route is called.
+        Set the total cap you intend to commit, review the ETH delta, then confirm the transaction in your wallet.
       </p>
 
       <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
@@ -388,7 +441,10 @@ export function WalletBidPanel({
             value={bidCapEth}
             disabled={isLoadingBidData || isPlacingBid}
             aria-describedby={bidActionState.disabledReason ? "wallet-bid-disabled-reason" : "wallet-bid-help"}
-            onChange={(event) => setBidCapEth(event.target.value)}
+            onChange={(event) => {
+              setBidCapEth(event.target.value);
+              setIsReviewingBid(false);
+            }}
             className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
             placeholder={minimumNextBid === null ? "Load minimum bid" : formatEther(minimumNextBid)}
             inputMode="decimal"
@@ -417,14 +473,41 @@ export function WalletBidPanel({
           <button
             type="button"
             disabled={Boolean(bidActionState.disabledReason)}
-            onClick={placeWalletBid}
+            onClick={() => setIsReviewingBid(true)}
             aria-describedby={bidActionState.disabledReason ? "wallet-bid-disabled-reason" : undefined}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
-            {isPlacingBid ? "Placing bid..." : "Place wallet-signed bid"}
+            {isStepUp ? "Review increase" : "Review bid"}
           </button>
         </div>
       </div>
+
+      {isReviewingBid ? (
+        <div className="mt-4">
+          <TransactionReview
+        title={isStepUp ? "Review increase bid" : "Review place bid"}
+            description="Review the total cap and the ETH delta before opening your wallet. The live preflight remains authoritative when you continue."
+            items={[
+              { label: "Auction", value: `#${auction.auctionId}` },
+              { label: "NFT", value: auction.nftMetadata?.metadataName ?? `${shortenAddress(auction.nft)} #${auction.tokenId}` },
+              { label: "Current highest bid", value: formatEth(auction.highestBid) },
+              { label: "Minimum valid total cap", value: minimumNextBid === null ? "Not loaded" : formatEth(minimumNextBid) },
+              { label: "Your current deposited cap", value: currentCap === null ? "Not loaded" : formatEth(currentCap) },
+              { label: "Your new total cap", value: bidActionState.parsedBidCap === null ? "Not available" : formatEth(bidActionState.parsedBidCap) },
+              { label: "ETH sent in this transaction", value: formatEth(bidActionState.valueToSend) },
+              { label: "Network gas", value: "Separate; shown by your wallet" },
+              { label: "Highest bidder status", value: highestBidderStatus }
+            ]}
+            confirmations="Currently expected: 1 wallet confirmation"
+            note="If you do not win, your full resulting cap remains refundable after finalization. Conditional redistribution is separate and may be zero."
+            primaryLabel="Continue in wallet"
+            busy={isPlacingBid}
+            disabled={Boolean(bidActionState.disabledReason) || txStatus?.phase === "confirmation-unknown"}
+            onBack={() => setIsReviewingBid(false)}
+            onConfirm={placeWalletBid}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4">
         <WalletTransactionStatus title="Wallet bid" status={txStatus} />

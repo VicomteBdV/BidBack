@@ -130,7 +130,7 @@ function setupWalletCreateForm({
 
 async function waitForContext() {
   await screen.findByText("NFTVault approval target");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Check ownership and approval" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Review auction" })).toBeEnabled());
 }
 
 describe("WalletCreateAuctionForm", () => {
@@ -151,7 +151,7 @@ describe("WalletCreateAuctionForm", () => {
     setupWalletCreateForm({ chainId: 1 });
 
     expect((await screen.findAllByText(/not on the target chain/)).length).toBeGreaterThan(0);
-    const checkButton = screen.getByRole("button", { name: "Check ownership and approval" });
+    const checkButton = screen.getByRole("button", { name: "Review auction" });
     expect(checkButton).toBeDisabled();
     const reasonId = checkButton.getAttribute("aria-describedby");
     expect(reasonId).toBeTruthy();
@@ -172,9 +172,9 @@ describe("WalletCreateAuctionForm", () => {
       }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
 
-    expect(await screen.findByText("Wallet owns the token and NFTVault is approved.")).toBeInTheDocument();
+    expect(await screen.findByText("Wallet owns the token and NFT custody approval is active.")).toBeInTheDocument();
     expect(readContract).toHaveBeenCalledWith(
       expect.objectContaining({
         functionName: "ownerOf",
@@ -190,12 +190,11 @@ describe("WalletCreateAuctionForm", () => {
 
     await waitForContext();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
 
     expect(await screen.findByText(/Connected wallet is not the token owner/)).toBeInTheDocument();
     expect(screen.getByText("Owner mismatch")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve NFTVault" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Create auction" })).toBeDisabled();
+    expect(screen.queryByText("Review before signing")).not.toBeInTheDocument();
   });
 
   it("shows missing approval and keeps create auction disabled", async () => {
@@ -207,12 +206,12 @@ describe("WalletCreateAuctionForm", () => {
 
     await waitForContext();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
 
-    expect(await screen.findByText("Wallet owns the token. Approve NFTVault before creating the auction.")).toBeInTheDocument();
+    expect(await screen.findByText("Wallet owns the token. Approve NFT custody before creating the auction.")).toBeInTheDocument();
     expect(screen.getByText("Approval required")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve NFTVault" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Create auction" })).toBeDisabled();
+    expect(screen.getByText("Currently expected: 2 wallet confirmations")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve NFT custody" })).toBeEnabled();
   });
 
   it("refreshes approval status after wallet approval confirmation", async () => {
@@ -224,14 +223,15 @@ describe("WalletCreateAuctionForm", () => {
 
     await waitForContext();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
 
-    expect(await screen.findByText("Wallet owns the token. Approve NFTVault before creating the auction.")).toBeInTheDocument();
+    expect(await screen.findByText("Wallet owns the token. Approve NFT custody before creating the auction.")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve NFTVault" }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve NFT custody" }));
 
-    expect(await screen.findByText("Approval confirmed. Approval status refreshed.")).toBeInTheDocument();
-    expect(screen.getByText("NFTVault approved")).toBeInTheDocument();
+    expect(await screen.findByText("NFT custody approval confirmed. Approval status refreshed.")).toBeInTheDocument();
+    expect(screen.getByText("NFT custody approved")).toBeInTheDocument();
+    expect(screen.getByText("Currently expected: 1 wallet confirmation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create auction" })).toBeEnabled();
     expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "approve" }));
     expect(waitForTransactionReceipt).toHaveBeenCalled();
@@ -246,11 +246,42 @@ describe("WalletCreateAuctionForm", () => {
 
     await waitForContext();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check ownership and approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
 
-    expect(await screen.findByText("Wallet owns the token and NFTVault is approved.")).toBeInTheDocument();
-    expect(screen.getByText("NFTVault approved")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve NFTVault" })).toBeDisabled();
+    expect(await screen.findByText("Wallet owns the token and NFT custody approval is active.")).toBeInTheDocument();
+    expect(screen.getByText("NFT custody approved")).toBeInTheDocument();
+    expect(screen.getByText("Currently expected: 1 wallet confirmation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create auction" })).toBeEnabled();
+  });
+
+  it("preserves approval then create call order and contract arguments", async () => {
+    const { writeContract, waitForTransactionReceipt } = setupWalletCreateForm({
+      owner: seller,
+      approvedAddress: zeroAddress,
+      approvedForAll: false
+    });
+
+    await waitForContext();
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    await screen.findByText("Currently expected: 2 wallet confirmations");
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve NFT custody" }));
+    await screen.findByText("NFT custody approval confirmed. Approval status refreshed.");
+    fireEvent.click(screen.getByRole("button", { name: "Create auction" }));
+
+    expect(await screen.findByText("Auction #1 confirmed.")).toBeInTheDocument();
+    expect(vi.mocked(writeContract).mock.calls.map(([request]) => (request as { functionName: string }).functionName)).toEqual([
+      "approve",
+      "createAuction"
+    ]);
+    expect(writeContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      functionName: "approve",
+      args: [testAddresses.nftVault, 2n]
+    }));
+    expect(writeContract).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      functionName: "createAuction",
+      args: [testAddresses.localNft, 2n, 1_000_000_000_000_000_000n, 7200n]
+    }));
+    expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
   });
 });

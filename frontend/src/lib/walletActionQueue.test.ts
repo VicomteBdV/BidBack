@@ -110,7 +110,9 @@ describe("buildWalletActionQueue", () => {
     );
 
     const reward = queue.auctionActions[0].actions.find((action) => action.kind === "claimReward");
+    expect(reward?.label).toBe("Claim redistribution");
     expect(reward?.description).toMatch(/not guaranteed in advance/i);
+    expect(reward?.description).toMatch(/separate from any refund/i);
   });
 
   it("keeps seller proceeds as one global wallet action across auctions", () => {

@@ -231,9 +231,9 @@ function auctionActionsFor(
     if (!rewardState.disabledReason && rewardEntitlement !== null) {
       actions.push({
         kind: "claimReward",
-        label: "Claim reward",
+        label: "Claim redistribution",
         description:
-          "A positive redistribution entitlement is currently claimable. Redistribution depends on auction conditions and is not guaranteed in advance.",
+          "A positive conditional redistribution entitlement is currently claimable. It is separate from any refund and is not guaranteed in advance.",
         amount: rewardEntitlement.toString(),
         priority: 30
       });
@@ -433,7 +433,7 @@ export function buildWalletActionQueue(
   if (positiveAmount(sellerCredit)) {
     globalActions.push({
       kind: "withdrawSellerProceeds",
-      label: "Withdraw seller proceeds",
+      label: "Withdraw proceeds",
       description:
         "This is a global wallet credit held by EscrowVault. It is not attributed to a single auction in this view.",
       amount: sellerCredit ?? "0",
