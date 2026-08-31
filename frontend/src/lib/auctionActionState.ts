@@ -137,18 +137,23 @@ export function getBidActionState({
 
 export function getFinalizeActionState({
   finalized,
+  auctionState,
   endTime,
   nowSeconds,
   ...context
 }: WalletContext & {
   finalized: boolean;
+  auctionState: AuctionStateValue;
   endTime?: string | number | bigint | null;
   nowSeconds?: number | bigint;
 }): ActionState {
   const base = baseWalletDisabledReason(context);
   if (base) return { disabledReason: base };
 
-  if (finalized) return { disabledReason: "Auction is already finalized." };
+  if (finalized || auctionState === 2) return { disabledReason: "Auction is already finalized." };
+
+  // ENDED is authoritative even when the chain clock is ahead of the browser.
+  if (auctionState === 1) return { disabledReason: null };
 
   const parsedEndTime = parseTimestampSeconds(endTime);
   if (parsedEndTime === null) return { disabledReason: "Auction end time is unavailable." };

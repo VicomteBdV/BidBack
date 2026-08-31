@@ -243,6 +243,7 @@ function auctionActionsFor(
   const finalizeState = getFinalizeActionState({
     ...projectionContext,
     finalized: lifecycle.isFinalized,
+    auctionState: auction.state,
     endTime: auction.endTime,
     nowSeconds
   });

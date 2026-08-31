@@ -171,6 +171,7 @@ export function WalletFinalizePanel({
     loading: isDeploymentLoading,
     pending: isFinalizing,
     finalized: auction.finalized,
+    auctionState: auction.state,
     endTime: auction.endTime,
     nowSeconds
   });
@@ -206,6 +207,7 @@ export function WalletFinalizePanel({
         deploymentError: null,
         auctionIdValid: true,
         finalized: auction.finalized,
+        auctionState: auction.state,
         endTime: auction.endTime,
         nowSeconds: Math.floor(Date.now() / 1000)
       });

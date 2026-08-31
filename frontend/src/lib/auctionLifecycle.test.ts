@@ -123,6 +123,18 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.canFinalize).toBe(true);
   });
 
+  it("treats ENDED as ready to finalize even before the browser reaches the end time", () => {
+    const lifecycle = getAuctionLifecycle(
+      baseAuction({ state: 1, stateLabel: "ENDED", endTime: "2000" }),
+      1500
+    );
+
+    expect(lifecycle.statusLabel).toBe("Ready to finalize");
+    expect(lifecycle.currentPhase).toBe("Finalization");
+    expect(lifecycle.canBid).toBe(false);
+    expect(lifecycle.canFinalize).toBe(true);
+  });
+
   it("describes a finalized auction with claimable lifecycle items", () => {
     const lifecycle = getAuctionLifecycle(
       baseAuction({

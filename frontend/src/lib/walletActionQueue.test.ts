@@ -210,6 +210,19 @@ describe("buildWalletActionQueue", () => {
     expect(queue.auctionActions[0].actions.map((action) => action.kind)).toEqual(["finalize"]);
   });
 
+  it("offers finalization for a related ENDED auction before the browser reaches the end time", () => {
+    const queue = buildWalletActionQueue(
+      [baseAuction({ state: 1, stateLabel: "ENDED", endTime: "2000" })],
+      testAddresses.seller,
+      { nowSeconds: 1500 }
+    );
+
+    expect(queue.auctionActions).toHaveLength(1);
+    expect(queue.auctionActions[0].lifecycleLabel).toBe("Ready to finalize");
+    expect(queue.auctionActions[0].actions.map((action) => action.kind)).toEqual(["finalize"]);
+    expect(queue.watching).toHaveLength(0);
+  });
+
   it("puts settled auctions in history, newest first", () => {
     const queue = buildWalletActionQueue(
       [

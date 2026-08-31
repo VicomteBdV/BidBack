@@ -58,6 +58,7 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext({ wrongNetwork: true }),
         finalized: false,
+        auctionState: 1,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
@@ -135,6 +136,7 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: false,
+        auctionState: 0,
         endTime: "2000",
         nowSeconds: 1000
       }).disabledReason
@@ -144,6 +146,7 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: true,
+        auctionState: 1,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
@@ -153,10 +156,55 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: false,
+        auctionState: 0,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
     ).toBeNull();
+  });
+
+  it("allows ENDED auctions to finalize before the browser reaches the end time", () => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(),
+        finalized: false,
+        auctionState: 1,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBeNull();
+  });
+
+  it("blocks on-chain FINALIZED state even when the finalized flag is stale", () => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(),
+        finalized: false,
+        auctionState: 2,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBe("Auction is already finalized.");
+  });
+
+  it.each<[Partial<WalletActionContext>, string]>([
+    [{ isConnected: false }, "Wallet not connected."],
+    [{ wrongNetwork: true }, "Wallet connected, but not on the target chain (Base Sepolia)."],
+    [{ deploymentError: "Deployment read failed." }, "Deployment read failed."],
+    [{ deploymentLoaded: false }, "Deployment missing or stale."],
+    [{ auctionIdValid: false }, "Invalid auction ID."],
+    [{ loading: true }, "Wallet data is loading."],
+    [{ pending: true }, "Another wallet transaction is pending."]
+  ])("preserves wallet guards for ENDED auctions: %j", (overrides, reason) => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(overrides),
+        finalized: false,
+        auctionState: 1,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBe(reason);
   });
 
   it("allows NFT claim only for the expected claimant after finalization", () => {

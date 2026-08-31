@@ -4,6 +4,7 @@ import { createPublicClient, createWalletClient } from "viem";
 import { useAccount } from "wagmi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WalletFinalizePanel } from "@/components/WalletFinalizePanel";
+import type { SerializedAuction } from "@/lib/auctionTypes";
 import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
 vi.mock("wagmi", () => ({ useAccount: vi.fn() }));
@@ -19,7 +20,10 @@ vi.mock("viem", async () => {
 
 const txHash = "0x2222222222222222222222222222222222222222222222222222222222222222" as const;
 
-function setupFinalize(onFinalizeComplete = vi.fn(async () => undefined)) {
+function setupFinalize(
+  onFinalizeComplete = vi.fn(async () => undefined),
+  auctionOverrides: Partial<SerializedAuction> = {}
+) {
   vi.mocked(useAccount).mockReturnValue({
     address: testAddresses.primaryBidder,
     chainId: 31337,
@@ -40,7 +44,7 @@ function setupFinalize(onFinalizeComplete = vi.fn(async () => undefined)) {
 
   render(
     <WalletFinalizePanel
-      auction={{ ...auctionDetailFixture.auction, state: 1, stateLabel: "ENDED", finalized: false, endTime: "1" }}
+      auction={{ ...auctionDetailFixture.auction, state: 1, stateLabel: "ENDED", finalized: false, endTime: "1", ...auctionOverrides }}
       onFinalizeComplete={onFinalizeComplete}
     />
   );
@@ -66,6 +70,26 @@ describe("WalletFinalizePanel", () => {
       functionName: "finalizeAuction",
       args: [1n]
     })));
+  });
+
+  it("allows review and submission for ENDED auctions while the browser clock is before endTime", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const { writeContract, onFinalizeComplete } = setupFinalize(undefined, { endTime: "2000" });
+    const reviewButton = await screen.findByRole("button", { name: "Review finalization" });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    expect(screen.queryByText("Auction is not expired yet.")).not.toBeInTheDocument();
+
+    fireEvent.click(reviewButton);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    await waitFor(() => expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({
+      address: localDeploymentFixture.contracts.auctionHouse,
+      functionName: "finalizeAuction",
+      args: [1n]
+    })));
+    expect(await screen.findByText("Transaction confirmed")).toBeInTheDocument();
+    expect(writeContract).toHaveBeenCalledTimes(1);
+    expect(onFinalizeComplete).toHaveBeenCalledTimes(1);
   });
 
   it("keeps finalization confirmed when lifecycle refresh fails", async () => {
