@@ -1,8 +1,9 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createPublicClient, createWalletClient } from "viem";
 import { useAccount } from "wagmi";
 import { describe, expect, it, vi } from "vitest";
+import { CreateAuctionFields } from "@/components/CreateAuctionFields";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
@@ -129,7 +130,7 @@ function setupWalletCreateForm({
 }
 
 async function waitForContext() {
-  await screen.findByText("NFTVault approval target");
+  await screen.findByText("Create network and contract details");
   await waitFor(() => expect(screen.getByRole("button", { name: "Review auction" })).toBeEnabled());
 }
 
@@ -145,6 +146,34 @@ describe("WalletCreateAuctionForm", () => {
     const errorId = nftContract.getAttribute("aria-describedby");
     expect(errorId).toBeTruthy();
     expect(document.getElementById(errorId!)).toHaveTextContent("Invalid NFT contract address");
+  });
+
+  it("shows days and hours and keeps the human duration in the creation review", async () => {
+    setupWalletCreateForm({ approvedAddress: testAddresses.nftVault });
+    await waitForContext();
+
+    const days = screen.getByLabelText("Days");
+    const hours = screen.getByLabelText("Hours");
+    expect(days).toHaveValue(0);
+    expect(hours).toHaveValue("2");
+    expect(days).toHaveClass("w-full", "min-w-0");
+    expect(hours).toHaveClass("w-full", "min-w-0");
+    expect(screen.queryByLabelText("Duration in seconds")).not.toBeInTheDocument();
+    expect(screen.queryByText(/7200 seconds/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Total duration:/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+
+    expect(await screen.findByText("Wallet owns the token and NFT custody approval is active.")).toBeInTheDocument();
+    const review = screen.getByRole("region", { name: "Create auction" });
+    expect(within(review).getByText("Duration").nextElementSibling).toHaveTextContent("2 hours");
+  });
+
+  it("keeps create deployment details collapsed by default", async () => {
+    setupWalletCreateForm();
+    await waitForContext();
+    const summary = screen.getByText("Create network and contract details");
+
+    expect(summary.closest("details")).not.toHaveAttribute("open");
   });
 
   it("explains the expected network while preserving disabled wallet actions", async () => {
@@ -229,7 +258,7 @@ describe("WalletCreateAuctionForm", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Approve NFT custody" }));
 
-    expect(await screen.findByText("NFT custody approval confirmed. Approval status refreshed.")).toBeInTheDocument();
+    expect(await screen.findByText("NFT custody approved.")).toBeInTheDocument();
     expect(screen.getByText("NFT custody approved")).toBeInTheDocument();
     expect(screen.getByText("Currently expected: 1 wallet confirmation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create auction" })).toBeEnabled();
@@ -262,14 +291,18 @@ describe("WalletCreateAuctionForm", () => {
     });
 
     await waitForContext();
+    fireEvent.change(screen.getByLabelText("Days"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Hours"), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
     await screen.findByText("Currently expected: 2 wallet confirmations");
+    const review = screen.getByRole("region", { name: "Create auction" });
+    expect(within(review).getByText("Duration").nextElementSibling).toHaveTextContent("2 days 3 hours");
 
     fireEvent.click(screen.getByRole("button", { name: "Approve NFT custody" }));
-    await screen.findByText("NFT custody approval confirmed. Approval status refreshed.");
+    await screen.findByText("NFT custody approved.");
     fireEvent.click(screen.getByRole("button", { name: "Create auction" }));
 
-    expect(await screen.findByText("Auction #1 confirmed.")).toBeInTheDocument();
+    expect(await screen.findByText("Auction #1 created.")).toBeInTheDocument();
     expect(vi.mocked(writeContract).mock.calls.map(([request]) => (request as { functionName: string }).functionName)).toEqual([
       "approve",
       "createAuction"
@@ -280,8 +313,67 @@ describe("WalletCreateAuctionForm", () => {
     }));
     expect(writeContract).toHaveBeenNthCalledWith(2, expect.objectContaining({
       functionName: "createAuction",
-      args: [testAddresses.localNft, 2n, 1_000_000_000_000_000_000n, 7200n]
+      args: [testAddresses.localNft, 2n, 1_000_000_000_000_000_000n, 183600n]
     }));
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps zero and invalid day values from reaching auction creation", async () => {
+    const { writeContract } = setupWalletCreateForm({ approvedAddress: testAddresses.nftVault });
+    await waitForContext();
+
+    const days = screen.getByLabelText("Days");
+    const hours = screen.getByLabelText("Hours");
+    const reviewButton = screen.getByRole("button", { name: "Review auction" });
+
+    fireEvent.change(hours, { target: { value: "0" } });
+    expect(reviewButton).toBeDisabled();
+    const durationGroup = screen.getByRole("group", { name: "Duration" });
+    const errorId = durationGroup.getAttribute("aria-describedby");
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById(errorId!)).toHaveTextContent("Duration must be greater than zero.");
+
+    for (const invalidDays of ["-1", "1.5", "not-a-number"]) {
+      fireEvent.change(days, { target: { value: invalidDays } });
+      expect(reviewButton).toBeDisabled();
+      fireEvent.click(reviewButton);
+    }
+
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it("rounds a non-aligned external duration up and synchronizes the canonical seconds", async () => {
+    const onDurationSecondsChange = vi.fn();
+
+    function DurationHarness() {
+      const [durationSeconds, setDurationSeconds] = React.useState("7201");
+
+      return (
+        <>
+          <CreateAuctionFields
+            nftContract={testAddresses.localNft}
+            tokenId="2"
+            startPriceEth="1"
+            durationSeconds={durationSeconds}
+            onNftContractChange={vi.fn()}
+            onTokenIdChange={vi.fn()}
+            onStartPriceEthChange={vi.fn()}
+            onDurationSecondsChange={(value) => {
+              onDurationSecondsChange(value);
+              setDurationSeconds(value);
+            }}
+          />
+          <output data-testid="canonical-duration">{durationSeconds}</output>
+        </>
+      );
+    }
+
+    render(<DurationHarness />);
+
+    await waitFor(() => expect(onDurationSecondsChange).toHaveBeenCalledWith("10800"));
+    expect(screen.getByLabelText("Days")).toHaveValue(0);
+    expect(screen.getByLabelText("Hours")).toHaveValue("3");
+    expect(screen.queryByText(/^Total duration:/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("canonical-duration")).toHaveTextContent("10800");
   });
 });

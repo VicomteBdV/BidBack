@@ -3,6 +3,8 @@ import { formatDurationSeconds, isZeroAddress } from "@/lib/format";
 
 export type AuctionLifecycleTone = "success" | "warning" | "info" | "complete" | "neutral";
 
+export type AuctionTimeInput = string | number | bigint;
+
 export type AuctionLifecycle = {
   statusLabel: string;
   statusTone: AuctionLifecycleTone;
@@ -26,12 +28,18 @@ export type AuctionLifecycle = {
   claimableItems: string[];
 };
 
-function parseBigInt(value?: string | bigint | number | null) {
+function parseOptionalBigInt(value?: string | bigint | number | null) {
+  if (value === undefined || value === null) return null;
+
   try {
-    return typeof value === "bigint" ? value : BigInt(value ?? "0");
+    return typeof value === "bigint" ? value : BigInt(value);
   } catch {
-    return 0n;
+    return null;
   }
+}
+
+function parseBigInt(value?: string | bigint | number | null) {
+  return parseOptionalBigInt(value) ?? 0n;
 }
 
 function parseTimestampSeconds(value?: string | bigint | number | null) {
@@ -43,23 +51,38 @@ function gtZero(value?: string | bigint | number | null) {
   return parseBigInt(value) > 0n;
 }
 
-function isAuctionExpired(endTime?: string | bigint | number | null, nowSeconds?: number | bigint) {
+export function resolveAuctionSnapshotNowSeconds(
+  auctions: readonly Pick<SerializedAuction, "chainTimestamp">[],
+  nowSeconds?: AuctionTimeInput
+): bigint {
+  const explicitNow = parseOptionalBigInt(nowSeconds);
+  if (explicitNow !== null) return explicitNow;
+
+  for (const auction of auctions) {
+    const chainTimestamp = parseTimestampSeconds(auction.chainTimestamp);
+    if (chainTimestamp !== null) return chainTimestamp;
+  }
+
+  return BigInt(Math.floor(Date.now() / 1000));
+}
+
+function isAuctionExpired(endTime: string | bigint | number | null | undefined, nowSeconds: bigint) {
   const parsedEndTime = parseTimestampSeconds(endTime);
   if (parsedEndTime === null) return false;
 
-  const now = typeof nowSeconds === "bigint" ? nowSeconds : BigInt(nowSeconds ?? Math.floor(Date.now() / 1000));
-  return now >= parsedEndTime;
+  return nowSeconds >= parsedEndTime;
 }
 
-function timeStatusLabel(auction: SerializedAuction, nowSeconds?: number | bigint) {
+function timeStatusLabel(auction: SerializedAuction, nowSeconds: bigint) {
+  if (auction.finalized || auction.state === 2) return "Auction finalized";
+  if (auction.state === 1) return "Auction ended";
+
   const endTime = parseTimestampSeconds(auction.endTime);
   if (endTime === null) return "End time unavailable";
 
-  const now = typeof nowSeconds === "bigint" ? nowSeconds : BigInt(nowSeconds ?? Math.floor(Date.now() / 1000));
+  if (nowSeconds >= endTime) return "Expired";
 
-  if (now >= endTime) return "Expired";
-
-  return `${formatDurationSeconds(endTime - now)} remaining`;
+  return `${formatDurationSeconds(endTime - nowSeconds)} remaining`;
 }
 
 function hasBidderRefund(auction: SerializedAuction, key: "primaryBidder" | "secondBidder") {
@@ -72,10 +95,11 @@ function hasBidderReward(auction: SerializedAuction, key: "primaryBidder" | "sec
   return Boolean(bidder && gtZero(bidder.rewardEntitlement) && !bidder.rewardClaimed);
 }
 
-export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: number | bigint): AuctionLifecycle {
+export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: AuctionTimeInput): AuctionLifecycle {
+  const resolvedNowSeconds = resolveAuctionSnapshotNowSeconds([auction], nowSeconds);
   const isOpen = auction.state === 0 && !auction.finalized;
   const isFinalized = auction.finalized || auction.state === 2;
-  const isExpired = isAuctionExpired(auction.endTime, nowSeconds) || auction.state === 1;
+  const isExpired = isAuctionExpired(auction.endTime, resolvedNowSeconds) || auction.state === 1;
   const canBid = isOpen && !isExpired;
   const canFinalize = !isFinalized && isExpired;
 
@@ -104,7 +128,7 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: num
       currentPhase: "Settled",
       nextActionLabel: "No pending action detected",
       nextActionReason: "The auction is finalized, the NFT is claimed, and no claimable amounts are currently visible.",
-      timeStatusLabel: timeStatusLabel(auction, nowSeconds),
+      timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,
       isFinalized,
@@ -131,7 +155,7 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: num
       nextActionReason: hasAnyClaimOrWithdrawal
         ? "The auction is finalized. Eligible wallets can now use pull-based claims or withdrawals."
         : "The auction is finalized. No claimable amount is currently visible in the read-only data.",
-      timeStatusLabel: timeStatusLabel(auction, nowSeconds),
+      timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,
       isFinalized,
@@ -156,7 +180,7 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: num
       currentPhase: "Finalization",
       nextActionLabel: "Finalize auction",
       nextActionReason: "The end time has passed. Finalization opens NFT, refund, reward, proceeds, and fee claims.",
-      timeStatusLabel: timeStatusLabel(auction, nowSeconds),
+      timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,
       isFinalized,
@@ -181,7 +205,7 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: num
       currentPhase: "Bidding",
       nextActionLabel: winnerAddress ? "Outbid current highest bidder" : "Place first bid",
       nextActionReason: "The auction is open and accepts step-up bid caps until the end time.",
-      timeStatusLabel: timeStatusLabel(auction, nowSeconds),
+      timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,
       isFinalized,
@@ -205,7 +229,7 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: num
     currentPhase: "Awaiting refresh",
     nextActionLabel: "Refresh auction state",
     nextActionReason: "The current read-only data is not enough to infer the next action with confidence.",
-    timeStatusLabel: timeStatusLabel(auction, nowSeconds),
+    timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
     isOpen,
     isExpired,
     isFinalized,

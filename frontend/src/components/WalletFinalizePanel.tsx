@@ -10,6 +10,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
@@ -45,6 +46,17 @@ function walletErrorMessage(error: unknown, fallback: string) {
   }
 
   return error instanceof Error ? error.message : fallback;
+}
+
+function parseChainTimestamp(value?: string) {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+
+  try {
+    const parsed = BigInt(value);
+    return parsed > 0n ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getInjectedEthereum(): EIP1193Provider {
@@ -108,22 +120,14 @@ export function WalletFinalizePanel({
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
-  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
+  const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
     auction.auctionId
   ]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNowSeconds(Math.floor(Date.now() / 1000));
-    }, 10_000);
-
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -173,7 +177,7 @@ export function WalletFinalizePanel({
     finalized: auction.finalized,
     auctionState: auction.state,
     endTime: auction.endTime,
-    nowSeconds
+    nowSeconds: auctionChainTimestamp
   });
 
   async function finalizeAuction() {
@@ -199,6 +203,10 @@ export function WalletFinalizePanel({
       setMessage(null);
       setTxStatus(null);
 
+      const { provider, publicClient, walletClient } = createBrowserClients(address);
+      await verifyWalletChain(provider);
+      const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+
       const liveState = getFinalizeActionState({
         isConnected,
         wrongNetwork,
@@ -209,15 +217,13 @@ export function WalletFinalizePanel({
         finalized: auction.finalized,
         auctionState: auction.state,
         endTime: auction.endTime,
-        nowSeconds: Math.floor(Date.now() / 1000)
+        nowSeconds: latestBlock.timestamp
       });
 
       if (liveState.disabledReason) {
         throw new Error(liveState.disabledReason);
       }
 
-      const { provider, publicClient, walletClient } = createBrowserClients(address);
-      await verifyWalletChain(provider);
       setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));
 
       const hash = await walletClient.writeContract({
@@ -257,12 +263,12 @@ export function WalletFinalizePanel({
         refreshIncomplete
           ? confirmedTransactionState(
               hash,
-              "Auction finalization confirmed. Displayed lifecycle and claim data could not be fully refreshed.",
+              "Auction finalized, but displayed lifecycle and claim data could not be fully refreshed.",
               "Refresh the auction before starting a claim or withdrawal."
             )
           : confirmedTransactionState(
               hash,
-              "Auction finalized. Economic state and claim data refreshed.",
+              "Auction finalized.",
               "Eligible wallets can now use the separate pull-based claim and withdrawal actions."
             )
       );
@@ -299,13 +305,22 @@ export function WalletFinalizePanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="Auction end time" value={formatTimestamp(auction.endTime)} />
         <InfoItem label="Finalized" value={auction.finalized ? "Yes" : "No"} />
-        <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
       </div>
+
+      <TechnicalDisclosure
+        summary="Finalization network and contract details"
+        description="Technical connection details for diagnosing permissionless finalization."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+        </div>
+      </TechnicalDisclosure>
 
       {finalizeState.disabledReason ? (
         <StateNotice id="wallet-finalize-disabled-reason" tone="warning" title="Finalization unavailable" className="mt-4">

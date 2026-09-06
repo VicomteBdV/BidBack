@@ -21,13 +21,17 @@ const txHash = "0x33333333333333333333333333333333333333333333333333333333333333
 
 function setupClaims({
   refundableAmount = 1_000_000_000_000_000_000n,
+  refundClaimed = false,
   rewardEntitlement = 100_000_000_000_000_000n,
+  rewardClaimed = false,
   sellerCredit = 2_000_000_000_000_000_000n,
   protocolFeeCredit = 10_000_000_000_000_000n,
   onActionComplete = vi.fn(async () => undefined)
 }: {
   refundableAmount?: bigint;
+  refundClaimed?: boolean;
   rewardEntitlement?: bigint;
+  rewardClaimed?: boolean;
   sellerCredit?: bigint;
   protocolFeeCredit?: bigint;
   onActionComplete?: () => Promise<void>;
@@ -37,9 +41,9 @@ function setupClaims({
 
   const readContract = vi.fn(async ({ functionName }: { functionName: string }) => {
     if (functionName === "refundableAmount") return refundableAmount;
-    if (functionName === "refundClaimed") return false;
+    if (functionName === "refundClaimed") return refundClaimed;
     if (functionName === "entitlementOf") return rewardEntitlement;
-    if (functionName === "claimed") return false;
+    if (functionName === "claimed") return rewardClaimed;
     if (functionName === "sellerCredits") return sellerCredit;
     if (functionName === "protocolFeeCredits") return protocolFeeCredit;
     throw new Error(`Unexpected read: ${functionName}`);
@@ -92,7 +96,34 @@ describe("WalletClaimPanel", () => {
     ]) {
       await waitFor(() => expect(screen.getByRole("button", { name })).toBeEnabled());
     }
+    expect(screen.getByRole("button", { name: "Review claim refund" })).toHaveClass("transaction-secondary-action");
+    expect(screen.queryByText("Wallet claim data loaded.")).not.toBeInTheDocument();
     expect(screen.getAllByText(/global credit/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows zero available and offers no new signature after refund and redistribution claims", async () => {
+    const { writeContract } = setupClaims({ refundClaimed: true, rewardClaimed: true });
+
+    await screen.findByText("Refund already claimed.");
+    expect(screen.getByText("Refund available").nextElementSibling).toHaveTextContent("0 ETH");
+    expect(screen.getByText("Redistribution available").nextElementSibling).toHaveTextContent("0 ETH");
+    expect(screen.getByRole("button", { name: "Review claim refund" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Review claim redistribution" })).toBeDisabled();
+    expect(screen.getByText("Redistribution already claimed.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue in wallet" })).not.toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Claim network, contract, and recorded amount details"));
+    expect(screen.getByText("Recorded refundable amount").nextElementSibling).toHaveTextContent("1 ETH");
+    expect(screen.getByText("Recorded redistribution entitlement").nextElementSibling).toHaveTextContent("0.1 ETH");
+  });
+
+  it("keeps claim diagnostics collapsed by default", async () => {
+    setupClaims();
+    await screen.findByText("Global seller proceeds credit");
+    const summary = screen.getByText("Claim network, contract, and recorded amount details");
+
+    expect(summary.closest("details")).not.toHaveAttribute("open");
   });
 
   it("keeps refund and redistribution separate and preserves their contract calls", async () => {
@@ -110,6 +141,8 @@ describe("WalletClaimPanel", () => {
       functionName: "claimRefund",
       args: [1n]
     })));
+    expect(await screen.findByText("Refund claimed.")).toBeInTheDocument();
+    expect(screen.queryByText(/Action state refreshed/)).not.toBeInTheDocument();
   });
 
   it("treats zero redistribution as a non-error state and offers no claim signature", async () => {

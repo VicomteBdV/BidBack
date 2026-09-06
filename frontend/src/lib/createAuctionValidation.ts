@@ -1,4 +1,5 @@
 import { isAddress, parseEther, type Address } from "viem";
+import { formatDurationSeconds } from "@/lib/format";
 
 const UINT64_MAX = (1n << 64n) - 1n;
 
@@ -62,7 +63,7 @@ export function getCreateAuctionValidationIssue(
     if (duration < minAuctionDuration) {
       return {
         field: "durationSeconds",
-        message: `Duration below minimum. minAuctionDuration is ${minAuctionDuration.toString()} seconds.`
+        message: `Duration must be at least ${formatDurationSeconds(minAuctionDuration)}.`
       };
     }
   }

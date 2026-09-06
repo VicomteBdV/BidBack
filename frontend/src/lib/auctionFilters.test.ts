@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { filterAndSortAuctions } from "@/lib/auctionFilters";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { testAddresses } from "@/test/fixtures";
@@ -39,6 +39,10 @@ function run(auctions: SerializedAuction[], overrides: Partial<Parameters<typeof
 }
 
 describe("auctionFilters", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("filters open auctions", () => {
     const result = run([
       auctionFixture({ auctionId: "1", endTime: "2500" }),
@@ -61,6 +65,30 @@ describe("auctionFilters", () => {
     });
 
     expect(result.map((auction) => auction.auctionId)).toEqual(["2"]);
+  });
+
+  it("uses snapshot chain time for status filters when explicit time is absent", () => {
+    vi.spyOn(Date, "now").mockReturnValue(3_000_000);
+    const auctions = [
+      auctionFixture({ auctionId: "1", chainTimestamp: "1500", endTime: "2000" }),
+      auctionFixture({ auctionId: "2", chainTimestamp: "1500", endTime: "1400" })
+    ];
+
+    expect(run(auctions, { status: "open", nowSeconds: undefined }).map((auction) => auction.auctionId)).toEqual([
+      "1"
+    ]);
+    expect(
+      run(auctions, { status: "readyToFinalize", nowSeconds: undefined }).map((auction) => auction.auctionId)
+    ).toEqual(["2"]);
+  });
+
+  it("prioritizes explicit time over snapshot chain time", () => {
+    const result = run([auctionFixture({ chainTimestamp: "2500", endTime: "2000" })], {
+      status: "open",
+      nowSeconds: "1500"
+    });
+
+    expect(result.map((auction) => auction.auctionId)).toEqual(["1"]);
   });
 
   it("filters finalized and settled auctions", () => {
@@ -218,5 +246,18 @@ describe("auctionFilters", () => {
     expect(run(auctions, { sort: "oldest" }).map((auction) => auction.auctionId)).toEqual(["1", "2", "3"]);
     expect(run(auctions, { sort: "endingSoon" }).map((auction) => auction.auctionId)).toEqual(["2", "3", "1"]);
     expect(run(auctions, { sort: "highestBid" }).map((auction) => auction.auctionId)).toEqual(["2", "3", "1"]);
+  });
+
+  it("uses snapshot chain time when sorting auctions by ending soon", () => {
+    vi.spyOn(Date, "now").mockReturnValue(3_000_000);
+    const auctions = [
+      auctionFixture({ auctionId: "1", chainTimestamp: "1500", endTime: "1400" }),
+      auctionFixture({ auctionId: "2", chainTimestamp: "1500", endTime: "2500" })
+    ];
+
+    expect(run(auctions, { sort: "endingSoon", nowSeconds: undefined }).map((auction) => auction.auctionId)).toEqual([
+      "2",
+      "1"
+    ]);
   });
 });

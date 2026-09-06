@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
@@ -47,6 +48,17 @@ function walletErrorMessage(error: unknown, fallback: string) {
   }
 
   return error instanceof Error ? error.message : fallback;
+}
+
+function parseChainTimestamp(value?: string) {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+
+  try {
+    const parsed = BigInt(value);
+    return parsed > 0n ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getInjectedEthereum(): EIP1193Provider {
@@ -111,8 +123,7 @@ export function WalletBidPanel({
 
   const [minimumNextBid, setMinimumNextBid] = useState<bigint | null>(null);
   const [currentCap, setCurrentCap] = useState<bigint | null>(null);
-  const [bidCapEth, setBidCapEth] = useState("");
-  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
+  const [bidAmountEth, setBidAmountEth] = useState("");
 
   const [isLoadingBidData, setIsLoadingBidData] = useState(false);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
@@ -122,19 +133,12 @@ export function WalletBidPanel({
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionOpen = auction.state === 0;
+  const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
 
   const auctionIdBigInt = useMemo(() => {
     if (!/^\d+$/.test(auction.auctionId)) return null;
     return BigInt(auction.auctionId);
   }, [auction.auctionId]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNowSeconds(Math.floor(Date.now() / 1000));
-    }, 10_000);
-
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -170,10 +174,12 @@ export function WalletBidPanel({
   useEffect(() => {
     setMinimumNextBid(null);
     setCurrentCap(null);
+    setBidAmountEth("");
     setTxStatus(null);
     setIsReviewingBid(false);
   }, [address, chainId, auction.auctionId]);
 
+  const isStepUp = currentCap !== null && currentCap > 0n;
   const bidActionState = getBidActionState({
     isConnected,
     wrongNetwork,
@@ -185,13 +191,13 @@ export function WalletBidPanel({
     pending: isPlacingBid,
     auctionState: auction.state,
     endTime: auction.endTime,
-    nowSeconds,
+    nowSeconds: auctionChainTimestamp,
     minimumNextBid,
     currentCap,
-    bidCapEth
+    bidAmountEth
   });
 
-  async function readWalletBidData(successMessage?: string, rethrow = false) {
+  async function readWalletBidData(rethrow = false) {
     if (!address) throw new Error("Wallet not connected.");
     if (!deployment) throw new Error("Deployment missing or stale.");
     if (!auctionIdBigInt) throw new Error("Invalid auction ID.");
@@ -220,12 +226,17 @@ export function WalletBidPanel({
         })
       ]);
 
+      const wasStepUp = currentCap !== null && currentCap > 0n;
+      const isNextStepUp = walletCap > 0n;
+      const defaultAmount = isNextStepUp
+        ? minimumRequired > walletCap ? minimumRequired - walletCap : 0n
+        : minimumRequired;
+
       setMinimumNextBid(minimumRequired);
       setCurrentCap(walletCap);
-      setBidCapEth((current) => current || formatEther(minimumRequired));
-      if (!rethrow) {
-        setMessage(successMessage ?? "Wallet bid data loaded.");
-      }
+      setBidAmountEth((current) =>
+        wasStepUp !== isNextStepUp || !current ? formatEther(defaultAmount) : current
+      );
     } catch (caught) {
       setMinimumNextBid(null);
       setCurrentCap(null);
@@ -290,6 +301,8 @@ export function WalletBidPanel({
       setMinimumNextBid(minimumRequired);
       setCurrentCap(walletCap);
 
+      const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+
       const liveActionState = getBidActionState({
         isConnected,
         wrongNetwork,
@@ -299,14 +312,14 @@ export function WalletBidPanel({
         auctionIdValid: true,
         auctionState: auction.state,
         endTime: auction.endTime,
-        nowSeconds: Math.floor(Date.now() / 1000),
+        nowSeconds: latestBlock.timestamp,
         minimumNextBid: minimumRequired,
         currentCap: walletCap,
-        bidCapEth
+        bidAmountEth
       });
 
       if (liveActionState.disabledReason || liveActionState.parsedBidCap === null) {
-        throw new Error(liveActionState.disabledReason ?? "Bid cap must be a valid ETH amount.");
+        throw new Error(liveActionState.disabledReason ?? "Bid amount must be a valid ETH amount.");
       }
 
       setTxStatus(awaitingSignatureState("Confirm wallet-signed bid in your wallet."));
@@ -345,7 +358,7 @@ export function WalletBidPanel({
       }
 
       try {
-        await readWalletBidData(undefined, true);
+        await readWalletBidData(true);
       } catch {
         refreshIncomplete = true;
       }
@@ -355,12 +368,12 @@ export function WalletBidPanel({
         refreshIncomplete
           ? confirmedTransactionState(
               hash,
-              `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Displayed data could not be fully refreshed.`,
+              `Bid placed with ${formatEth(liveActionState.valueToSend)} sent, but displayed data could not be fully refreshed.`,
               "Refresh the auction and wallet bid data before your next action."
             )
           : confirmedTransactionState(
               hash,
-              `Bid confirmed. Value sent: ${formatEth(liveActionState.valueToSend)}. Auction and wallet cap refreshed.`,
+              `Bid placed with ${formatEth(liveActionState.valueToSend)} sent.`,
               "Monitor the auction or review a later increase if you are outbid."
             )
       );
@@ -374,7 +387,6 @@ export function WalletBidPanel({
     }
   }
 
-  const isStepUp = currentCap !== null && currentCap > 0n;
   const highestBidderStatus = address && sameAddress(address, auction.highestBidder)
     ? "Your wallet is currently the highest bidder"
     : auction.highestBid === "0"
@@ -396,14 +408,10 @@ export function WalletBidPanel({
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-cyan-100/80">
-        Set the total cap you intend to commit, review the ETH delta, then confirm the transaction in your wallet.
+        {isStepUp
+          ? "Enter the additional ETH to add to your current cap, review the new total, then confirm in your wallet."
+          : "Set the total cap you intend to commit, review it, then confirm the transaction in your wallet."}
       </p>
-
-      <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed bidding requires your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
-        Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
-        reliable localhost/testnet RPC.
-      </div>
 
       {isDeploymentLoading ? (
         <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
@@ -424,34 +432,57 @@ export function WalletBidPanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
-        <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
-        <InfoItem label="Minimum required bid" value={minimumNextBid === null ? "Not loaded" : formatEth(minimumNextBid)} />
+        <InfoItem label="Minimum required total cap" value={minimumNextBid === null ? "Not loaded" : formatEth(minimumNextBid)} />
         <InfoItem label="Current wallet cap" value={currentCap === null ? "Not loaded" : formatEth(currentCap)} />
-        <InfoItem label="Value that will be sent" value={formatEth(bidActionState.valueToSend)} />
+        <InfoItem label={isStepUp ? "Additional amount" : "Amount sent"} value={formatEth(bidActionState.valueToSend)} />
+        <InfoItem label="New total cap" value={bidActionState.parsedBidCap === null ? "Not available" : formatEth(bidActionState.parsedBidCap)} />
       </div>
+
+      <TechnicalDisclosure
+        summary="Bid network and contract details"
+        description="Technical connection details for diagnosing wallet-signed bidding."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          Wallet-signed bidding requires your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
+          Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+          reliable localhost/testnet RPC.
+        </p>
+      </TechnicalDisclosure>
 
       <div className="mt-4 grid gap-3">
         <label className="grid gap-2" htmlFor="wallet-bid-cap">
-          <span className="text-sm font-medium text-slate-200">Bid cap in ETH</span>
+          <span className="text-sm font-medium text-slate-200">
+            {isStepUp ? "Additional amount in ETH" : "Bid cap in ETH"}
+          </span>
           <input
             id="wallet-bid-cap"
-            value={bidCapEth}
+            value={bidAmountEth}
             disabled={isLoadingBidData || isPlacingBid}
             aria-describedby={bidActionState.disabledReason ? "wallet-bid-disabled-reason" : "wallet-bid-help"}
             onChange={(event) => {
-              setBidCapEth(event.target.value);
+              setBidAmountEth(event.target.value);
               setIsReviewingBid(false);
             }}
             className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder={minimumNextBid === null ? "Load minimum bid" : formatEther(minimumNextBid)}
+            placeholder={minimumNextBid === null
+              ? "Load minimum bid"
+              : formatEther(isStepUp && currentCap !== null && minimumNextBid > currentCap
+                ? minimumNextBid - currentCap
+                : minimumNextBid)}
             inputMode="decimal"
           />
         </label>
         <p id="wallet-bid-help" className="text-xs leading-5 text-cyan-100/70">
-          Enter the total cap. For a step-up bid, only the difference from the current wallet cap is sent.
+          {isStepUp
+            ? "Enter only the amount to add. The new total cap is calculated from your current cap."
+            : "Enter the total cap for your first bid. The same amount is sent with the transaction."}
         </p>
 
         {bidActionState.disabledReason ? (
@@ -485,14 +516,17 @@ export function WalletBidPanel({
       {isReviewingBid ? (
         <div className="mt-4">
           <TransactionReview
-        title={isStepUp ? "Review increase bid" : "Review place bid"}
-            description="Review the total cap and the ETH delta before opening your wallet. The live preflight remains authoritative when you continue."
+            title={isStepUp ? "Review increase bid" : "Review place bid"}
+            description={isStepUp
+              ? "Review the added amount and new total cap before opening your wallet. The live preflight recalculates the total from fresh on-chain values."
+              : "Review the total cap before opening your wallet. The live preflight remains authoritative when you continue."}
             items={[
               { label: "Auction", value: `#${auction.auctionId}` },
               { label: "NFT", value: auction.nftMetadata?.metadataName ?? `${shortenAddress(auction.nft)} #${auction.tokenId}` },
               { label: "Current highest bid", value: formatEth(auction.highestBid) },
               { label: "Minimum valid total cap", value: minimumNextBid === null ? "Not loaded" : formatEth(minimumNextBid) },
               { label: "Your current deposited cap", value: currentCap === null ? "Not loaded" : formatEth(currentCap) },
+              { label: isStepUp ? "Amount added" : "Entered total cap", value: formatEth(bidActionState.valueToSend) },
               { label: "Your new total cap", value: bidActionState.parsedBidCap === null ? "Not available" : formatEth(bidActionState.parsedBidCap) },
               { label: "ETH sent in this transaction", value: formatEth(bidActionState.valueToSend) },
               { label: "Network gas", value: "Separate; shown by your wallet" },

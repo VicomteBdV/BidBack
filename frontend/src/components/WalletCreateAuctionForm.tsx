@@ -15,6 +15,7 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
@@ -420,7 +421,7 @@ export function WalletCreateAuctionForm() {
         setApprovalTxStatus(
           confirmedTransactionState(
             txHash,
-            "NFT custody approval confirmed. Approval status refreshed.",
+            "NFT custody approved.",
             "Review and create the auction."
           )
         );
@@ -428,7 +429,7 @@ export function WalletCreateAuctionForm() {
         setApprovalTxStatus(
           confirmedTransactionState(
             txHash,
-            "NFT custody approval confirmed; displayed approval data could not be fully refreshed.",
+            "NFT custody approved, but displayed approval data could not be fully refreshed.",
             "Run the ownership and approval review again before creating the auction.",
             true
           )
@@ -508,7 +509,7 @@ export function WalletCreateAuctionForm() {
       setCreateTxStatus(
         confirmedTransactionState(
           txHash,
-          `Auction #${expectedAuctionId.toString()} confirmed.`,
+          `Auction #${expectedAuctionId.toString()} created.`,
           "Open the auction detail to review the live lot and bidding state."
         )
       );
@@ -555,7 +556,7 @@ export function WalletCreateAuctionForm() {
       <div className="seller-mode-note mt-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
         <p className="mt-1 text-sm leading-6 text-cyan-100/80">
-          Your wallet must be connected to {targetChainLabel}. Ownership and approval are verified before listing.
+          Your wallet must be connected to the configured target network. Ownership and approval are verified before listing.
         </p>
       </div>
 
@@ -585,24 +586,35 @@ export function WalletCreateAuctionForm() {
         </StateNotice>
       ) : null}
 
-      {context ? (
-        <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
-          <InfoItem label="Deployment chain" value={String(context.chainId)} />
-          <InfoItem label="AuctionHouse" value={shortenAddress(context.auctionHouse)} mono />
-          <InfoItem label="NFTVault approval target" value={shortenAddress(context.nftVault)} mono />
-          <InfoItem
-            label="Minimum duration"
-            value={context.minAuctionDuration ? formatDurationSeconds(context.minAuctionDuration) : "Loaded from contract check"}
-          />
-        </div>
-      ) : null}
-
       <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="Approval status" value={approvalStatus} />
+        <InfoItem
+          label="Minimum duration"
+          value={context?.minAuctionDuration ? formatDurationSeconds(context.minAuctionDuration) : "Loaded during review"}
+        />
       </div>
+
+      <TechnicalDisclosure
+        summary="Create network and contract details"
+        description="Technical deployment, approval, and argument details for diagnosing wallet-signed creation."
+        className="mt-5"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="Deployment chain" value={context ? String(context.chainId) : "Not loaded"} />
+          <InfoItem label="AuctionHouse" value={context ? shortenAddress(context.auctionHouse) : "Not loaded"} mono />
+          <InfoItem label="NFTVault approval target" value={context ? shortenAddress(context.nftVault) : "Not loaded"} mono />
+          {owner ? <InfoItem label="ownerOf(tokenId)" value={shortenAddress(owner)} mono /> : null}
+          {owner ? <InfoItem label="getApproved(tokenId)" value={approvedAddress ? shortenAddress(approvedAddress) : "Not checked"} mono /> : null}
+          {owner ? <InfoItem label="isApprovedForAll" value={approvedForAll === null ? "Not checked" : approvedForAll ? "Yes" : "No"} /> : null}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          The frontend converts the ETH start price to wei, keeps duration in seconds, and calls AuctionHouse.createAuction
+          with the reviewed NFT contract, token ID, start price, and duration.
+        </p>
+      </TechnicalDisclosure>
 
       {modeMessage ? (
         <StateNotice tone="warning" title="Wallet action unavailable" className="mt-5">
@@ -632,10 +644,9 @@ export function WalletCreateAuctionForm() {
         ) : null}
 
         {owner ? (
-          <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-            <InfoItem label="ownerOf(tokenId)" value={shortenAddress(owner)} mono />
-            <InfoItem label="getApproved(tokenId)" value={approvedAddress ? shortenAddress(approvedAddress) : "Not checked"} mono />
-            <InfoItem label="isApprovedForAll" value={approvedForAll === null ? "Not checked" : approvedForAll ? "Yes" : "No"} />
+          <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+            <InfoItem label="NFT owner" value={shortenAddress(owner)} mono />
+            <InfoItem label="Custody approval" value={hasApproval ? "Approved" : "Required"} />
           </div>
         ) : null}
 
@@ -665,7 +676,7 @@ export function WalletCreateAuctionForm() {
               { label: "Token ID", value: tokenId },
               { label: "Owner wallet", value: owner ? shortenAddress(owner) : "Not checked", mono: true },
               { label: "Start price", value: `${startPriceEth.trim()} ETH` },
-              { label: "Duration", value: `${durationSeconds} seconds` },
+              { label: "Duration", value: formatDurationSeconds(durationSeconds) },
               { label: "NFT custody approval", value: hasApproval ? "Already approved" : "Required before creation" },
               { label: "Network gas", value: "Separate; shown by your wallet" }
             ]}
@@ -709,9 +720,6 @@ export function WalletCreateAuctionForm() {
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-xs leading-5 text-slate-500">
-        Enter the start price in ETH. The frontend converts it to wei before calling AuctionHouse.createAuction.
-      </div>
     </section>
   );
 }

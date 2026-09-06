@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview, type TransactionReviewItem } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
@@ -280,14 +281,13 @@ export function WalletClaimPanel({
     };
   }
 
-  async function loadWalletClaimData(successMessage = "Wallet claim data loaded.") {
+  async function loadWalletClaimData() {
     try {
       setIsLoadingClaimData(true);
       setMessage(null);
 
       const next = await readWalletClaimData();
       applyClaimData(next);
-      setMessage(successMessage);
     } catch (caught) {
       setMessage(walletErrorMessage(caught, "Unable to load wallet claim data."));
     } finally {
@@ -349,7 +349,7 @@ export function WalletClaimPanel({
             `${successMessage} Displayed action data could not be fully refreshed.`,
             "Refresh the auction and wallet claim data before your next action."
           )
-        : confirmedTransactionState(hash, `${successMessage} Action state refreshed.`, nextAction)
+        : confirmedTransactionState(hash, successMessage, nextAction)
     );
   }
 
@@ -651,6 +651,8 @@ export function WalletClaimPanel({
     : rawClaimRewardDisabledReason === "Reward already claimed."
       ? "Redistribution already claimed."
       : rawClaimRewardDisabledReason;
+  const availableRefundableAmount = refundClaimed === true ? 0n : refundableAmount;
+  const availableRewardEntitlement = rewardClaimed === true ? 0n : rewardEntitlement;
 
   const withdrawSellerDisabledReason = getWithdrawSellerActionState({
     ...commonActionContext,
@@ -712,7 +714,7 @@ export function WalletClaimPanel({
       description = "Recover the refundable cap currently available to the connected wallet for this auction.";
       items = [
         { label: "Auction", value: `#${auction.auctionId}` },
-        { label: "Refund amount", value: refundableAmount === null ? "Not loaded" : formatEth(refundableAmount) },
+        { label: "Refund available", value: availableRefundableAmount === null ? "Not loaded" : formatEth(availableRefundableAmount) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Effect", value: "Sends the refundable cap to this wallet" },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -725,7 +727,7 @@ export function WalletClaimPanel({
       description = "Claim the positive conditional redistribution entitlement currently recorded for this wallet.";
       items = [
         { label: "Auction", value: `#${auction.auctionId}` },
-        { label: "Redistribution amount", value: rewardEntitlement === null ? "Not loaded" : formatEth(rewardEntitlement) },
+        { label: "Redistribution available", value: availableRewardEntitlement === null ? "Not loaded" : formatEth(availableRewardEntitlement) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Effect", value: "Sends the recorded entitlement to this wallet" },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -788,12 +790,6 @@ export function WalletClaimPanel({
         called.
       </p>
 
-      <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
-        Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
-        Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
-        reliable localhost/testnet RPC.
-      </div>
-
       {isDeploymentLoading ? (
         <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
           Preparing wallet-signed claim and withdrawal reads.
@@ -813,22 +809,41 @@ export function WalletClaimPanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="NFT claimant" value={shortenAddress(expectedNftClaimant)} mono />
         <InfoItem label="NFT claimant role" value={expectedNftClaimantLabel} />
         <InfoItem label="Seller wallet" value={shortenAddress(auction.seller)} mono />
         <InfoItem label="Fee recipient" value={auction.auctionFeeRecipient ? shortenAddress(auction.auctionFeeRecipient) : "Not loaded"} mono />
-        <InfoItem label="Refundable amount" value={refundableAmount === null ? "Not loaded" : formatEth(refundableAmount)} />
-        <InfoItem label="Refund claimed" value={refundClaimed === null ? "Not loaded" : refundClaimed ? "Yes" : "No"} />
-        <InfoItem label="Redistribution entitlement" value={rewardEntitlement === null ? "Not loaded" : formatEth(rewardEntitlement)} />
-        <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Not loaded" : rewardClaimed ? "Yes" : "No"} />
+        <InfoItem label="Refund available" value={availableRefundableAmount === null ? "Not loaded" : formatEth(availableRefundableAmount)} />
+        <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Not loaded" : formatEth(availableRewardEntitlement)} />
         <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Not loaded" : formatEth(sellerCredit)} />
         <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Not loaded" : formatEth(protocolFeeCredit)} />
         <InfoItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
         <InfoItem label="Auction finalized" value={auction.finalized ? "Yes" : "No"} />
       </div>
+
+      <TechnicalDisclosure
+        summary="Claim network, contract, and recorded amount details"
+        description="Technical values retained for diagnosing wallet-signed claims and historical on-chain records."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+          <InfoItem label="EscrowVault" value={deployment ? shortenAddress(deployment.contracts.escrowVault) : "Not loaded"} mono />
+          <InfoItem label="DistributionVault" value={deployment ? shortenAddress(deployment.contracts.distributionVault) : "Not loaded"} mono />
+          <InfoItem label="Recorded refundable amount" value={refundableAmount === null ? "Not loaded" : formatEth(refundableAmount)} />
+          <InfoItem label="Refund claimed" value={refundClaimed === null ? "Not loaded" : refundClaimed ? "Yes" : "No"} />
+          <InfoItem label="Recorded redistribution entitlement" value={rewardEntitlement === null ? "Not loaded" : formatEth(rewardEntitlement)} />
+          <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Not loaded" : rewardClaimed ? "Yes" : "No"} />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
+          Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
+          reliable localhost/testnet RPC.
+        </p>
+      </TechnicalDisclosure>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <button
@@ -854,7 +869,7 @@ export function WalletClaimPanel({
         <ActionButton
           label="Claim refund"
           description="Recover refundable cap. This is separate from redistribution."
-          amount={refundableAmount === null ? undefined : formatEth(refundableAmount)}
+          amount={availableRefundableAmount === null ? undefined : formatEth(availableRefundableAmount)}
           pending={pendingAction === "claim-refund"}
           disabledReason={claimRefundDisabledReason}
           primary={primaryAction === "claim-refund"}
@@ -864,7 +879,7 @@ export function WalletClaimPanel({
         <ActionButton
           label="Claim redistribution"
           description="Claim a positive conditional entitlement when one is currently recorded."
-          amount={rewardEntitlement === null ? undefined : formatEth(rewardEntitlement)}
+          amount={availableRewardEntitlement === null ? undefined : formatEth(availableRewardEntitlement)}
           pending={pendingAction === "claim-reward"}
           disabledReason={claimRewardDisabledReason}
           primary={primaryAction === "claim-reward"}
@@ -923,7 +938,7 @@ function ActionButton({
   const reasonId = `wallet-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-disabled-reason`;
 
   return (
-    <div className={`transaction-action-card ${primary ? "transaction-action-primary" : ""}`}>
+    <div className={`transaction-action-card ${primary ? "transaction-action-primary" : ""} ${disabledReason ? "transaction-action-disabled" : ""}`}>
       <div>
         <h4 className="font-semibold text-white">{label}</h4>
         <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
@@ -934,7 +949,7 @@ function ActionButton({
         disabled={Boolean(disabledReason)}
         aria-describedby={disabledReason ? reasonId : undefined}
         onClick={onClick}
-        className={primary ? "transaction-primary-action mt-3 w-full" : "secondary-link mt-3 w-full"}
+        className={`${primary ? "transaction-primary-action" : "transaction-secondary-action"} mt-3 w-full`}
       >
         {pending ? "Working..." : `Review ${label.toLowerCase()}`}
       </button>

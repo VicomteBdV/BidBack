@@ -90,6 +90,39 @@ describe("buildAuctionEconomicSummary", () => {
     expect(summary.settlement.rewardsAvailable.value).toBe("15000000000000000");
   });
 
+  it("excludes claimed historical refund and reward amounts from available totals", () => {
+    const auction = finalizedAuction();
+    auction.economics = {
+      ...auction.economics!,
+      primaryBidder: {
+        ...auction.economics!.primaryBidder,
+        refundableAmount: "1000000000000000000",
+        refundClaimed: true,
+        rewardEntitlement: "15000000000000000",
+        rewardClaimed: true
+      },
+      secondBidder: {
+        ...auction.economics!.secondBidder,
+        refundableAmount: "200000000000000000",
+        refundClaimed: true,
+        rewardEntitlement: "5000000000000000",
+        rewardClaimed: true
+      }
+    };
+    const economics = auction.economics!;
+
+    const summary = buildAuctionEconomicSummary(auction);
+
+    expect(summary.settlement.refundsAvailable.value).toBe("0");
+    expect(summary.settlement.rewardsAvailable.value).toBe("0");
+    expect(summary.settlement.totalAssignedRewards.value).toBe("15000000000000000");
+    expect(summary.settlement.totalClaimedRewards.value).toBe("5000000000000000");
+    expect(economics.primaryBidder.refundableAmount).toBe("1000000000000000000");
+    expect(economics.primaryBidder.rewardEntitlement).toBe("15000000000000000");
+    expect(economics.secondBidder.refundableAmount).toBe("200000000000000000");
+    expect(economics.secondBidder.rewardEntitlement).toBe("5000000000000000");
+  });
+
   it("returns unavailable fields without crashing when detailed economics are absent", () => {
     const summary = buildAuctionEconomicSummary({
       ...auctionDetailFixture.auction,

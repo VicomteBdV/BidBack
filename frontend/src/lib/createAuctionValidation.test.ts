@@ -70,4 +70,14 @@ describe("create auction validation", () => {
 
     expect(parsed.tokenId).toBe(BigInt(largeTokenId));
   });
+
+  it("describes the minimum duration in human terms without exposing the contract field name", () => {
+    const error = validateCreateAuctionFields(
+      { ...validValues, durationSeconds: "3599" },
+      { minAuctionDuration: 3600n }
+    );
+
+    expect(error).toBe("Duration must be at least 1 hour.");
+    expect(error).not.toContain("minAuctionDuration");
+  });
 });

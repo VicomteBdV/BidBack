@@ -374,7 +374,7 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function serializeAuction(auctionId: bigint, raw: unknown): SerializedAuction {
+function serializeAuction(auctionId: bigint, raw: unknown, chainTimestamp: string): SerializedAuction {
   const state = toAuctionState(getField(raw, "state", 8));
 
   return {
@@ -386,6 +386,7 @@ function serializeAuction(auctionId: bigint, raw: unknown): SerializedAuction {
     startTime: toDecimalString(getField(raw, "startTime", 4)),
     initialEndTime: toDecimalString(getField(raw, "initialEndTime", 5)),
     endTime: toDecimalString(getField(raw, "endTime", 6)),
+    chainTimestamp,
     extensionsUsed: toNumber(getField(raw, "extensionsUsed", 7)),
     state,
     stateLabel: formatAuctionState(state),
@@ -780,20 +781,30 @@ async function readAuctionEconomics(
 }
 
 export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAuctionsByIdsOptions = {}) {
+  if (auctionIds.length === 0) {
+    return [];
+  }
+
   const deployment = options.deployment ?? (await readTargetDeployment());
   const client = options.client ?? createTargetPublicClient();
 
-  const auctions = await Promise.all(
-    auctionIds.map(async (auctionId) => {
-      const rawAuction = await client.readContract({
-        address: deployment.contracts.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "getAuction",
-        args: [auctionId]
-      });
-
-      return serializeAuction(auctionId, rawAuction);
-    })
+  const [latestBlock, rawAuctions] = await Promise.all([
+    client.getBlock({ blockTag: "latest" }),
+    Promise.all(
+      auctionIds.map(async (auctionId) => ({
+        auctionId,
+        rawAuction: await client.readContract({
+          address: deployment.contracts.auctionHouse,
+          abi: auctionHouseAbi,
+          functionName: "getAuction",
+          args: [auctionId]
+        })
+      }))
+    )
+  ]);
+  const chainTimestamp = latestBlock.timestamp.toString();
+  const auctions = rawAuctions.map(({ auctionId, rawAuction }) =>
+    serializeAuction(auctionId, rawAuction, chainTimestamp)
   );
 
   if (!options.includeNftMetadata) {
@@ -859,14 +870,14 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     throw new AuctionNotFoundError(auctionIdParam);
   }
 
-  const rawAuction = await client.readContract({
-    address: deployment.contracts.auctionHouse,
-    abi: auctionHouseAbi,
-    functionName: "getAuction",
-    args: [auctionId]
+  const [auction] = await readAuctionsByIds([auctionId], {
+    client,
+    deployment
   });
 
-  const auction = serializeAuction(auctionId, rawAuction);
+  if (!auction) {
+    throw new AuctionNotFoundError(auctionIdParam);
+  }
 
   auction.nftMetadata = await readNftMetadata({
     client,
