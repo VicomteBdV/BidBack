@@ -204,7 +204,7 @@ describe("WalletActivityDashboard", () => {
     render(<WalletActivityDashboard />);
 
     expect(await screen.findByText("Global wallet credit")).toBeInTheDocument();
-    expect(screen.getByText("Withdraw seller proceeds")).toBeInTheDocument();
+    expect(screen.getByText("Withdraw proceeds")).toBeInTheDocument();
     expect(screen.getByText(/not attributed to a single auction/i)).toBeInTheDocument();
   });
 

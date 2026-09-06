@@ -3,7 +3,10 @@ import {
   buildExplorerTxUrl,
   failedTransactionState,
   isUserRejectedTransaction,
+  receiptWasSuccessful,
+  revertedTransactionState,
   shortenTxHash,
+  unknownConfirmationState,
   walletTransactionErrorMessage
 } from "@/lib/walletTransaction";
 
@@ -37,5 +40,19 @@ describe("walletTransaction", () => {
     );
 
     expect(failedTransactionState(new Error("execution reverted"), "Fallback").phase).toBe("failed");
+  });
+
+  it("distinguishes successful, reverted, and unverifiable submitted transactions", () => {
+    expect(receiptWasSuccessful({ status: "success" })).toBe(true);
+    expect(receiptWasSuccessful({ status: "reverted" })).toBe(false);
+    expect(revertedTransactionState(txHash)).toMatchObject({ phase: "failed", txHash });
+
+    const unknown = unknownConfirmationState(txHash, new Error("RPC timeout"));
+    expect(unknown).toMatchObject({
+      phase: "confirmation-unknown",
+      txHash,
+      technicalDetail: "RPC timeout"
+    });
+    expect(unknown.message).not.toMatch(/revert|failed/i);
   });
 });

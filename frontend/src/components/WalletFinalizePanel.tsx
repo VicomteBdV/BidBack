@@ -10,6 +10,8 @@ import {
 } from "viem";
 import { useAccount } from "wagmi";
 import { ModeBadge } from "@/components/ModeBadge";
+import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
+import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
@@ -23,6 +25,10 @@ import {
   confirmedTransactionState,
   failedTransactionState,
   pendingTransactionState,
+  receiptWasSuccessful,
+  refreshingTransactionState,
+  revertedTransactionState,
+  unknownConfirmationState,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
 
@@ -40,6 +46,17 @@ function walletErrorMessage(error: unknown, fallback: string) {
   }
 
   return error instanceof Error ? error.message : fallback;
+}
+
+function parseChainTimestamp(value?: string) {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+
+  try {
+    const parsed = BigInt(value);
+    return parsed > 0n ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function getInjectedEthereum(): EIP1193Provider {
@@ -102,22 +119,15 @@ export function WalletFinalizePanel({
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000));
+  const [isReviewing, setIsReviewing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
+  const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
     auction.auctionId
   ]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNowSeconds(Math.floor(Date.now() / 1000));
-    }, 10_000);
-
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -152,6 +162,7 @@ export function WalletFinalizePanel({
 
   useEffect(() => {
     setTxStatus(null);
+    setIsReviewing(false);
   }, [address, chainId, auction.auctionId]);
 
   const finalizeState = getFinalizeActionState({
@@ -164,8 +175,9 @@ export function WalletFinalizePanel({
     loading: isDeploymentLoading,
     pending: isFinalizing,
     finalized: auction.finalized,
+    auctionState: auction.state,
     endTime: auction.endTime,
-    nowSeconds
+    nowSeconds: auctionChainTimestamp
   });
 
   async function finalizeAuction() {
@@ -184,10 +196,16 @@ export function WalletFinalizePanel({
       return;
     }
 
+    let submittedHash: `0x${string}` | null = null;
+
     try {
       setIsFinalizing(true);
       setMessage(null);
       setTxStatus(null);
+
+      const { provider, publicClient, walletClient } = createBrowserClients(address);
+      await verifyWalletChain(provider);
+      const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
 
       const liveState = getFinalizeActionState({
         isConnected,
@@ -197,16 +215,15 @@ export function WalletFinalizePanel({
         deploymentError: null,
         auctionIdValid: true,
         finalized: auction.finalized,
+        auctionState: auction.state,
         endTime: auction.endTime,
-        nowSeconds: Math.floor(Date.now() / 1000)
+        nowSeconds: latestBlock.timestamp
       });
 
       if (liveState.disabledReason) {
         throw new Error(liveState.disabledReason);
       }
 
-      const { provider, publicClient, walletClient } = createBrowserClients(address);
-      await verifyWalletChain(provider);
       setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));
 
       const hash = await walletClient.writeContract({
@@ -215,16 +232,51 @@ export function WalletFinalizePanel({
         functionName: "finalizeAuction",
         args: [auctionIdBigInt]
       });
+      submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
-      await publicClient.waitForTransactionReceipt({ hash });
-      await onFinalizeComplete();
-      setMessage("Auction finalized with wallet signature. Auction data refreshed.");
-      setTxStatus(confirmedTransactionState(hash, "Auction finalized. Economic state and claim data refreshed."));
+      let receipt;
+
+      try {
+        receipt = await publicClient.waitForTransactionReceipt({ hash });
+      } catch (caught) {
+        setTxStatus(unknownConfirmationState(hash, caught));
+        return;
+      }
+
+      if (!receiptWasSuccessful(receipt)) {
+        setTxStatus(revertedTransactionState(hash));
+        return;
+      }
+
+      setTxStatus(refreshingTransactionState(hash, "Finalization confirmed on-chain. Refreshing lifecycle and claim data."));
+      let refreshIncomplete = false;
+
+      try {
+        await onFinalizeComplete();
+      } catch {
+        refreshIncomplete = true;
+      }
+
+      setIsReviewing(false);
+      setTxStatus(
+        refreshIncomplete
+          ? confirmedTransactionState(
+              hash,
+              "Auction finalized, but displayed lifecycle and claim data could not be fully refreshed.",
+              "Refresh the auction before starting a claim or withdrawal."
+            )
+          : confirmedTransactionState(
+              hash,
+              "Auction finalized.",
+              "Eligible wallets can now use the separate pull-based claim and withdrawal actions."
+            )
+      );
     } catch (caught) {
-      const failed = failedTransactionState(caught, "Transaction reverted.");
+      const failed = submittedHash
+        ? unknownConfirmationState(submittedHash, caught)
+        : failedTransactionState(caught, "Finalization failed before submission.");
       setTxStatus(failed);
-      setMessage(failed.message);
     } finally {
       setIsFinalizing(false);
     }
@@ -233,12 +285,11 @@ export function WalletFinalizePanel({
   return (
     <section aria-busy={isDeploymentLoading || isFinalizing} className="min-w-0 rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-base font-semibold text-white">Wallet-signed finalization</h3>
+        <h3 className="text-base font-semibold text-white">Finalize auction</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/80">
-        Your wallet signs AuctionHouse.finalizeAuction directly after the auction end time. No server private key is used
-        and no /api/dev route is called.
+        Complete the expired auction on-chain so eligible wallets can use the separate pull-based actions that follow.
       </p>
 
       {isDeploymentLoading ? (
@@ -254,13 +305,22 @@ export function WalletFinalizePanel({
       ) : null}
 
       <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-        <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="Auction end time" value={formatTimestamp(auction.endTime)} />
         <InfoItem label="Finalized" value={auction.finalized ? "Yes" : "No"} />
-        <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
       </div>
+
+      <TechnicalDisclosure
+        summary="Finalization network and contract details"
+        description="Technical connection details for diagnosing permissionless finalization."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+        </div>
+      </TechnicalDisclosure>
 
       {finalizeState.disabledReason ? (
         <StateNotice id="wallet-finalize-disabled-reason" tone="warning" title="Finalization unavailable" className="mt-4">
@@ -273,12 +333,36 @@ export function WalletFinalizePanel({
           type="button"
           disabled={Boolean(finalizeState.disabledReason)}
           aria-describedby={finalizeState.disabledReason ? "wallet-finalize-disabled-reason" : undefined}
-          onClick={finalizeAuction}
+          onClick={() => setIsReviewing(true)}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
-          {isFinalizing ? "Finalizing..." : "Finalize auction"}
+          {isFinalizing ? "Finalizing..." : "Review finalization"}
         </button>
       </div>
+
+      {isReviewing ? (
+        <div className="mt-4">
+          <TransactionReview
+            title="Finalize auction"
+            description="The auction has expired and still requires an on-chain finalization transaction. Any wallet may perform this permissionless action."
+            items={[
+              { label: "Auction", value: `#${auction.auctionId}` },
+              { label: "End time", value: formatTimestamp(auction.endTime) },
+              { label: "Caller", value: address ? shortenAddress(address) : "Not connected", mono: true },
+              { label: "Caller payment", value: "No automatic payment or compensation" },
+              { label: "Effect", value: "Fixes the result and unlocks separate pull-based actions" },
+              { label: "Network gas", value: "Separate; shown by your wallet" }
+            ]}
+            confirmations="Currently expected: 1 wallet confirmation"
+            note="Finalization does not automatically send the NFT, refunds, redistribution, proceeds, or protocol fees. Eligible wallets claim each item separately."
+            primaryLabel="Continue in wallet"
+            busy={isFinalizing}
+            disabled={Boolean(finalizeState.disabledReason) || txStatus?.phase === "confirmation-unknown"}
+            onBack={() => setIsReviewing(false)}
+            onConfirm={finalizeAuction}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4">
         <WalletTransactionStatus title="Auction finalization" status={txStatus} />

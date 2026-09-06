@@ -172,6 +172,7 @@ export type SerializedAuction = {
   startTime: string;
   initialEndTime: string;
   endTime: string;
+  chainTimestamp?: string;
   extensionsUsed: number;
   state: AuctionStateValue;
   stateLabel: string;

@@ -35,7 +35,8 @@ describe("AuctionHistoryPanel", () => {
 
     expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
     expect(screen.getAllByText("1.2 ETH").length).toBeGreaterThan(0);
-    expect(screen.getByText("Visible configured refunds")).toBeInTheDocument();
+    expect(screen.getByText("Recorded configured refunds")).toBeInTheDocument();
+    expect(screen.getByText("Recorded reward entitlements")).toBeInTheDocument();
     expect(await screen.findAllByText("Bid placed")).toHaveLength(2);
     expect(screen.getAllByTitle("0x1111111111111111111111111111111111111111111111111111111111111111")[0]).toHaveAttribute(
       "href",

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useLayoutEffect, useMemo } from "react";
+import { durationInputToSeconds, durationSecondsToInput } from "@/lib/auctionDurationInput";
 import type { CreateAuctionFieldName } from "@/lib/createAuctionValidation";
 
 export function CreateAuctionFields({
@@ -32,6 +33,21 @@ export function CreateAuctionFields({
     startPriceEth: `${idPrefix}-start-price`,
     durationSeconds: `${idPrefix}-duration`
   };
+  const durationInput = useMemo(() => durationSecondsToInput(durationSeconds), [durationSeconds]);
+  const canonicalDurationSeconds = durationInput?.durationSeconds ?? null;
+  const days = durationInput?.days ?? durationSeconds.trim();
+  const hours = durationInput?.hours ?? "0";
+  const durationDescriptionId = errors.durationSeconds ? `${fieldIds.durationSeconds}-error` : undefined;
+
+  useLayoutEffect(() => {
+    if (canonicalDurationSeconds !== null && canonicalDurationSeconds !== durationSeconds) {
+      onDurationSecondsChange(canonicalDurationSeconds);
+    }
+  }, [canonicalDurationSeconds, durationSeconds, onDurationSecondsChange]);
+
+  function updateDuration(nextDays: string, nextHours: string, invalidValue: string) {
+    onDurationSecondsChange(durationInputToSeconds(nextDays, nextHours) ?? invalidValue);
+  }
 
   return (
     <>
@@ -83,21 +99,49 @@ export function CreateAuctionFields({
           {errors.startPriceEth ? <span id={`${fieldIds.startPriceEth}-error`} className="text-xs text-rose-200">{errors.startPriceEth}</span> : null}
         </label>
 
-        <label className="grid gap-2" htmlFor={fieldIds.durationSeconds}>
-          <span className="text-sm font-medium text-slate-200">Duration in seconds</span>
-          <input
-            id={fieldIds.durationSeconds}
-            value={durationSeconds}
-            disabled={disabled}
-            aria-invalid={Boolean(errors.durationSeconds)}
-            aria-describedby={errors.durationSeconds ? `${fieldIds.durationSeconds}-error` : undefined}
-            onChange={(event) => onDurationSecondsChange(event.target.value)}
-            className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-            placeholder="7200"
-            inputMode="numeric"
-          />
+        <fieldset
+          className="grid min-w-0 gap-2"
+          aria-invalid={Boolean(errors.durationSeconds)}
+          aria-describedby={durationDescriptionId}
+        >
+          <legend className="text-sm font-medium text-slate-200">Duration</legend>
+          <div className="grid min-w-0 grid-cols-2 gap-3">
+            <label className="grid min-w-0 gap-2" htmlFor={`${fieldIds.durationSeconds}-days`}>
+              <span className="text-xs text-slate-400">Days</span>
+              <input
+                id={`${fieldIds.durationSeconds}-days`}
+                type="number"
+                min="0"
+                step="1"
+                value={days}
+                disabled={disabled}
+                aria-invalid={Boolean(errors.durationSeconds)}
+                aria-describedby={durationDescriptionId}
+                onChange={(event) => updateDuration(event.target.value, hours, event.target.value)}
+                className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="0"
+                inputMode="numeric"
+              />
+            </label>
+            <label className="grid min-w-0 gap-2" htmlFor={`${fieldIds.durationSeconds}-hours`}>
+              <span className="text-xs text-slate-400">Hours</span>
+              <select
+                id={`${fieldIds.durationSeconds}-hours`}
+                value={hours}
+                disabled={disabled}
+                aria-invalid={Boolean(errors.durationSeconds)}
+                aria-describedby={durationDescriptionId}
+                onChange={(event) => updateDuration(days, event.target.value, durationSeconds)}
+                className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour}>{hour}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           {errors.durationSeconds ? <span id={`${fieldIds.durationSeconds}-error`} className="text-xs text-rose-200">{errors.durationSeconds}</span> : null}
-        </label>
+        </fieldset>
       </div>
     </>
   );

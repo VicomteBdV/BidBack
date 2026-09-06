@@ -91,7 +91,10 @@ function visibleRefunds(auction: SerializedAuction) {
 
   return amount(
     "known",
-    sumAmounts([economics.primaryBidder.refundableAmount, economics.secondBidder.refundableAmount]),
+    sumAmounts([
+      economics.primaryBidder.refundClaimed ? "0" : economics.primaryBidder.refundableAmount,
+      economics.secondBidder.refundClaimed ? "0" : economics.secondBidder.refundableAmount
+    ]),
     "Visible configured bidder wallets only in the MVP read model. Refunds are separate from redistribution."
   );
 }
@@ -109,7 +112,10 @@ function visibleRewards(auction: SerializedAuction) {
 
   return amount(
     "known",
-    sumAmounts([economics.primaryBidder.rewardEntitlement, economics.secondBidder.rewardEntitlement]),
+    sumAmounts([
+      economics.primaryBidder.rewardClaimed ? "0" : economics.primaryBidder.rewardEntitlement,
+      economics.secondBidder.rewardClaimed ? "0" : economics.secondBidder.rewardEntitlement
+    ]),
     "Visible configured bidder wallets only in the MVP read model. Rewards are conditional and never guaranteed."
   );
 }

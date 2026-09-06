@@ -45,7 +45,7 @@ describe("auctionActionState", () => {
     expect(
       getBidActionState({
         ...walletContext({ isConnected: false }),
-        bidCapEth: "1",
+        bidAmountEth: "1",
         minimumNextBid: 1n,
         currentCap: 0n,
         auctionState: 0,
@@ -58,53 +58,34 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext({ wrongNetwork: true }),
         finalized: false,
+        auctionState: 1,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
     ).toBe("Wallet connected, but not on the target chain (Base Sepolia).");
   });
 
-  it("validates bid cap input and computes only the step-up value to send", () => {
-    expect(
-      getBidActionState({
-        ...walletContext(),
-        bidCapEth: "",
-        minimumNextBid: 1_000_000_000_000_000_000n,
-        currentCap: 0n,
-        auctionState: 0,
-        endTime: "2000",
-        nowSeconds: 1000
-      }).disabledReason
-    ).toBe("Bid cap is required.");
+  it("uses the entered total cap and value for a first bid", () => {
+    const firstBid = getBidActionState({
+      ...walletContext(),
+      bidAmountEth: "1",
+      minimumNextBid: 1_000_000_000_000_000_000n,
+      currentCap: 0n,
+      auctionState: 0,
+      endTime: "2000",
+      nowSeconds: 1000
+    });
 
-    expect(
-      getBidActionState({
-        ...walletContext(),
-        bidCapEth: "0.9",
-        minimumNextBid: 1_000_000_000_000_000_000n,
-        currentCap: 0n,
-        auctionState: 0,
-        endTime: "2000",
-        nowSeconds: 1000
-      }).disabledReason
-    ).toBe("Bid cap must be at least minimumNextBid.");
+    expect(firstBid.disabledReason).toBeNull();
+    expect(firstBid.parsedBidCap).toBe(1_000_000_000_000_000_000n);
+    expect(firstBid.valueToSend).toBe(1_000_000_000_000_000_000n);
+  });
 
-    expect(
-      getBidActionState({
-        ...walletContext(),
-        bidCapEth: "1",
-        minimumNextBid: 1_000_000_000_000_000_000n,
-        currentCap: 1_000_000_000_000_000_000n,
-        auctionState: 0,
-        endTime: "2000",
-        nowSeconds: 1000
-      }).disabledReason
-    ).toBe("Bid cap must be greater than your current cap.");
-
+  it("adds an entered step-up delta to the current cap and sends only that delta", () => {
     const validStepUp = getBidActionState({
       ...walletContext(),
-      bidCapEth: "1.25",
-      minimumNextBid: 1_100_000_000_000_000_000n,
+      bidAmountEth: "0.2",
+      minimumNextBid: 1_200_000_000_000_000_000n,
       currentCap: 1_000_000_000_000_000_000n,
       auctionState: 0,
       endTime: "2000",
@@ -112,15 +93,34 @@ describe("auctionActionState", () => {
     });
 
     expect(validStepUp.disabledReason).toBeNull();
-    expect(validStepUp.parsedBidCap).toBe(1_250_000_000_000_000_000n);
-    expect(validStepUp.valueToSend).toBe(250_000_000_000_000_000n);
+    expect(validStepUp.parsedBidCap).toBe(1_200_000_000_000_000_000n);
+    expect(validStepUp.valueToSend).toBe(200_000_000_000_000_000n);
+  });
+
+  it.each([
+    ["", "Bid increase is required."],
+    ["0", "Bid increase must be greater than zero."],
+    ["-0.1", "Bid increase must be greater than zero."],
+    ["0.1", "New bid cap must meet the minimum required bid."]
+  ])("blocks an invalid or insufficient step-up delta %j", (bidAmountEth, expectedReason) => {
+    expect(
+      getBidActionState({
+        ...walletContext(),
+        bidAmountEth,
+        minimumNextBid: 1_200_000_000_000_000_000n,
+        currentCap: 1_000_000_000_000_000_000n,
+        auctionState: 0,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBe(expectedReason);
   });
 
   it("blocks wallet bids once the auction has reached its end time", () => {
     expect(
       getBidActionState({
         ...walletContext(),
-        bidCapEth: "1.25",
+        bidAmountEth: "1.25",
         minimumNextBid: 1_000_000_000_000_000_000n,
         currentCap: 0n,
         auctionState: 0,
@@ -135,6 +135,7 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: false,
+        auctionState: 0,
         endTime: "2000",
         nowSeconds: 1000
       }).disabledReason
@@ -144,6 +145,7 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: true,
+        auctionState: 1,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
@@ -153,10 +155,55 @@ describe("auctionActionState", () => {
       getFinalizeActionState({
         ...walletContext(),
         finalized: false,
+        auctionState: 0,
         endTime: "1000",
         nowSeconds: 2000
       }).disabledReason
     ).toBeNull();
+  });
+
+  it("allows ENDED auctions to finalize before the browser reaches the end time", () => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(),
+        finalized: false,
+        auctionState: 1,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBeNull();
+  });
+
+  it("blocks on-chain FINALIZED state even when the finalized flag is stale", () => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(),
+        finalized: false,
+        auctionState: 2,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBe("Auction is already finalized.");
+  });
+
+  it.each<[Partial<WalletActionContext>, string]>([
+    [{ isConnected: false }, "Wallet not connected."],
+    [{ wrongNetwork: true }, "Wallet connected, but not on the target chain (Base Sepolia)."],
+    [{ deploymentError: "Deployment read failed." }, "Deployment read failed."],
+    [{ deploymentLoaded: false }, "Deployment missing or stale."],
+    [{ auctionIdValid: false }, "Invalid auction ID."],
+    [{ loading: true }, "Wallet data is loading."],
+    [{ pending: true }, "Another wallet transaction is pending."]
+  ])("preserves wallet guards for ENDED auctions: %j", (overrides, reason) => {
+    expect(
+      getFinalizeActionState({
+        ...walletContext(overrides),
+        finalized: false,
+        auctionState: 1,
+        endTime: "2000",
+        nowSeconds: 1000
+      }).disabledReason
+    ).toBe(reason);
   });
 
   it("allows NFT claim only for the expected claimant after finalization", () => {

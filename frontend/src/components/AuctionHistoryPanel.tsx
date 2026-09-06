@@ -124,8 +124,8 @@ export function AuctionHistoryPanel({ auction }: { auction: SerializedAuction })
         <SummaryItem label="Distribution reserve" value={formatEth(transparency.distributionReserve)} mono />
         <SummaryItem label="Total assigned rewards" value={formatEth(transparency.totalAssignedRewards)} mono />
         <SummaryItem label="Total claimed rewards" value={formatEth(transparency.totalClaimedRewards)} mono />
-        <SummaryItem label="Visible configured refunds" value={formatEth(transparency.visibleRefundableAmount)} mono />
-        <SummaryItem label="Visible reward entitlements" value={formatEth(transparency.visibleRewardEntitlement)} mono />
+        <SummaryItem label="Recorded configured refunds" value={formatEth(transparency.visibleRefundableAmount)} mono />
+        <SummaryItem label="Recorded reward entitlements" value={formatEth(transparency.visibleRewardEntitlement)} mono />
         <SummaryItem label="NFT claimed" value={transparency.nftClaimed ? "Yes" : "No"} />
       </div>
 

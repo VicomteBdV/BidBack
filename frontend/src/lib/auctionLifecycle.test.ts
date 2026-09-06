@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { testAddresses } from "@/test/fixtures";
@@ -93,6 +93,10 @@ function finalizedEconomics() {
 }
 
 describe("getAuctionLifecycle", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("describes an open auction", () => {
     const lifecycle = getAuctionLifecycle(
       baseAuction({
@@ -106,6 +110,7 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.currentPhase).toBe("Bidding");
     expect(lifecycle.canBid).toBe(true);
     expect(lifecycle.canFinalize).toBe(false);
+    expect(lifecycle.timeStatusLabel).toBe("8 minutes 20 seconds remaining");
   });
 
   it("describes an expired auction that is ready to finalize", () => {
@@ -121,6 +126,57 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.currentPhase).toBe("Finalization");
     expect(lifecycle.canBid).toBe(false);
     expect(lifecycle.canFinalize).toBe(true);
+    expect(lifecycle.timeStatusLabel).toBe("Expired");
+  });
+
+  it("keeps an OPEN auction open when chain time is before the end despite a later browser clock", () => {
+    vi.spyOn(Date, "now").mockReturnValue(2_500_000);
+
+    const lifecycle = getAuctionLifecycle(
+      baseAuction({
+        chainTimestamp: "1500",
+        highestBidder: testAddresses.primaryBidder,
+        highestBid: "1000000000000000000"
+      })
+    );
+
+    expect(lifecycle.statusLabel).toBe("Open");
+    expect(lifecycle.canBid).toBe(true);
+    expect(lifecycle.canFinalize).toBe(false);
+    expect(lifecycle.timeStatusLabel).toBe("8 minutes 20 seconds remaining");
+  });
+
+  it("makes an OPEN auction finalizable when chain time reaches the end despite an earlier browser clock", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_500_000);
+
+    const lifecycle = getAuctionLifecycle(baseAuction({ chainTimestamp: "2000" }));
+
+    expect(lifecycle.statusLabel).toBe("Ready to finalize");
+    expect(lifecycle.canBid).toBe(false);
+    expect(lifecycle.canFinalize).toBe(true);
+    expect(lifecycle.timeStatusLabel).toBe("Expired");
+  });
+
+  it("prioritizes an explicit string timestamp over chain time", () => {
+    const lifecycle = getAuctionLifecycle(baseAuction({ chainTimestamp: "2500" }), "1500");
+
+    expect(lifecycle.statusLabel).toBe("Open");
+    expect(lifecycle.canBid).toBe(true);
+    expect(lifecycle.canFinalize).toBe(false);
+    expect(lifecycle.timeStatusLabel).toBe("8 minutes 20 seconds remaining");
+  });
+
+  it("treats ENDED as ready to finalize even before the browser reaches the end time", () => {
+    const lifecycle = getAuctionLifecycle(
+      baseAuction({ state: 1, stateLabel: "ENDED", endTime: "2000" }),
+      1500
+    );
+
+    expect(lifecycle.statusLabel).toBe("Ready to finalize");
+    expect(lifecycle.currentPhase).toBe("Finalization");
+    expect(lifecycle.canBid).toBe(false);
+    expect(lifecycle.canFinalize).toBe(true);
+    expect(lifecycle.timeStatusLabel).toBe("Auction ended");
   });
 
   it("describes a finalized auction with claimable lifecycle items", () => {
@@ -128,12 +184,12 @@ describe("getAuctionLifecycle", () => {
       baseAuction({
         state: 2,
         stateLabel: "FINALIZED",
-        finalized: true,
+        finalized: false,
         highestBidder: testAddresses.secondBidder,
         highestBid: "1200000000000000000",
         economics: finalizedEconomics()
       }),
-      2500
+      1500
     );
 
     expect(lifecycle.statusLabel).toBe("Finalized");
@@ -144,13 +200,12 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.hasSellerProceeds).toBe(true);
     expect(lifecycle.hasProtocolFees).toBe(true);
     expect(lifecycle.claimableItems).toEqual(["NFT claim", "Refund", "Reward", "Seller proceeds", "Protocol fees"]);
+    expect(lifecycle.timeStatusLabel).toBe("Auction finalized");
   });
 
   it("describes a settled auction when no visible claims remain", () => {
     const economics = finalizedEconomics();
-    economics.primaryBidder.refundableAmount = "0";
     economics.primaryBidder.refundClaimed = true;
-    economics.primaryBidder.rewardEntitlement = "0";
     economics.primaryBidder.rewardClaimed = true;
     economics.seller.credit = "0";
     economics.feeRecipient.credit = "0";
@@ -165,11 +220,12 @@ describe("getAuctionLifecycle", () => {
         highestBid: "1200000000000000000",
         economics
       }),
-      2500
+      1500
     );
 
     expect(lifecycle.statusLabel).toBe("Settled");
     expect(lifecycle.currentPhase).toBe("Settled");
     expect(lifecycle.hasAnyClaimOrWithdrawal).toBe(false);
+    expect(lifecycle.timeStatusLabel).toBe("Auction finalized");
   });
 });

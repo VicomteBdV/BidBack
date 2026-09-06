@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildWalletActivity, type WalletActivityAuction, type WalletAuctionPosition } from "@/lib/walletActivity";
 import { testAddresses } from "@/test/fixtures";
 
@@ -43,6 +43,10 @@ function walletPosition(overrides: Partial<WalletAuctionPosition> = {}): WalletA
 }
 
 describe("buildWalletActivity", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("returns a connect-wallet warning when no wallet is provided", () => {
     const activity = buildWalletActivity([baseAuction()], null, 1500);
 
@@ -101,6 +105,43 @@ describe("buildWalletActivity", () => {
 
     expect(activity.activeBids).toBe(1);
     expect(activity.nextActions).toHaveLength(0);
+    expect(activity.actionQueue.watching[0].roles).toContain("bidder");
+  });
+
+  it("uses snapshot chain time when explicit time is absent", () => {
+    vi.spyOn(Date, "now").mockReturnValue(2_500_000);
+    const activity = buildWalletActivity(
+      [
+        baseAuction({
+          chainTimestamp: "1500",
+          highestBidder: testAddresses.secondBidder,
+          highestBid: "1200000000000000000",
+          walletPosition: walletPosition({ cap: "1000000000000000000" })
+        })
+      ],
+      testAddresses.primaryBidder
+    );
+
+    expect(activity.activeBids).toBe(1);
+    expect(activity.nextActions.some((action) => action.kind === "finalize")).toBe(false);
+    expect(activity.actionQueue.watching[0].roles).toContain("bidder");
+  });
+
+  it("prioritizes explicit time over snapshot chain time", () => {
+    const activity = buildWalletActivity(
+      [
+        baseAuction({
+          chainTimestamp: "2500",
+          highestBidder: testAddresses.secondBidder,
+          highestBid: "1200000000000000000",
+          walletPosition: walletPosition({ cap: "1000000000000000000" })
+        })
+      ],
+      testAddresses.primaryBidder,
+      "1500"
+    );
+
+    expect(activity.nextActions.some((action) => action.kind === "finalize")).toBe(false);
     expect(activity.actionQueue.watching[0].roles).toContain("bidder");
   });
 

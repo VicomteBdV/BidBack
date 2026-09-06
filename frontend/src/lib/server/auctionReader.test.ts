@@ -36,12 +36,14 @@ function createReaderClient({
   nextAuctionId,
   logs,
   logsError,
-  tokenUri
+  tokenUri,
+  blockTimestamp = 1_780_000_100n
 }: {
   nextAuctionId: bigint;
   logs?: ReturnType<typeof auctionCreatedLog>[];
   logsError?: Error;
   tokenUri?: string;
+  blockTimestamp?: bigint;
 }) {
   const readContract = vi.fn(async (request: unknown) => {
     const { functionName, args } = request as { functionName?: string; args?: readonly unknown[] };
@@ -76,14 +78,17 @@ function createReaderClient({
     if (logsError) throw logsError;
     return logs ?? [];
   });
+  const getBlock = vi.fn(async () => ({ timestamp: blockTimestamp }));
 
   return {
     client: {
       readContract,
-      getContractEvents
+      getContractEvents,
+      getBlock
     } as unknown as PublicClient,
     readContract,
-    getContractEvents
+    getContractEvents,
+    getBlock
   };
 }
 
@@ -137,7 +142,7 @@ describe("auctionReader auction discovery", () => {
   });
 
   it("returns an empty event-discovered list when no auction exists", async () => {
-    const { client } = createReaderClient({
+    const { client, getBlock } = createReaderClient({
       nextAuctionId: 1n,
       logs: []
     });
@@ -151,6 +156,23 @@ describe("auctionReader auction discovery", () => {
     expect(payload.discovery.strategy).toBe("events");
     expect(payload.count).toBe(0);
     expect(payload.auctions).toEqual([]);
+    expect(getBlock).not.toHaveBeenCalled();
+  });
+
+  it("shares one latest block timestamp across an auction snapshot", async () => {
+    const { client, getBlock } = createReaderClient({
+      nextAuctionId: 3n,
+      blockTimestamp: 1_780_000_321n
+    });
+
+    const auctions = await readAuctionsByIds([1n, 2n], {
+      client,
+      deployment: localDeploymentFixture
+    });
+
+    expect(getBlock).toHaveBeenCalledTimes(1);
+    expect(getBlock).toHaveBeenCalledWith({ blockTag: "latest" });
+    expect(auctions.map((auction) => auction.chainTimestamp)).toEqual(["1780000321", "1780000321"]);
   });
 
   it("keeps read-only auction loading available when metadata fetch fails", async () => {

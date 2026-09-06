@@ -934,6 +934,169 @@ a { color: inherit; }
   }
 
   .lifecycle-no-claims { align-self: center; font-style: italic; }
+
+  .transaction-review {
+    min-width: 0;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-recessed);
+    padding: 1rem;
+  }
+
+  .transaction-review-list {
+    display: grid;
+    min-width: 0;
+    gap: 0;
+    margin-top: 1rem;
+  }
+
+  .transaction-review-row {
+    display: grid;
+    min-width: 0;
+    gap: 0.25rem;
+    border-top: 1px solid var(--border);
+    padding: 0.65rem 0;
+  }
+
+  .transaction-review-row dt {
+    color: var(--ink-muted);
+    font-size: 0.72rem;
+  }
+
+  .transaction-review-row dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--ink-strong);
+    font-size: 0.86rem;
+    font-weight: 650;
+  }
+
+  .transaction-review-confirmations {
+    border-left: 3px solid var(--bronze);
+    margin-top: 0.8rem;
+    background: color-mix(in srgb, var(--bronze-soft) 48%, transparent);
+    padding: 0.7rem 0.85rem;
+    color: var(--ink-strong);
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .transaction-review-note {
+    margin-top: 0.75rem;
+    color: var(--ink-muted);
+    font-size: 0.75rem;
+    line-height: 1.55;
+  }
+
+  .transaction-review-actions {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+
+  .transaction-primary-action {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--accent-strong);
+    background: var(--accent-strong);
+    padding: 0.65rem 1rem;
+    color: #f9f1df;
+    font-size: 0.86rem;
+    font-weight: 750;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+
+  .transaction-primary-action:not(:disabled):hover { border-color: var(--accent); background: var(--accent); }
+  .transaction-secondary-action {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 0.65rem 1rem;
+    color: var(--accent-foreground);
+    font-size: 0.86rem;
+    font-weight: 750;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .transaction-secondary-action:not(:disabled):hover {
+    border-color: var(--accent-strong);
+    background: var(--accent);
+    color: var(--button-ink);
+  }
+
+  .transaction-primary-action:disabled,
+  .transaction-secondary-action:disabled,
+  .transaction-review-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+  .transaction-journey-steps {
+    display: grid;
+    min-width: 0;
+    gap: 0.5rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .transaction-journey-steps li {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 1.8rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    border-top: 1px solid var(--border);
+    padding: 0.55rem 0;
+    color: var(--ink-muted);
+  }
+
+  .transaction-journey-steps li > span {
+    display: inline-flex;
+    height: 1.65rem;
+    width: 1.65rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-strong);
+    color: var(--ink-muted);
+    font-size: 0.72rem;
+  }
+
+  .transaction-journey-steps small {
+    color: var(--ink-faint);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+  }
+
+  .transaction-journey-current { color: var(--warning-foreground) !important; }
+  .transaction-journey-current > span { border-color: var(--bronze) !important; color: var(--bronze) !important; }
+  .transaction-journey-completed > span { border-color: var(--accent) !important; background: var(--accent); color: #f8f1e3 !important; }
+  .transaction-journey-upcoming { opacity: 0.62; }
+
+  .transaction-action-card {
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--surface-recessed);
+    padding: 0.9rem;
+  }
+
+  .transaction-action-primary {
+    border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .transaction-action-disabled {
+    border-color: var(--border);
+    background: color-mix(in srgb, var(--surface-recessed) 70%, transparent);
+  }
+
+  .transaction-evidence summary {
+    cursor: pointer;
+    color: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
 }
 
 @media (min-width: 640px) {
@@ -950,6 +1113,9 @@ a { color: inherit; }
   .app-footer { padding-inline: 1.5rem; }
   .activity-ledger,
   .seller-form-surface { padding: 1.25rem; }
+
+  .transaction-review-row { grid-template-columns: minmax(9rem, 0.75fr) minmax(0, 1.25fr); gap: 1rem; }
+  .transaction-review-actions { flex-direction: row; justify-content: flex-end; }
 }
 
 @media (min-width: 1024px) {

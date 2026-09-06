@@ -1,4 +1,8 @@
-import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
+import {
+  getAuctionLifecycle,
+  resolveAuctionSnapshotNowSeconds,
+  type AuctionTimeInput
+} from "@/lib/auctionLifecycle";
 import { isZeroAddress } from "@/lib/format";
 import {
   buildWalletActionQueue,
@@ -121,10 +125,10 @@ function flattenActions(actionQueue: WalletActionQueue): WalletActivityAction[] 
 export function buildWalletActivity(
   auctions: WalletActivityAuction[],
   wallet?: `0x${string}` | null,
-  nowSeconds?: number | bigint,
+  nowSeconds?: AuctionTimeInput,
   options: BuildWalletActivityOptions = {}
 ): WalletActivitySummary {
-  const resolvedNowSeconds = nowSeconds ?? Math.floor(Date.now() / 1000);
+  const resolvedNowSeconds = resolveAuctionSnapshotNowSeconds(auctions, nowSeconds);
   const actionQueue = buildWalletActionQueue(auctions, wallet, {
     nowSeconds: resolvedNowSeconds,
     globalCredits: options.globalCredits,

@@ -25,27 +25,31 @@ export function sameAddress(a?: string | null, b?: string | null) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
-export function parseBidCap(value: string): { value: bigint | null; error: string | null } {
+export function parseBidAmount(
+  value: string,
+  mode: "total-cap" | "step-up-delta"
+): { value: bigint | null; error: string | null } {
   const trimmed = value.trim();
+  const fieldLabel = mode === "step-up-delta" ? "Bid increase" : "Bid cap";
 
   if (!trimmed) {
-    return { value: null, error: "Bid cap is required." };
+    return { value: null, error: `${fieldLabel} is required.` };
   }
 
   if (trimmed.startsWith("-")) {
-    return { value: null, error: "Bid cap must be greater than zero." };
+    return { value: null, error: `${fieldLabel} must be greater than zero.` };
   }
 
   try {
     const parsed = parseEther(trimmed);
 
     if (parsed <= 0n) {
-      return { value: parsed, error: "Bid cap must be greater than zero." };
+      return { value: parsed, error: `${fieldLabel} must be greater than zero.` };
     }
 
     return { value: parsed, error: null };
   } catch {
-    return { value: null, error: "Bid cap must be a valid ETH amount." };
+    return { value: null, error: `${fieldLabel} must be a valid ETH amount.` };
   }
 }
 
@@ -78,7 +82,7 @@ export function isAuctionExpired(endTime?: string | number | bigint | null, nowS
 }
 
 export function getBidActionState({
-  bidCapEth,
+  bidAmountEth,
   minimumNextBid,
   currentCap,
   auctionState,
@@ -86,7 +90,7 @@ export function getBidActionState({
   nowSeconds,
   ...context
 }: WalletContext & {
-  bidCapEth: string;
+  bidAmountEth: string;
   minimumNextBid: bigint | null;
   currentCap: bigint | null;
   auctionState: AuctionStateValue;
@@ -112,16 +116,22 @@ export function getBidActionState({
     return { disabledReason: "Load wallet bid data before placing a bid.", parsedBidCap: null, valueToSend: 0n };
   }
 
-  const parsed = parseBidCap(bidCapEth);
+  const isStepUp = currentCap > 0n;
+  const parsed = parseBidAmount(bidAmountEth, isStepUp ? "step-up-delta" : "total-cap");
 
   if (parsed.error) {
     return { disabledReason: parsed.error, parsedBidCap: parsed.value, valueToSend: 0n };
   }
 
-  const bidCap = parsed.value ?? 0n;
+  const enteredAmount = parsed.value ?? 0n;
+  const bidCap = isStepUp ? currentCap + enteredAmount : enteredAmount;
 
   if (bidCap < minimumNextBid) {
-    return { disabledReason: "Bid cap must be at least minimumNextBid.", parsedBidCap: bidCap, valueToSend: 0n };
+    return {
+      disabledReason: "New bid cap must meet the minimum required bid.",
+      parsedBidCap: bidCap,
+      valueToSend: 0n
+    };
   }
 
   if (bidCap <= currentCap) {
@@ -131,24 +141,29 @@ export function getBidActionState({
   return {
     disabledReason: null,
     parsedBidCap: bidCap,
-    valueToSend: bidCap - currentCap
+    valueToSend: enteredAmount
   };
 }
 
 export function getFinalizeActionState({
   finalized,
+  auctionState,
   endTime,
   nowSeconds,
   ...context
 }: WalletContext & {
   finalized: boolean;
+  auctionState: AuctionStateValue;
   endTime?: string | number | bigint | null;
   nowSeconds?: number | bigint;
 }): ActionState {
   const base = baseWalletDisabledReason(context);
   if (base) return { disabledReason: base };
 
-  if (finalized) return { disabledReason: "Auction is already finalized." };
+  if (finalized || auctionState === 2) return { disabledReason: "Auction is already finalized." };
+
+  // ENDED is authoritative even when the chain clock is ahead of the browser.
+  if (auctionState === 1) return { disabledReason: null };
 
   const parsedEndTime = parseTimestampSeconds(endTime);
   if (parsedEndTime === null) return { disabledReason: "Auction end time is unavailable." };

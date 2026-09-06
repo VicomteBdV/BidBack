@@ -1,4 +1,8 @@
-import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
+import {
+  getAuctionLifecycle,
+  resolveAuctionSnapshotNowSeconds,
+  type AuctionTimeInput
+} from "@/lib/auctionLifecycle";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { isZeroAddress } from "@/lib/format";
 
@@ -19,7 +23,7 @@ export type AuctionFilterOptions = {
   query: string;
   sort: AuctionSortOption;
   connectedWallet?: `0x${string}` | null;
-  nowSeconds?: number | bigint;
+  nowSeconds?: AuctionTimeInput;
 };
 
 export const auctionStatusFilterLabels: Record<AuctionStatusFilter, string> = {
@@ -77,8 +81,8 @@ function isWalletInvolved(auction: SerializedAuction, wallet?: `0x${string}` | n
 function matchesStatus(
   auction: SerializedAuction,
   status: AuctionStatusFilter,
-  connectedWallet?: `0x${string}` | null,
-  nowSeconds?: number | bigint
+  connectedWallet: `0x${string}` | null | undefined,
+  nowSeconds: bigint
 ) {
   const lifecycle = getAuctionLifecycle(auction, nowSeconds);
 
@@ -127,19 +131,17 @@ function compareBigIntAscending(a: bigint, b: bigint) {
   return a < b ? -1 : 1;
 }
 
-function sortAuctions(auctions: SerializedAuction[], sort: AuctionSortOption, nowSeconds?: number | bigint) {
-  const now = typeof nowSeconds === "bigint" ? nowSeconds : BigInt(nowSeconds ?? Math.floor(Date.now() / 1000));
-
+function sortAuctions(auctions: SerializedAuction[], sort: AuctionSortOption, nowSeconds: bigint) {
   return [...auctions].sort((a, b) => {
     if (sort === "oldest") {
       return compareBigIntAscending(parseBigInt(a.auctionId), parseBigInt(b.auctionId));
     }
 
     if (sort === "endingSoon") {
-      const aLifecycle = getAuctionLifecycle(a, now);
-      const bLifecycle = getAuctionLifecycle(b, now);
-      const aActive = !aLifecycle.isFinalized && parseBigInt(a.endTime) >= now;
-      const bActive = !bLifecycle.isFinalized && parseBigInt(b.endTime) >= now;
+      const aLifecycle = getAuctionLifecycle(a, nowSeconds);
+      const bLifecycle = getAuctionLifecycle(b, nowSeconds);
+      const aActive = !aLifecycle.isFinalized && parseBigInt(a.endTime) >= nowSeconds;
+      const bActive = !bLifecycle.isFinalized && parseBigInt(b.endTime) >= nowSeconds;
 
       if (aActive !== bActive) return aActive ? -1 : 1;
 
@@ -161,12 +163,13 @@ function sortAuctions(auctions: SerializedAuction[], sort: AuctionSortOption, no
 }
 
 export function filterAndSortAuctions(auctions: SerializedAuction[], options: AuctionFilterOptions) {
+  const resolvedNowSeconds = resolveAuctionSnapshotNowSeconds(auctions, options.nowSeconds);
   const filtered = auctions.filter((auction) => {
     return (
-      matchesStatus(auction, options.status, options.connectedWallet, options.nowSeconds) &&
+      matchesStatus(auction, options.status, options.connectedWallet, resolvedNowSeconds) &&
       matchesQuery(auction, options.query)
     );
   });
 
-  return sortAuctions(filtered, options.sort, options.nowSeconds);
+  return sortAuctions(filtered, options.sort, resolvedNowSeconds);
 }
