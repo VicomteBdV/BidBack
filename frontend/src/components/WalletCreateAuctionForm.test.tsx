@@ -1,9 +1,10 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { createPublicClient, createWalletClient } from "viem";
+import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics } from "viem";
 import { useAccount } from "wagmi";
 import { describe, expect, it, vi } from "vitest";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
+import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
@@ -25,6 +26,23 @@ vi.mock("viem", async () => {
 const seller = testAddresses.seller;
 const otherOwner = testAddresses.secondBidder;
 const zeroAddress = "0x0000000000000000000000000000000000000000" as const;
+
+const blockHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+
+function creationLog({ auctionId = 1n, sellerAddress = seller, nft = testAddresses.localNft,
+  tokenId = 2n, startPrice = 1_000_000_000_000_000_000n, duration = 7200n,
+  emitter = testAddresses.auctionHouse }: {
+  auctionId?: bigint; sellerAddress?: `0x${string}`; nft?: `0x${string}`;
+  tokenId?: bigint; startPrice?: bigint; duration?: bigint; emitter?: `0x${string}`;
+} = {}) {
+  return {
+    address: emitter,
+    topics: encodeEventTopics({ abi: auctionHouseAbi, eventName: "AuctionCreated",
+      args: { auctionId, seller: sellerAddress, nft } }),
+    data: encodeAbiParameters([{ type: "uint256" }, { type: "uint256" }, { type: "uint64" }],
+      [tokenId, startPrice, 1000n + duration])
+  };
+}
 
 type MinimalConnectedAccount = {
   address: `0x${string}`;
@@ -75,7 +93,9 @@ function setupWalletCreateForm({
     throw new Error(`Unexpected readContract call: ${String(functionName)}`);
   });
 
-  const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
+  let logs = [creationLog()];
+  const waitForTransactionReceipt = vi.fn(async () => ({ status: "success", logs, blockHash }));
+  const getBlock = vi.fn(async () => ({ timestamp: 1000n }));
   const writeContract = vi.fn(async (request: unknown) => {
     const { functionName } = request as { functionName?: string };
 
@@ -84,11 +104,17 @@ function setupWalletCreateForm({
       currentApprovedForAll = false;
     }
 
+    if (functionName === "createAuction") {
+      const [nft, tokenId, startPrice, duration] = (request as { args: [`0x${string}`, bigint, bigint, bigint] }).args;
+      logs = [creationLog({ nft, tokenId, startPrice, duration })];
+    }
+
     return "0x1111111111111111111111111111111111111111111111111111111111111111" as const;
   });
 
   vi.mocked(createPublicClient).mockReturnValue({
     readContract,
+    getBlock,
     waitForTransactionReceipt
   } as unknown as ReturnType<typeof createPublicClient>);
 
@@ -376,4 +402,39 @@ describe("WalletCreateAuctionForm", () => {
     expect(screen.queryByText(/^Total duration:/)).not.toBeInTheDocument();
     expect(screen.getByTestId("canonical-duration")).toHaveTextContent("10800");
   });
+  it("uses the receipt ID after a concurrent creation instead of the old counter", async () => {
+    const { readContract, waitForTransactionReceipt } = setupWalletCreateForm({ approvedAddress: testAddresses.nftVault });
+    waitForTransactionReceipt.mockResolvedValue({ status: "success", logs: [creationLog({ auctionId: 9n })], blockHash });
+    await waitForContext();
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create auction" }));
+    expect(await screen.findByText("Auction #9 created.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open auction detail" })).toHaveAttribute("href", "/auctions/9");
+    expect(readContract).not.toHaveBeenCalledWith(expect.objectContaining({ functionName: "nextAuctionId" }));
+  });
+
+  it.each([
+    { label: "missing", logs: [] },
+    { label: "wrong emitter", logs: [creationLog({ emitter: otherOwner })] },
+    { label: "wrong seller", logs: [creationLog({ sellerAddress: otherOwner })] },
+    { label: "wrong NFT", logs: [creationLog({ nft: otherOwner })] },
+    { label: "wrong token", logs: [creationLog({ tokenId: 99n })] },
+    { label: "wrong price", logs: [creationLog({ startPrice: 1n })] },
+    { label: "wrong duration", logs: [creationLog({ duration: 1n })] },
+    { label: "ambiguous", logs: [creationLog(), creationLog({ auctionId: 2n })] },
+    { label: "malformed", logs: [{ ...creationLog(), data: "0x" as const }] }
+  ])("preserves confirmed creation with an unidentified ID when the event is $label", async ({ logs }) => {
+    const { waitForTransactionReceipt, writeContract } = setupWalletCreateForm({ approvedAddress: testAddresses.nftVault });
+    waitForTransactionReceipt.mockResolvedValue({ status: "success", logs, blockHash });
+    await waitForContext();
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create auction" }));
+    expect(await screen.findByText("Auction creation confirmed, but the auction ID could not be determined.")).toBeInTheDocument();
+    expect(screen.getByText("Transaction confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/Do not create the auction again/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open auction detail" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review auction" })).toBeDisabled();
+    expect(writeContract).toHaveBeenCalledTimes(1);
+  });
+
 });

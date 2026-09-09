@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AuctionLifecyclePanel } from "@/components/AuctionLifecyclePanel";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture } from "@/test/fixtures";
+import { auctionDetailFixture, settledReadinessFixture } from "@/test/fixtures";
 
 const baseAuction = auctionDetailFixture.auction as unknown as SerializedAuction;
 
@@ -55,7 +55,8 @@ describe("AuctionLifecyclePanel", () => {
           stateLabel: "FINALIZED",
           finalized: true,
           nftClaimed: true,
-          economics: undefined
+          economics: undefined,
+          settlementReadiness: settledReadinessFixture
         }}
       />
     );
@@ -70,4 +71,13 @@ describe("AuctionLifecyclePanel", () => {
     expect(screen.getByText("Settled")).toBeInTheDocument();
     expect(screen.getByText("No pending action detected")).toBeInTheDocument();
   });
+  it("leaves settlement upcoming when economic reads are unavailable", () => {
+    render(<AuctionLifecyclePanel auction={{ ...baseAuction, state: 2, finalized: true, nftClaimed: true,
+      economics: undefined, settlementReadiness: undefined }} />);
+    expect(screen.getByLabelText("Claims: Current")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByLabelText("Settlement: Upcoming")).toBeInTheDocument();
+    expect(screen.queryByText("Settled")).not.toBeInTheDocument();
+    expect(screen.getByText(/Settlement reads are incomplete or unavailable/)).toBeInTheDocument();
+  });
+
 });

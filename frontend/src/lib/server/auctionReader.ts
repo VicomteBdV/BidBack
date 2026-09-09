@@ -11,6 +11,8 @@ import type {
   AuctionDetailApiResponse,
   AuctionDiscovery,
   AuctionEconomics,
+  AuctionEconomicAmount,
+  AuctionSettlementReadiness,
   AuctionParamsSnapshot,
   AuctionStateValue,
   AuctionsApiResponse,
@@ -61,6 +63,7 @@ type ReadAuctionsByIdsOptions = {
   client?: PublicClient;
   deployment?: DeploymentFile;
   includeNftMetadata?: boolean;
+  includeSettlementReadiness?: boolean;
 };
 
 type AuctionCreatedLog = {
@@ -578,6 +581,7 @@ async function readBidderEconomics({
   label,
   finalized,
   distributionOpened,
+  blockNumber,
   deployment,
   client
 }: {
@@ -587,6 +591,7 @@ async function readBidderEconomics({
   label: string;
   finalized: boolean;
   distributionOpened: boolean;
+  blockNumber?: bigint;
   deployment: DeploymentFile;
   client: PublicClient;
 }): Promise<BidderEconomics> {
@@ -608,30 +613,35 @@ async function readBidderEconomics({
 
   const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed] = await Promise.all([
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "capOf",
       args: [auctionId, bidder.address]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "refundableAmount",
       args: [auctionId, bidder.address]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "refundClaimed",
       args: [auctionId, bidder.address]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.distributionVault,
       abi: distributionVaultAbi,
       functionName: "entitlementOf",
       args: [auctionId, bidder.address]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.distributionVault,
       abi: distributionVaultAbi,
       functionName: "claimed",
@@ -660,25 +670,30 @@ async function readAuctionEconomics(
   deployment: DeploymentFile,
   client: PublicClient
 ): Promise<AuctionEconomics> {
+  const blockNumber = auction.readBlockNumber ? BigInt(auction.readBlockNumber) : undefined;
   const [globalFeeRecipient, settlementRaw, distributionRaw, participants] = await Promise.all([
     client.readContract({
+      blockNumber,
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
       functionName: "feeRecipient"
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "settlements",
       args: [auctionId]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.distributionVault,
       abi: distributionVaultAbi,
       functionName: "distributions",
       args: [auctionId]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
       functionName: "getParticipants",
@@ -708,6 +723,7 @@ async function readAuctionEconomics(
       label: "Bidder #1",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
+      blockNumber,
       deployment,
       client
     }),
@@ -718,16 +734,19 @@ async function readAuctionEconomics(
       label: "Bidder #2",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
+      blockNumber,
       deployment,
       client
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "sellerCredits",
       args: [auction.seller]
     }),
     client.readContract({
+      blockNumber,
       address: deployment.contracts.escrowVault,
       abi: escrowVaultAbi,
       functionName: "protocolFeeCredits",
@@ -780,6 +799,141 @@ async function readAuctionEconomics(
   };
 }
 
+// ParamsController enforces this hard ceiling even when an auction snapshot is unavailable.
+const MAX_SETTLEMENT_PARTICIPANTS = 256;
+const SETTLEMENT_AUCTION_BATCH_SIZE = 2;
+const SETTLEMENT_PARTICIPANT_BATCH_SIZE = 4;
+
+async function readAuctionFeeRecipientSnapshot(
+  auction: SerializedAuction,
+  deployment: DeploymentFile,
+  client: PublicClient
+) {
+  try {
+    auction.auctionFeeRecipient = await client.readContract({
+      address: deployment.contracts.auctionHouse,
+      abi: auctionHouseAbi,
+      functionName: "getAuctionFeeRecipient",
+      args: [BigInt(auction.auctionId)],
+      blockNumber: auction.readBlockNumber ? BigInt(auction.readBlockNumber) : undefined
+    });
+  } catch (error) {
+    auction.auctionFeeRecipientError = `Unable to read auction fee recipient snapshot: ${errorMessage(error)}`;
+  }
+}
+
+export async function readAuctionSettlementReadiness(
+  auction: SerializedAuction,
+  deployment: DeploymentFile,
+  client: PublicClient
+): Promise<AuctionSettlementReadiness> {
+  const unavailable = (): AuctionEconomicAmount => ({ status: "unavailable" });
+  const known = (value: bigint): AuctionEconomicAmount => ({ status: "known", value: value.toString() });
+  const result: AuctionSettlementReadiness = {
+    status: "unavailable",
+    participantsExpected: auction.participantCount,
+    participantsRead: 0,
+    refunds: unavailable(),
+    redistribution: unavailable(),
+    sellerWalletCredit: unavailable(),
+    protocolWalletCredit: unavailable(),
+    warnings: []
+  };
+  if (!auction.finalized || !auction.readBlockNumber) return result;
+
+  const auctionId = BigInt(auction.auctionId);
+  const blockNumber = BigInt(auction.readBlockNumber);
+  const uint = (value: unknown): bigint => {
+    if (typeof value !== "bigint" || value < 0n) throw new Error("Invalid economic amount.");
+    return value;
+  };
+  const noBids = auction.participantCount === "0" && auction.highestBid === "0" &&
+    sameAddress(auction.highestBidder, ZERO_ADDRESS);
+
+  // Independent groups retain useful positive balances when another read fails.
+  const reads = await Promise.allSettled([
+    (async () => {
+      const [participantsRead, settlementRead] = await Promise.allSettled([
+        client.readContract({ address: deployment.contracts.auctionHouse, abi: auctionHouseAbi,
+          functionName: "getParticipants", args: [auctionId], blockNumber }),
+        client.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
+          functionName: "settlements", args: [auctionId], blockNumber })
+      ]);
+      if (participantsRead.status === "rejected") throw participantsRead.reason;
+      if (settlementRead.status === "rejected") throw settlementRead.reason;
+      const participants = participantsRead.value;
+      const settlement = settlementRead.value;
+      const limit = Math.min(MAX_SETTLEMENT_PARTICIPANTS, Number(auction.paramsSnapshot?.maxParticipants ?? MAX_SETTLEMENT_PARTICIPANTS));
+      if (!Array.isArray(participants) || !Number.isInteger(limit) || limit < 0 ||
+          participants.length > limit || BigInt(participants.length) !== BigInt(auction.participantCount) ||
+          participants.some((participant) => !isAddress(participant) || sameAddress(participant, ZERO_ADDRESS)) ||
+          new Set(participants.map((participant) => participant.toLowerCase())).size !== participants.length) {
+        throw new Error("Participant reads are incomplete or exceed the contract limit.");
+      }
+      const settled = getField(settlement, "finalized", 0);
+      if (settled !== true && !(noBids && settled === false)) {
+        throw new Error("ETH settlement is not confirmed.");
+      }
+      // Each pair preserves the difference between zero and an already claimed amount.
+      const refunds: PromiseSettledResult<bigint>[] = [];
+      for (let offset = 0; offset < participants.length; offset += SETTLEMENT_PARTICIPANT_BATCH_SIZE) {
+        refunds.push(...await Promise.allSettled(participants.slice(offset, offset + SETTLEMENT_PARTICIPANT_BATCH_SIZE).map(async (participant) => {
+          // Drain both reads even on failure before starting another bounded batch.
+          const [amountRead, claimedRead] = await Promise.allSettled([
+            client.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
+              functionName: "refundableAmount", args: [auctionId, participant], blockNumber }),
+            client.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
+              functionName: "refundClaimed", args: [auctionId, participant], blockNumber })
+          ]);
+          if (amountRead.status === "rejected") throw amountRead.reason;
+          if (claimedRead.status === "rejected") throw claimedRead.reason;
+          const amount = amountRead.value;
+          const claimed = claimedRead.value;
+          uint(amount);
+          if (typeof claimed !== "boolean") throw new Error("Refund claim status is unavailable.");
+          return claimed ? 0n : amount;
+        })));
+      }
+      result.participantsRead = refunds.filter((read) => read.status === "fulfilled").length;
+      if (refunds.some((read) => read.status === "rejected")) {
+        throw new Error("Some participant refunds are unavailable.");
+      }
+      result.refunds = known(refunds.reduce((total, read) => total + (read.status === "fulfilled" ? read.value : 0n), 0n));
+    })(),
+    (async () => {
+      const raw = await client.readContract({ address: deployment.contracts.distributionVault, abi: distributionVaultAbi,
+        functionName: "distributions", args: [auctionId], blockNumber });
+      const opened = getField(raw, "opened", 0);
+      const assigned = uint(getField(raw, "totalAssigned", 1));
+      const claimed = uint(getField(raw, "totalClaimed", 2));
+      if (claimed > assigned || (opened !== true && !(noBids && opened === false && assigned === 0n && claimed === 0n))) {
+        throw new Error("Redistribution settlement is unavailable or inconsistent.");
+      }
+      result.redistribution = known(assigned - claimed);
+    })(),
+    (async () => {
+      result.sellerWalletCredit = known(uint(await client.readContract({
+        address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
+        functionName: "sellerCredits", args: [auction.seller], blockNumber
+      })));
+    })(),
+    (async () => {
+      // Never substitute the current global fee recipient for the auction snapshot.
+      if (!auction.auctionFeeRecipient) throw new Error("Auction fee recipient is unavailable.");
+      result.protocolWalletCredit = known(uint(await client.readContract({
+        address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
+        functionName: "protocolFeeCredits", args: [auction.auctionFeeRecipient], blockNumber
+      })));
+    })()
+  ]);
+  for (const read of reads) {
+    if (read.status === "rejected") result.warnings.push(errorMessage(read.reason));
+  }
+  result.status = reads.every((read) => read.status === "fulfilled") ? "complete"
+    : reads.every((read) => read.status === "rejected") ? "unavailable" : "partial";
+  return result;
+}
+
 export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAuctionsByIdsOptions = {}) {
   if (auctionIds.length === 0) {
     return [];
@@ -788,24 +942,34 @@ export async function readAuctionsByIds(auctionIds: bigint[], options: ReadAucti
   const deployment = options.deployment ?? (await readTargetDeployment());
   const client = options.client ?? createTargetPublicClient();
 
-  const [latestBlock, rawAuctions] = await Promise.all([
-    client.getBlock({ blockTag: "latest" }),
-    Promise.all(
-      auctionIds.map(async (auctionId) => ({
-        auctionId,
-        rawAuction: await client.readContract({
-          address: deployment.contracts.auctionHouse,
-          abi: auctionHouseAbi,
-          functionName: "getAuction",
-          args: [auctionId]
-        })
-      }))
-    )
-  ]);
-  const chainTimestamp = latestBlock.timestamp.toString();
-  const auctions = rawAuctions.map(({ auctionId, rawAuction }) =>
-    serializeAuction(auctionId, rawAuction, chainTimestamp)
+  const latestBlock = await client.getBlock({ blockTag: "latest" });
+  const rawAuctions = await Promise.all(
+    auctionIds.map(async (auctionId) => ({
+      auctionId,
+      rawAuction: await client.readContract({
+        address: deployment.contracts.auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [auctionId],
+        blockNumber: latestBlock.number
+      })
+    }))
   );
+  const chainTimestamp = latestBlock.timestamp.toString();
+  const auctions: SerializedAuction[] = rawAuctions.map(({ auctionId, rawAuction }) =>
+    ({ ...serializeAuction(auctionId, rawAuction, chainTimestamp), readBlockNumber: latestBlock.number?.toString() })
+  );
+
+  if (options.includeSettlementReadiness) {
+    const finalizedAuctions = auctions.filter((auction) => auction.finalized);
+    for (let offset = 0; offset < finalizedAuctions.length; offset += SETTLEMENT_AUCTION_BATCH_SIZE) {
+      await Promise.all(finalizedAuctions.slice(offset, offset + SETTLEMENT_AUCTION_BATCH_SIZE).map(async (auction) => {
+        // Missing block evidence must stay unavailable; do not fall back to moving latest reads.
+        if (auction.readBlockNumber) await readAuctionFeeRecipientSnapshot(auction, deployment, client);
+        auction.settlementReadiness = await readAuctionSettlementReadiness(auction, deployment, client);
+      }));
+    }
+  }
 
   if (!options.includeNftMetadata) {
     return auctions;
@@ -837,7 +1001,8 @@ export async function readAllAuctions(options: ReadAllAuctionsOptions = {}): Pro
   const auctions = await readAuctionsByIds(discoveryResult.ids, {
     client,
     deployment,
-    includeNftMetadata: true
+    includeNftMetadata: true,
+    includeSettlementReadiness: true
   });
 
   return {
@@ -890,7 +1055,8 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
       address: deployment.contracts.auctionHouse,
       abi: auctionHouseAbi,
       functionName: "getAuctionParams",
-      args: [auctionId]
+      args: [auctionId],
+      blockNumber: auction.readBlockNumber ? BigInt(auction.readBlockNumber) : undefined
     });
 
     auction.paramsSnapshot = serializeAuctionParams(rawParams);
@@ -898,18 +1064,12 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     auction.paramsSnapshotError = `Unable to read auction parameter snapshot: ${errorMessage(error)}`;
   }
 
-  try {
-    auction.auctionFeeRecipient = await client.readContract({
-      address: deployment.contracts.auctionHouse,
-      abi: auctionHouseAbi,
-      functionName: "getAuctionFeeRecipient",
-      args: [auctionId]
-    });
-  } catch (error) {
-    auction.auctionFeeRecipientError = `Unable to read auction fee recipient snapshot: ${errorMessage(error)}`;
-  }
+  await readAuctionFeeRecipientSnapshot(auction, deployment, client);
 
   const economicWarnings: string[] = [];
+
+  auction.settlementReadiness = await readAuctionSettlementReadiness(auction, deployment, client);
+  economicWarnings.push(...auction.settlementReadiness.warnings);
 
   try {
     auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
@@ -920,6 +1080,17 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
   auction.economicSummary = buildAuctionEconomicSummary(auction, {
     extraWarnings: economicWarnings
   });
+  if (auction.finalized) {
+    const summary = auction.economicSummary.settlement;
+    summary.refundsAvailable = { ...auction.settlementReadiness.refunds,
+      note: "All auction participants; unavailable if any refund read is incomplete. Refunds are separate from redistribution." };
+    summary.rewardsAvailable = { ...auction.settlementReadiness.redistribution,
+      note: "Total assigned redistribution minus total claimed. Redistribution is conditional and can be zero." };
+    summary.sellerCredit = { ...auction.settlementReadiness.sellerWalletCredit,
+      note: "Aggregate seller wallet credit across auctions, not historical attribution to this auction." };
+    summary.protocolFeeCredit = { ...auction.settlementReadiness.protocolWalletCredit,
+      note: "Aggregate protocol wallet credit across auctions, not historical attribution to this auction." };
+  }
 
   return {
     chainId: deployment.chainId,

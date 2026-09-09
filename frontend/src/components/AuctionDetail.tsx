@@ -147,12 +147,8 @@ export function AuctionDetail({
               <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
             ) : lifecycle.canFinalize ? (
               <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
-            ) : lifecycle.isFinalized && lifecycle.statusLabel !== "Settled" ? (
+            ) : lifecycle.isFinalized ? (
               <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
-            ) : lifecycle.statusLabel === "Settled" ? (
-              <StateNotice tone="info" title="No pending wallet action">
-                This auction is fully settled. The lifecycle timeline remains the authoritative progression view.
-              </StateNotice>
             ) : (
               <StateNotice tone="warning" title="Action state unavailable">
                 Refresh the auction before choosing a wallet-signed action.
@@ -171,6 +167,10 @@ export function AuctionDetail({
           ) : null}
 
           <AuctionEconomicsPanel auction={auction} />
+          <p className="text-xs leading-5 text-slate-400">
+            Seller and protocol withdrawable credits are aggregate wallet balances across auctions. They do not establish
+            which auction&apos;s proceeds or fees have already been withdrawn.
+          </p>
         </div>
 
         <aside className="auction-detail-aside" aria-label="Auction status and participation rules">

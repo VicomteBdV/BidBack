@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { testAddresses } from "@/test/fixtures";
+import { settledReadinessFixture, testAddresses } from "@/test/fixtures";
 
 function baseAuction(overrides: Partial<SerializedAuction> = {}): SerializedAuction {
   return {
@@ -199,11 +199,11 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.hasReward).toBe(true);
     expect(lifecycle.hasSellerProceeds).toBe(true);
     expect(lifecycle.hasProtocolFees).toBe(true);
-    expect(lifecycle.claimableItems).toEqual(["NFT claim", "Refund", "Reward", "Seller proceeds", "Protocol fees"]);
+    expect(lifecycle.claimableItems).toEqual(["NFT claim", "Refund", "Reward", "Seller proceeds (wallet credit)", "Protocol fees (wallet credit)"]);
     expect(lifecycle.timeStatusLabel).toBe("Auction finalized");
   });
 
-  it("describes a settled auction when no visible claims remain", () => {
+  it("describes a settled auction only with complete zero balances", () => {
     const economics = finalizedEconomics();
     economics.primaryBidder.refundClaimed = true;
     economics.primaryBidder.rewardClaimed = true;
@@ -218,7 +218,9 @@ describe("getAuctionLifecycle", () => {
         nftClaimed: true,
         highestBidder: testAddresses.secondBidder,
         highestBid: "1200000000000000000",
-        economics
+        economics,
+        participantCount: "2",
+        settlementReadiness: settledReadinessFixture
       }),
       1500
     );
@@ -228,4 +230,41 @@ describe("getAuctionLifecycle", () => {
     expect(lifecycle.hasAnyClaimOrWithdrawal).toBe(false);
     expect(lifecycle.timeStatusLabel).toBe("Auction finalized");
   });
+  it.each([undefined, { ...settledReadinessFixture, status: "partial" as const },
+    { ...settledReadinessFixture, status: "unavailable" as const },
+    { ...settledReadinessFixture, refunds: { status: "unavailable" as const } },
+    { ...settledReadinessFixture, participantsRead: 1 }])("never infers Settled from missing or partial reads: %j", (settlementReadiness) => {
+    const lifecycle = getAuctionLifecycle(baseAuction({ state: 2, finalized: true, nftClaimed: true,
+      participantCount: "2", economics: undefined, settlementReadiness }));
+    expect(lifecycle.statusLabel).not.toBe("Settled");
+    expect(lifecycle.isFinalized).toBe(true);
+  });
+
+  it("does not infer settlement from two cleared bidder views", () => {
+    const economics = finalizedEconomics();
+    economics.primaryBidder.refundClaimed = true;
+    economics.primaryBidder.rewardClaimed = true;
+    economics.seller.credit = "0";
+    economics.feeRecipient.credit = "0";
+    const lifecycle = getAuctionLifecycle(baseAuction({ state: 2, finalized: true, nftClaimed: true,
+      participantCount: "4", economics }));
+    expect(lifecycle.statusLabel).not.toBe("Settled");
+  });
+
+  it("keeps the seller NFT claim available without bids or an ETH settlement", () => {
+    const lifecycle = getAuctionLifecycle(baseAuction({ state: 2, finalized: true, economics: undefined }));
+    expect(lifecycle.hasClaimableNft).toBe(true);
+    expect(lifecycle.nftClaimantAddress).toBe(testAddresses.seller);
+    expect(lifecycle.statusLabel).toBe("Finalized");
+  });
+
+  it("labels aggregate wallet credit without attributing a withdrawal to the auction", () => {
+    const lifecycle = getAuctionLifecycle(baseAuction({ state: 2, finalized: true, nftClaimed: true,
+      participantCount: "2", settlementReadiness: { ...settledReadinessFixture,
+        sellerWalletCredit: { status: "known", value: "100" } } }));
+    expect(lifecycle.statusLabel).not.toBe("Settled");
+    expect(lifecycle.claimableItems).toContain("Seller proceeds (wallet credit)");
+    expect(lifecycle.nextActionReason).toContain("aggregate wallet balances across auctions");
+  });
+
 });

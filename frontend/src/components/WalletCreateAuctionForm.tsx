@@ -6,6 +6,7 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  decodeEventLog,
   type Address,
   type EIP1193Provider,
   type PublicClient
@@ -473,12 +474,6 @@ export function WalletCreateAuctionForm() {
       const parsed = parseCreateAuctionValues(values);
       const { publicClient, walletClient } = createBrowserClients(address);
 
-      const expectedAuctionId = await publicClient.readContract({
-        address: context.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "nextAuctionId"
-      });
-
       setCreateTxStatus(awaitingSignatureState("Confirm auction creation in your wallet."));
 
       const txHash = await walletClient.writeContract({
@@ -504,13 +499,38 @@ export function WalletCreateAuctionForm() {
         return;
       }
 
-      setCreatedAuctionId(expectedAuctionId.toString());
+      let confirmedAuctionId: string | null = null;
+      try {
+        const matches = (receipt.logs ?? []).flatMap((log) => {
+          if (!sameAddress(log.address, context.auctionHouse)) return [];
+          try {
+            const event = decodeEventLog({ abi: auctionHouseAbi, eventName: "AuctionCreated", data: log.data, topics: log.topics, strict: true });
+            if (event.eventName !== "AuctionCreated") return [];
+            const args = event.args;
+            return args.auctionId > 0n && sameAddress(args.seller, address) &&
+              sameAddress(args.nft, parsed.nftContract) && args.tokenId === parsed.tokenId &&
+              args.startPrice === parsed.startPrice ? [args] : [];
+          } catch {
+            return [];
+          }
+        });
+        if (matches.length === 1) {
+          const block = await publicClient.getBlock({ blockHash: receipt.blockHash });
+          if (matches[0].initialEndTime === block.timestamp + parsed.duration) {
+            confirmedAuctionId = matches[0].auctionId.toString();
+          }
+        }
+      } catch {
+        // Receipt success remains authoritative even if event identification is unavailable.
+      }
+      setCreatedAuctionId(confirmedAuctionId);
       setIsReviewing(false);
       setCreateTxStatus(
         confirmedTransactionState(
           txHash,
-          `Auction #${expectedAuctionId.toString()} created.`,
-          "Open the auction detail to review the live lot and bidding state."
+          confirmedAuctionId ? `Auction #${confirmedAuctionId} created.` : "Auction creation confirmed, but the auction ID could not be determined.",
+          confirmedAuctionId ? "Open the auction detail to review the live lot and bidding state."
+            : "Keep this transaction hash and review its receipt or refresh the auction list. Do not create the auction again."
         )
       );
     } catch (caught) {
@@ -533,7 +553,7 @@ export function WalletCreateAuctionForm() {
     }
   }
 
-  const journeyStep = createdAuctionId
+  const journeyStep = createTxStatus?.phase === "confirmed"
     ? 5
     : isCreating || (isReviewing && hasApproval)
       ? 4
@@ -654,7 +674,7 @@ export function WalletCreateAuctionForm() {
           <div>
             <button
               type="button"
-              disabled={Boolean(validationError) || !isConnected || wrongNetwork || isChecking || isApproving || isCreating}
+              disabled={Boolean(validationError) || !isConnected || wrongNetwork || isChecking || isApproving || isCreating || createTxStatus?.phase === "confirmed" || createTxStatus?.phase === "confirmation-unknown"}
               aria-describedby={checkDisabledReason ? "check-ownership-disabled-reason" : undefined}
               onClick={openCreateReview}
               className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"

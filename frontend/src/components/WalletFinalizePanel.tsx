@@ -206,6 +206,17 @@ export function WalletFinalizePanel({
       const { provider, publicClient, walletClient } = createBrowserClients(address);
       await verifyWalletChain(provider);
       const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+      const liveAuction = await publicClient.readContract({
+        address: deployment.contracts.auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [auctionIdBigInt],
+        blockNumber: latestBlock.number
+      });
+      const liveAuctionState = liveAuction.state;
+      if (liveAuctionState !== 0 && liveAuctionState !== 1 && liveAuctionState !== 2) {
+        throw new Error("Auction state is unavailable.");
+      }
 
       const liveState = getFinalizeActionState({
         isConnected,
@@ -214,14 +225,17 @@ export function WalletFinalizePanel({
         deploymentLoaded: true,
         deploymentError: null,
         auctionIdValid: true,
-        finalized: auction.finalized,
-        auctionState: auction.state,
-        endTime: auction.endTime,
+        finalized: liveAuction.state === 2,
+        auctionState: liveAuctionState,
+        endTime: liveAuction.endTime,
         nowSeconds: latestBlock.timestamp
       });
 
       if (liveState.disabledReason) {
-        throw new Error(liveState.disabledReason);
+        setMessage(liveState.disabledReason);
+        setIsReviewing(false);
+        try { await onFinalizeComplete(); } catch { /* Preserve the on-chain explanation if refresh fails. */ }
+        return;
       }
 
       setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AuctionDetail } from "@/components/AuctionDetail";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture } from "@/test/fixtures";
+import { auctionDetailFixture, settledReadinessFixture } from "@/test/fixtures";
 
 vi.mock("@/components/AuctionDevActions", () => ({
   AuctionDevActions: () => (
@@ -142,7 +142,7 @@ describe("AuctionDetail", () => {
     expect(screen.queryByRole("heading", { name: "Wallet-signed claims / withdrawals" })).not.toBeInTheDocument();
   });
 
-  it("shows no pending wallet action once the auction is settled", async () => {
+  it("keeps wallet claims accessible when economics are unavailable", async () => {
     mockAuctionDetailFetch({
       ...auctionDetailFixture.auction,
       state: 2,
@@ -154,10 +154,11 @@ describe("AuctionDetail", () => {
 
     render(<AuctionDetail auctionId="1" />);
 
-    expect(await screen.findByText("No pending wallet action")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Wallet-signed claims / withdrawals" })).toBeInTheDocument();
+    expect(screen.queryByText("Settled")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wallet-signed bid" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wallet-signed finalization" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Wallet-signed claims / withdrawals" })).not.toBeInTheDocument();
+
   });
 
   it("keeps read-only panels visible when a refresh fails", async () => {
@@ -198,4 +199,13 @@ describe("AuctionDetail", () => {
     expect(screen.getByRole("heading", { name: "Economic transparency / Settlement breakdown" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bid history / Auction transparency" })).toBeInTheDocument();
   });
+  it("keeps direct wallet reads accessible even with a proven Settled snapshot", async () => {
+    mockAuctionDetailFetch({ ...auctionDetailFixture.auction, state: 2, finalized: true, nftClaimed: true,
+      economics: undefined, settlementReadiness: settledReadinessFixture });
+    render(<AuctionDetail auctionId="1" />);
+    expect(await screen.findByRole("heading", { name: "Wallet-signed claims / withdrawals" })).toBeInTheDocument();
+    expect(screen.getAllByText("Settled").length).toBeGreaterThan(0);
+    expect(screen.getByText(/They do not establish which auction/)).toBeInTheDocument();
+  });
+
 });

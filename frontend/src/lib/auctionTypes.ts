@@ -63,6 +63,18 @@ export type AuctionEconomicAddress = {
   note?: string;
 };
 
+export type AuctionSettlementReadiness = {
+  status: "complete" | "partial" | "unavailable";
+  participantsExpected: string;
+  participantsRead: number;
+  refunds: AuctionEconomicAmount;
+  redistribution: AuctionEconomicAmount;
+  // Current aggregate wallet credits, never historical attribution to this auction.
+  sellerWalletCredit: AuctionEconomicAmount;
+  protocolWalletCredit: AuctionEconomicAmount;
+  warnings: string[];
+};
+
 export type AuctionEconomicParameterSnapshot = {
   bidbackFeeBps: string;
   redistributionBps: string;
@@ -173,6 +185,7 @@ export type SerializedAuction = {
   initialEndTime: string;
   endTime: string;
   chainTimestamp?: string;
+  readBlockNumber?: string;
   extensionsUsed: number;
   state: AuctionStateValue;
   stateLabel: string;
@@ -188,6 +201,7 @@ export type SerializedAuction = {
   auctionFeeRecipient?: `0x${string}`;
   auctionFeeRecipientError?: string;
   economics?: AuctionEconomics;
+  settlementReadiness?: AuctionSettlementReadiness;
   economicSummary?: AuctionEconomicsSummary;
   history?: AuctionHistory;
   historyError?: string;

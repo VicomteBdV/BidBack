@@ -54,12 +54,13 @@ type ClaimAction =
   | "withdraw-fees";
 
 type WalletClaimData = {
-  refundableAmount: bigint;
-  refundClaimed: boolean;
-  rewardEntitlement: bigint;
-  rewardClaimed: boolean;
-  sellerCredit: bigint;
-  protocolFeeCredit: bigint;
+  refundableAmount: bigint | null;
+  refundClaimed: boolean | null;
+  rewardEntitlement: bigint | null;
+  rewardClaimed: boolean | null;
+  sellerCredit: bigint | null;
+  protocolFeeCredit: bigint | null;
+  unavailable: boolean;
 };
 
 function walletErrorMessage(error: unknown, fallback: string) {
@@ -217,6 +218,7 @@ export function WalletClaimPanel({
     setRewardClaimed(next.rewardClaimed);
     setSellerCredit(next.sellerCredit);
     setProtocolFeeCredit(next.protocolFeeCredit);
+    setMessage(next.unavailable ? "Some wallet claim data is unavailable. Refresh to retry failed reads." : null);
   }
 
   async function readWalletClaimData(): Promise<WalletClaimData> {
@@ -232,7 +234,7 @@ export function WalletClaimPanel({
       nextRewardClaimed,
       nextSellerCredit,
       nextProtocolFeeCredit
-    ] = await Promise.all([
+    ] = await Promise.allSettled([
       publicClient.readContract({
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
@@ -272,13 +274,19 @@ export function WalletClaimPanel({
     ]);
 
     return {
-      refundableAmount: nextRefundableAmount,
-      refundClaimed: nextRefundClaimed,
-      rewardEntitlement: nextRewardEntitlement,
-      rewardClaimed: nextRewardClaimed,
-      sellerCredit: nextSellerCredit,
-      protocolFeeCredit: nextProtocolFeeCredit
+      refundableAmount: nextRefundableAmount.status === "fulfilled" ? nextRefundableAmount.value : null,
+      refundClaimed: nextRefundClaimed.status === "fulfilled" ? nextRefundClaimed.value : null,
+      rewardEntitlement: nextRewardEntitlement.status === "fulfilled" ? nextRewardEntitlement.value : null,
+      rewardClaimed: nextRewardClaimed.status === "fulfilled" ? nextRewardClaimed.value : null,
+      sellerCredit: nextSellerCredit.status === "fulfilled" ? nextSellerCredit.value : null,
+      protocolFeeCredit: nextProtocolFeeCredit.status === "fulfilled" ? nextProtocolFeeCredit.value : null,
+      unavailable: [nextRefundableAmount, nextRefundClaimed, nextRewardEntitlement, nextRewardClaimed, nextSellerCredit, nextProtocolFeeCredit].some((read) => read.status === "rejected")
     };
+  }
+
+  function clearClaimData() {
+    applyClaimData({ refundableAmount: null, refundClaimed: null, rewardEntitlement: null, rewardClaimed: null,
+      sellerCredit: null, protocolFeeCredit: null, unavailable: true });
   }
 
   async function loadWalletClaimData() {
@@ -289,7 +297,8 @@ export function WalletClaimPanel({
       const next = await readWalletClaimData();
       applyClaimData(next);
     } catch (caught) {
-      setMessage(walletErrorMessage(caught, "Unable to load wallet claim data."));
+      clearClaimData();
+      setMessage(`Wallet claim data is unavailable. ${walletErrorMessage(caught, "Unable to load wallet claim data.")}`);
     } finally {
       setIsLoadingClaimData(false);
     }
@@ -337,7 +346,9 @@ export function WalletClaimPanel({
     try {
       const next = await readWalletClaimData();
       applyClaimData(next);
+      refreshIncomplete ||= next.unavailable;
     } catch {
+      clearClaimData();
       refreshIncomplete = true;
     }
 
@@ -363,15 +374,28 @@ export function WalletClaimPanel({
 
       const context = requireWalletContext();
 
-      if (!auction.finalized) throw new Error("Auction is not finalized.");
-      if (auction.nftClaimed) throw new Error("NFT already claimed.");
-
-      if (!sameAddress(context.account, expectedNftClaimant)) {
-        throw new Error(`Connected wallet is not the NFT claimant. Expected ${expectedNftClaimantLabel}: ${expectedNftClaimant}.`);
-      }
-
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
       await verifyWalletChain(provider);
+      const liveAuction = await publicClient.readContract({
+        address: context.deployment.contracts.auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [context.auctionId]
+      });
+      const claimant = isZeroAddress(liveAuction.highestBidder) ? liveAuction.seller : liveAuction.highestBidder;
+      const liveState = getClaimNftActionState({
+        isConnected: true, wrongNetwork: false, targetChainLabel,
+        deploymentLoaded: true, auctionIdValid: true,
+        account: context.account, claimant,
+        claimantRoleLabel: isZeroAddress(liveAuction.highestBidder) ? "seller" : "winner",
+        nftClaimed: liveAuction.nftClaimed, finalized: liveAuction.state === 2
+      });
+      if (liveState.disabledReason) {
+        setMessage(liveState.disabledReason);
+        setSelectedAction(null);
+        try { await onActionComplete(); } catch { /* Keep the preflight explanation available. */ }
+        return;
+      }
       setTxStatus(awaitingSignatureState("Confirm NFT claim in your wallet."));
 
       const hash = await walletClient.writeContract({
@@ -408,6 +432,8 @@ export function WalletClaimPanel({
       if (!auction.finalized) throw new Error("Auction is not finalized.");
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      setRefundableAmount(null);
+      setRefundClaimed(null);
       await verifyWalletChain(provider);
 
       const [amount, wasClaimed] = await Promise.all([
@@ -467,6 +493,8 @@ export function WalletClaimPanel({
       if (!auction.finalized) throw new Error("Auction is not finalized.");
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      setRewardEntitlement(null);
+      setRewardClaimed(null);
       await verifyWalletChain(provider);
 
       const [entitlement, wasClaimed] = await Promise.all([
@@ -527,6 +555,7 @@ export function WalletClaimPanel({
       if (!sameAddress(context.account, auction.seller)) throw new Error("Connect the seller wallet.");
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      setSellerCredit(null);
       await verifyWalletChain(provider);
 
       const credit = await publicClient.readContract({
@@ -578,6 +607,7 @@ export function WalletClaimPanel({
       }
 
       const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      setProtocolFeeCredit(null);
       await verifyWalletChain(provider);
 
       const credit = await publicClient.readContract({
@@ -651,8 +681,8 @@ export function WalletClaimPanel({
     : rawClaimRewardDisabledReason === "Reward already claimed."
       ? "Redistribution already claimed."
       : rawClaimRewardDisabledReason;
-  const availableRefundableAmount = refundClaimed === true ? 0n : refundableAmount;
-  const availableRewardEntitlement = rewardClaimed === true ? 0n : rewardEntitlement;
+  const availableRefundableAmount = refundClaimed === null ? null : refundClaimed ? 0n : refundableAmount;
+  const availableRewardEntitlement = rewardClaimed === null ? null : rewardClaimed ? 0n : rewardEntitlement;
 
   const withdrawSellerDisabledReason = getWithdrawSellerActionState({
     ...commonActionContext,
@@ -714,7 +744,7 @@ export function WalletClaimPanel({
       description = "Recover the refundable cap currently available to the connected wallet for this auction.";
       items = [
         { label: "Auction", value: `#${auction.auctionId}` },
-        { label: "Refund available", value: availableRefundableAmount === null ? "Not loaded" : formatEth(availableRefundableAmount) },
+        { label: "Refund available", value: availableRefundableAmount === null ? "Unavailable" : formatEth(availableRefundableAmount) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Effect", value: "Sends the refundable cap to this wallet" },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -727,7 +757,7 @@ export function WalletClaimPanel({
       description = "Claim the positive conditional redistribution entitlement currently recorded for this wallet.";
       items = [
         { label: "Auction", value: `#${auction.auctionId}` },
-        { label: "Redistribution available", value: availableRewardEntitlement === null ? "Not loaded" : formatEth(availableRewardEntitlement) },
+        { label: "Redistribution available", value: availableRewardEntitlement === null ? "Unavailable" : formatEth(availableRewardEntitlement) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Effect", value: "Sends the recorded entitlement to this wallet" },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -740,7 +770,7 @@ export function WalletClaimPanel({
       description = "Withdraw the seller wallet's current aggregate credit from EscrowVault.";
       items = [
         { label: "Credit scope", value: "Wallet-level / global credit" },
-        { label: "Amount", value: sellerCredit === null ? "Not loaded" : formatEth(sellerCredit) },
+        { label: "Amount", value: sellerCredit === null ? "Unavailable" : formatEth(sellerCredit) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Auction page", value: `#${auction.auctionId} is a navigation context, not exact credit attribution` },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -753,7 +783,7 @@ export function WalletClaimPanel({
       description = "Withdraw the fee-recipient wallet's current aggregate credit from EscrowVault.";
       items = [
         { label: "Credit scope", value: "Wallet-level / global credit" },
-        { label: "Amount", value: protocolFeeCredit === null ? "Not loaded" : formatEth(protocolFeeCredit) },
+        { label: "Amount", value: protocolFeeCredit === null ? "Unavailable" : formatEth(protocolFeeCredit) },
         { label: "Destination", value: address ? shortenAddress(address) : "Not connected", mono: true },
         { label: "Auction page", value: `#${auction.auctionId} is a navigation context, not exact credit attribution` },
         { label: "Network gas", value: "Separate; shown by your wallet" }
@@ -814,10 +844,10 @@ export function WalletClaimPanel({
         <InfoItem label="NFT claimant role" value={expectedNftClaimantLabel} />
         <InfoItem label="Seller wallet" value={shortenAddress(auction.seller)} mono />
         <InfoItem label="Fee recipient" value={auction.auctionFeeRecipient ? shortenAddress(auction.auctionFeeRecipient) : "Not loaded"} mono />
-        <InfoItem label="Refund available" value={availableRefundableAmount === null ? "Not loaded" : formatEth(availableRefundableAmount)} />
-        <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Not loaded" : formatEth(availableRewardEntitlement)} />
-        <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Not loaded" : formatEth(sellerCredit)} />
-        <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Not loaded" : formatEth(protocolFeeCredit)} />
+        <InfoItem label="Refund available" value={availableRefundableAmount === null ? "Unavailable" : formatEth(availableRefundableAmount)} />
+        <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Unavailable" : formatEth(availableRewardEntitlement)} />
+        <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Unavailable" : formatEth(sellerCredit)} />
+        <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Unavailable" : formatEth(protocolFeeCredit)} />
         <InfoItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
         <InfoItem label="Auction finalized" value={auction.finalized ? "Yes" : "No"} />
       </div>
@@ -833,10 +863,10 @@ export function WalletClaimPanel({
           <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
           <InfoItem label="EscrowVault" value={deployment ? shortenAddress(deployment.contracts.escrowVault) : "Not loaded"} mono />
           <InfoItem label="DistributionVault" value={deployment ? shortenAddress(deployment.contracts.distributionVault) : "Not loaded"} mono />
-          <InfoItem label="Recorded refundable amount" value={refundableAmount === null ? "Not loaded" : formatEth(refundableAmount)} />
-          <InfoItem label="Refund claimed" value={refundClaimed === null ? "Not loaded" : refundClaimed ? "Yes" : "No"} />
-          <InfoItem label="Recorded redistribution entitlement" value={rewardEntitlement === null ? "Not loaded" : formatEth(rewardEntitlement)} />
-          <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Not loaded" : rewardClaimed ? "Yes" : "No"} />
+          <InfoItem label="Recorded refundable amount" value={refundableAmount === null ? "Unavailable" : formatEth(refundableAmount)} />
+          <InfoItem label="Refund claimed" value={refundClaimed === null ? "Unavailable" : refundClaimed ? "Yes" : "No"} />
+          <InfoItem label="Recorded redistribution entitlement" value={rewardEntitlement === null ? "Unavailable" : formatEth(rewardEntitlement)} />
+          <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Unavailable" : rewardClaimed ? "Yes" : "No"} />
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-400">
           Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
