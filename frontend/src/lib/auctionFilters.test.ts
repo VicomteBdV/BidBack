@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { filterAndSortAuctions } from "@/lib/auctionFilters";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { testAddresses } from "@/test/fixtures";
+import { settledReadinessFixture, testAddresses } from "@/test/fixtures";
 
 const zeroAddress = "0x0000000000000000000000000000000000000000" as const;
 
@@ -91,14 +91,25 @@ describe("auctionFilters", () => {
     expect(result.map((auction) => auction.auctionId)).toEqual(["1"]);
   });
 
-  it("filters finalized and settled auctions", () => {
+  it("filters finalized auctions and a settled no-bid auction with complete reads", () => {
     const finalized = auctionFixture({ auctionId: "2", state: 2, stateLabel: "FINALIZED", finalized: true });
     const settled = auctionFixture({
       auctionId: "3",
       state: 2,
       stateLabel: "FINALIZED",
       finalized: true,
-      nftClaimed: true
+      highestBidder: zeroAddress,
+      highestBid: "0",
+      participantCount: "0",
+      bidCount: "0",
+      nftClaimed: true,
+      // No-bid finalization does not open an ETH settlement.
+      economics: undefined,
+      settlementReadiness: {
+        ...settledReadinessFixture,
+        participantsExpected: "0",
+        participantsRead: 0
+      }
     });
 
     expect(run([auctionFixture(), finalized, settled], { status: "finalized" }).map((auction) => auction.auctionId)).toEqual([
@@ -109,6 +120,30 @@ describe("auctionFilters", () => {
       "3"
     ]);
   });
+
+  it.each(["absent", "partial"] as const)(
+    "keeps an auction finalized but excludes it from settled when settlement reads are %s",
+    (readStatus) => {
+      const auction = auctionFixture({
+        auctionId: "3",
+        state: 2,
+        stateLabel: "FINALIZED",
+        finalized: true,
+        nftClaimed: true,
+        economics: undefined,
+        settlementReadiness: readStatus === "absent" ? undefined : {
+          ...settledReadinessFixture,
+          status: "partial",
+          participantsExpected: "0",
+          participantsRead: 0,
+          refunds: { status: "unavailable" }
+        }
+      });
+
+      expect(run([auction], { status: "settled" })).toEqual([]);
+      expect(run([auction], { status: "finalized" }).map((entry) => entry.auctionId)).toEqual(["3"]);
+    }
+  );
 
   it("filters claimable or withdrawable auctions when economics are available", () => {
     const result = run([

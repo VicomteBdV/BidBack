@@ -30,11 +30,14 @@ function setupFinalize(
     chainId: 31337,
     isConnected: true
   } as unknown as ReturnType<typeof useAccount>);
-  const getBlock = vi.fn(async () => ({ timestamp: latestBlockTimestamp }));
+  const getBlock = vi.fn(async () => ({ timestamp: latestBlockTimestamp, number: 42n }));
+  const readContract = vi.fn(async () => ({ state: 1, ...auctionOverrides,
+    endTime: BigInt(auctionOverrides.endTime ?? "1") }));
   const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
   const writeContract = vi.fn(async () => txHash);
   vi.mocked(createPublicClient).mockReturnValue({
     getBlock,
+    readContract,
     waitForTransactionReceipt
   } as unknown as ReturnType<typeof createPublicClient>);
   vi.mocked(createWalletClient).mockReturnValue({ writeContract } as unknown as ReturnType<typeof createWalletClient>);
@@ -62,7 +65,7 @@ function setupFinalize(
     />
   );
 
-  return { getBlock, writeContract, waitForTransactionReceipt, onFinalizeComplete };
+  return { getBlock, readContract, writeContract, waitForTransactionReceipt, onFinalizeComplete };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -152,4 +155,48 @@ describe("WalletFinalizePanel", () => {
     expect(screen.getByText("Auction finalized, but displayed lifecycle and claim data could not be fully refreshed.")).toBeInTheDocument();
     expect(screen.queryByText("Transaction failed")).not.toBeInTheDocument();
   });
+  it.each([
+    { state: 0, endTime: 3000n, reason: "Auction is not expired yet." },
+    { state: 2, endTime: 1000n, reason: "Auction is already finalized." }
+  ])("detects concurrent state $state / deadline changes before signature", async ({ state, endTime, reason }) => {
+    const { readContract, writeContract, onFinalizeComplete } = setupFinalize(undefined, {}, 2000n);
+    readContract.mockResolvedValue({ state, endTime });
+    const review = await screen.findByRole("button", { name: "Review finalization" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "getAuction", args: [1n], blockNumber: 42n }));
+    expect(writeContract).not.toHaveBeenCalled();
+    expect(onFinalizeComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not request a signature when the live auction read fails", async () => {
+    const { readContract, writeContract } = setupFinalize();
+    readContract.mockRejectedValue(new Error("Live auction unavailable"));
+    const review = await screen.findByRole("button", { name: "Review finalization" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText("Live auction unavailable")).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it.each(["rejected", "reverted", "unknown"])("preserves a %s transaction outcome after preflight", async (outcome) => {
+    const { writeContract, waitForTransactionReceipt, onFinalizeComplete } = setupFinalize();
+    if (outcome === "rejected") writeContract.mockRejectedValue({ code: 4001 });
+    if (outcome === "reverted") waitForTransactionReceipt.mockResolvedValue({ status: "reverted" });
+    if (outcome === "unknown") waitForTransactionReceipt.mockRejectedValue(new Error("Receipt unavailable"));
+    const review = await screen.findByRole("button", { name: "Review finalization" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    const message = outcome === "rejected" ? "Transaction rejected in wallet."
+      : outcome === "reverted" ? "The transaction was included on-chain but reverted."
+      : "The transaction was submitted, but its on-chain result could not be verified.";
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText("Auction finalized.")).not.toBeInTheDocument();
+    expect(onFinalizeComplete).not.toHaveBeenCalled();
+  });
+
 });

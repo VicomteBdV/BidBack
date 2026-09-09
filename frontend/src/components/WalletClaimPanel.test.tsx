@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createPublicClient, createWalletClient } from "viem";
 import { useAccount } from "wagmi";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SerializedAuction } from "@/lib/auctionTypes";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
@@ -26,7 +27,9 @@ function setupClaims({
   rewardClaimed = false,
   sellerCredit = 2_000_000_000_000_000_000n,
   protocolFeeCredit = 10_000_000_000_000_000n,
-  onActionComplete = vi.fn(async () => undefined)
+  onActionComplete = vi.fn(async () => undefined),
+  auctionOverrides = {},
+  failedReads = new Set<string>()
 }: {
   refundableAmount?: bigint;
   refundClaimed?: boolean;
@@ -35,11 +38,17 @@ function setupClaims({
   sellerCredit?: bigint;
   protocolFeeCredit?: bigint;
   onActionComplete?: () => Promise<void>;
+  auctionOverrides?: Partial<SerializedAuction>;
+  failedReads?: Set<string>;
 } = {}) {
   const account = testAddresses.primaryBidder;
   vi.mocked(useAccount).mockReturnValue({ address: account, chainId: 31337, isConnected: true } as unknown as ReturnType<typeof useAccount>);
 
+  const liveAuction = { state: 2, nftClaimed: false,
+    highestBidder: (auctionOverrides.highestBidder ?? account) as `0x${string}`, seller: account as `0x${string}` };
   const readContract = vi.fn(async ({ functionName }: { functionName: string }) => {
+    if (failedReads.has(functionName)) throw new Error(`Unavailable: ${functionName}`);
+    if (functionName === "getAuction") return liveAuction;
     if (functionName === "refundableAmount") return refundableAmount;
     if (functionName === "refundClaimed") return refundClaimed;
     if (functionName === "entitlementOf") return rewardEntitlement;
@@ -71,13 +80,14 @@ function setupClaims({
         nftClaimed: false,
         seller: account,
         highestBidder: account,
-        auctionFeeRecipient: account
+        auctionFeeRecipient: account,
+        ...auctionOverrides
       }}
       onActionComplete={onActionComplete}
     />
   );
 
-  return { writeContract, onActionComplete };
+  return { writeContract, onActionComplete, readContract, liveAuction, failedReads, waitForTransactionReceipt };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -172,4 +182,92 @@ describe("WalletClaimPanel", () => {
     expect(screen.getByText(/Displayed action data could not be fully refreshed/)).toBeInTheDocument();
     expect(screen.queryByText("Transaction failed")).not.toBeInTheDocument();
   });
+  it.each([
+    { label: "already claimed", live: { nftClaimed: true }, reason: "NFT already claimed." },
+    { label: "wrong beneficiary", live: { highestBidder: testAddresses.secondBidder }, reason: "Connected wallet is not the NFT claimant. Expected winner." },
+    { label: "not finalized", live: { state: 1 }, reason: "Auction is not finalized." }
+  ])("blocks an NFT signature when the live auction is $label", async ({ live, reason }) => {
+    const { liveAuction, writeContract, readContract, onActionComplete } = setupClaims();
+    const review = await screen.findByRole("button", { name: "Review claim nft" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    Object.assign(liveAuction, live);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "getAuction", args: [1n] }));
+    expect(writeContract).not.toHaveBeenCalled();
+    expect(onActionComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows the seller to claim the NFT after a no-bid finalization", async () => {
+    const { writeContract } = setupClaims({ auctionOverrides: {
+      highestBidder: "0x0000000000000000000000000000000000000000", highestBid: "0", participantCount: "0", economics: undefined
+    }, refundableAmount: 0n, rewardEntitlement: 0n });
+    const review = await screen.findByRole("button", { name: "Review claim nft" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText("NFT claimed.")).toBeInTheDocument();
+    expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "claimNft", args: [1n] }));
+  });
+
+  it("keeps a direct refund accessible when redistribution reads fail and global economics are absent", async () => {
+    setupClaims({ failedReads: new Set(["entitlementOf"]), auctionOverrides: { economics: undefined } });
+    expect(await screen.findByText(/Some wallet claim data is unavailable/)).toBeInTheDocument();
+    expect(screen.getByText("Redistribution available").nextElementSibling).toHaveTextContent("Unavailable");
+    expect(screen.getByRole("button", { name: "Review claim redistribution" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Review claim refund" })).toBeEnabled();
+  });
+
+  it("replaces stale claim values with unavailable after a failed refresh", async () => {
+    const { failedReads } = setupClaims();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review claim refund" })).toBeEnabled());
+    failedReads.add("refundableAmount");
+    failedReads.add("refundClaimed");
+    fireEvent.click(screen.getByRole("button", { name: "Refresh wallet claim data" }));
+    expect(await screen.findByText(/Some wallet claim data is unavailable/)).toBeInTheDocument();
+    expect(screen.getByText("Refund available").nextElementSibling).toHaveTextContent("Unavailable");
+    expect(screen.queryByText("No refund available.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review claim refund" })).toBeDisabled();
+  });
+
+  it.each(["getAuction", "network"])("blocks NFT preflight when %s is unavailable or wrong", async (failure) => {
+    const { failedReads, writeContract } = setupClaims();
+    const review = await screen.findByRole("button", { name: "Review claim nft" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    if (failure === "network") {
+      Object.defineProperty(window, "ethereum", { configurable: true, value: { request: vi.fn(async () => "0x1") } });
+    } else failedReads.add(failure);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText("Transaction failed")).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it("explains global credit in the proceeds review without auction attribution", async () => {
+    setupClaims();
+    const review = await screen.findByRole("button", { name: "Review withdraw proceeds" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    expect(screen.getByText("Wallet-level / global credit")).toBeInTheDocument();
+    expect(screen.getByText(/not attributed solely to this lot/)).toBeInTheDocument();
+  });
+
+  it.each(["rejected", "reverted", "unknown"])("preserves a %s NFT transaction outcome after preflight", async (outcome) => {
+    const { writeContract, waitForTransactionReceipt, onActionComplete } = setupClaims();
+    if (outcome === "rejected") writeContract.mockRejectedValue({ code: 4001 });
+    if (outcome === "reverted") waitForTransactionReceipt.mockResolvedValue({ status: "reverted" });
+    if (outcome === "unknown") waitForTransactionReceipt.mockRejectedValue(new Error("Receipt unavailable"));
+    const review = await screen.findByRole("button", { name: "Review claim nft" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    const message = outcome === "rejected" ? "Transaction rejected in wallet."
+      : outcome === "reverted" ? "The transaction was included on-chain but reverted."
+      : "The transaction was submitted, but its on-chain result could not be verified.";
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText("NFT claimed.")).not.toBeInTheDocument();
+    expect(onActionComplete).not.toHaveBeenCalled();
+  });
+
 });

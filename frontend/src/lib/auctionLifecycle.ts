@@ -107,27 +107,38 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: Auc
   const nftClaimantAddress = isFinalized ? winnerAddress ?? auction.seller : null;
 
   const hasClaimableNft = isFinalized && !auction.nftClaimed;
-  const hasRefund = hasBidderRefund(auction, "primaryBidder") || hasBidderRefund(auction, "secondBidder");
-  const hasReward = hasBidderReward(auction, "primaryBidder") || hasBidderReward(auction, "secondBidder");
-  const hasSellerProceeds = Boolean(auction.economics && gtZero(auction.economics.seller.credit));
-  const hasProtocolFees = Boolean(auction.economics && gtZero(auction.economics.feeRecipient.credit));
+  const readiness = auction.settlementReadiness;
+  const hasRefund = readiness?.refunds.status === "known" ? gtZero(readiness.refunds.value)
+    : hasBidderRefund(auction, "primaryBidder") || hasBidderRefund(auction, "secondBidder");
+  const hasReward = readiness?.redistribution.status === "known" ? gtZero(readiness.redistribution.value)
+    : hasBidderReward(auction, "primaryBidder") || hasBidderReward(auction, "secondBidder");
+  const hasSellerProceeds = readiness?.sellerWalletCredit.status === "known" ? gtZero(readiness.sellerWalletCredit.value)
+    : Boolean(auction.economics && gtZero(auction.economics.seller.credit));
+  const hasProtocolFees = readiness?.protocolWalletCredit.status === "known" ? gtZero(readiness.protocolWalletCredit.value)
+    : Boolean(auction.economics && gtZero(auction.economics.feeRecipient.credit));
   const hasAnyClaimOrWithdrawal = hasClaimableNft || hasRefund || hasReward || hasSellerProceeds || hasProtocolFees;
 
   const claimableItems = [
     hasClaimableNft ? "NFT claim" : null,
     hasRefund ? "Refund" : null,
     hasReward ? "Reward" : null,
-    hasSellerProceeds ? "Seller proceeds" : null,
-    hasProtocolFees ? "Protocol fees" : null
+    hasSellerProceeds ? "Seller proceeds (wallet credit)" : null,
+    hasProtocolFees ? "Protocol fees (wallet credit)" : null
   ].filter((item): item is string => Boolean(item));
 
-  if (isFinalized && auction.nftClaimed && !hasRefund && !hasReward && !hasSellerProceeds && !hasProtocolFees) {
+  const settlementComplete = readiness?.status === "complete" &&
+    readiness.participantsExpected === auction.participantCount &&
+    String(readiness.participantsRead) === auction.participantCount &&
+    [readiness.refunds, readiness.redistribution, readiness.sellerWalletCredit, readiness.protocolWalletCredit]
+      .every((amount) => amount.status === "known" && parseOptionalBigInt(amount.value) === 0n);
+
+  if (isFinalized && auction.nftClaimed && settlementComplete) {
     return {
       statusLabel: "Settled",
       statusTone: "complete",
       currentPhase: "Settled",
       nextActionLabel: "No pending action detected",
-      nextActionReason: "The auction is finalized, the NFT is claimed, and no claimable amounts are currently visible.",
+      nextActionReason: "The auction is finalized, the NFT is claimed, all participant refunds and assigned redistribution are cleared, and the seller and protocol wallets have zero aggregate credit at the read block. Wallet credits are not historical attribution to this auction.",
       timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,
@@ -153,8 +164,10 @@ export function getAuctionLifecycle(auction: SerializedAuction, nowSeconds?: Auc
       currentPhase: "Claims and withdrawals",
       nextActionLabel: hasAnyClaimOrWithdrawal ? "Process claims / withdrawals" : "Review settlement",
       nextActionReason: hasAnyClaimOrWithdrawal
-        ? "The auction is finalized. Eligible wallets can now use pull-based claims or withdrawals."
-        : "The auction is finalized. No claimable amount is currently visible in the read-only data.",
+        ? readiness?.status === "complete"
+          ? "The auction is finalized. Eligible wallets can now use pull-based claims or withdrawals. Seller and protocol credits are aggregate wallet balances across auctions."
+          : "The auction is finalized, but settlement reads are incomplete or unavailable. Eligible wallets can check their claims directly. Seller and protocol credits are aggregate wallet balances across auctions."
+        : "The auction is finalized. Settlement reads are incomplete or unavailable. Connect your wallet to check its claims directly.",
       timeStatusLabel: timeStatusLabel(auction, resolvedNowSeconds),
       isOpen,
       isExpired,

@@ -1,4 +1,4 @@
-import type { AuctionDetailApiResponse } from "@/lib/auctionTypes";
+import type { AuctionDetailApiResponse, AuctionSettlementReadiness } from "@/lib/auctionTypes";
 import type { LocalDeployment } from "@/lib/deployment";
 
 export const testAddresses = {
@@ -227,3 +227,15 @@ export const auctionDetailFixture = {
     }
   }
 } satisfies AuctionDetailApiResponse;
+
+// An explicit complete snapshot for finalized fixtures only; never inferred from missing economics.
+export const settledReadinessFixture: AuctionSettlementReadiness = {
+  status: "complete",
+  participantsExpected: "2",
+  participantsRead: 2,
+  refunds: { status: "known", value: "0" },
+  redistribution: { status: "known", value: "0" },
+  sellerWalletCredit: { status: "known", value: "0" },
+  protocolWalletCredit: { status: "known", value: "0" },
+  warnings: []
+};
