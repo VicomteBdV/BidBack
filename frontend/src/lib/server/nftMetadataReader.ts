@@ -1,12 +1,9 @@
 import type { Address, PublicClient } from "viem";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import type { NftMetadata } from "@/lib/auctionTypes";
+import { fetchNftMetadataJson, metadataHttpErrorMessage } from "@/lib/server/nftMetadataHttp";
 
-type MetadataFetch = (input: string, init?: RequestInit) => Promise<Response>;
-
-type MetadataJson = Record<string, unknown>;
-
-export const DEFAULT_NFT_METADATA_TIMEOUT_MS = 4_000;
+export { DEFAULT_NFT_METADATA_TIMEOUT_MS } from "@/lib/server/nftMetadataHttp";
 export const DEFAULT_IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
 function configuredIpfsGateway() {
@@ -23,18 +20,6 @@ function cleanString(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function errorMessage(error: unknown) {
-  if (error && typeof error === "object") {
-    const candidate = error as { shortMessage?: unknown; details?: unknown; message?: unknown };
-
-    if (typeof candidate.shortMessage === "string") return candidate.shortMessage;
-    if (typeof candidate.details === "string") return candidate.details;
-    if (typeof candidate.message === "string") return candidate.message;
-  }
-
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function ipfsUriToGatewayUrl(uri: string, gateway = configuredIpfsGateway()) {
@@ -96,52 +81,16 @@ async function readTokenUri(client: PublicClient, nft: Address, tokenId: bigint)
   return cleanString(value);
 }
 
-async function fetchJsonMetadata(
-  url: string,
-  fetchFn: MetadataFetch,
-  timeoutMs: number
-): Promise<MetadataJson> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetchFn(url, {
-      headers: {
-        accept: "application/json"
-      },
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      throw new Error(`Metadata request failed with HTTP ${response.status}`);
-    }
-
-    const json = (await response.json()) as unknown;
-
-    if (!json || typeof json !== "object" || Array.isArray(json)) {
-      throw new Error("NFT metadata JSON is not an object");
-    }
-
-    return json as MetadataJson;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 export async function readNftMetadata({
   client,
   nft,
   tokenId,
-  gateway = configuredIpfsGateway(),
-  fetchFn = fetch,
-  timeoutMs = DEFAULT_NFT_METADATA_TIMEOUT_MS
+  gateway = configuredIpfsGateway()
 }: {
   client: PublicClient;
   nft: Address;
   tokenId: string | bigint;
   gateway?: string;
-  fetchFn?: MetadataFetch;
-  timeoutMs?: number;
 }): Promise<NftMetadata> {
   const tokenIdString = tokenId.toString();
   const base: NftMetadata = {
@@ -177,7 +126,7 @@ export async function readNftMetadata({
     return {
       ...metadataBase,
       status: "unavailable",
-      errorMessage: `tokenURI unavailable: ${errorMessage(tokenUriResult.reason)}`
+      errorMessage: "tokenURI unavailable."
     };
   }
 
@@ -203,7 +152,7 @@ export async function readNftMetadata({
   }
 
   try {
-    const metadata = await fetchJsonMetadata(tokenUriGatewayUrl, fetchFn, timeoutMs);
+    const metadata = await fetchNftMetadataJson(tokenUriGatewayUrl);
     const metadataName = cleanString(metadata.name);
     const description = cleanString(metadata.description);
     const image = cleanString(metadata.image);
@@ -227,7 +176,7 @@ export async function readNftMetadata({
       tokenUri,
       tokenUriGatewayUrl,
       status: "fetch-failed",
-      errorMessage: `Metadata fetch failed: ${errorMessage(error)}`
+      errorMessage: `Metadata fetch failed: ${metadataHttpErrorMessage(error)}`
     };
   }
 }
