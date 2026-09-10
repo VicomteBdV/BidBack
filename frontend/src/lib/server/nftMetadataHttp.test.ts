@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { X509Certificate } from "node:crypto";
 import { Resolver } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
@@ -8,6 +9,28 @@ import { setImmediate as immediate } from "node:timers";
 import type { PeerCertificate } from "node:tls";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchNftMetadataJson, MAX_NFT_METADATA_BYTES } from "@/lib/server/nftMetadataHttp";
+
+// Public test certificate only; its private key is not retained in the repository.
+const ipCertificate = new X509Certificate(`-----BEGIN CERTIFICATE-----
+MIIDTjCCAjagAwIBAgIUaV+mMAKuxU4T58L88GAXM2m2Te8wDQYJKoZIhvcNAQEL
+BQAwGzEZMBcGA1UEAwwQbWV0YWRhdGEuZXhhbXBsZTAeFw0yNjA5MTAxOTQ2MTBa
+Fw0zNjA5MDcxOTQ2MTBaMBsxGTAXBgNVBAMMEG1ldGFkYXRhLmV4YW1wbGUwggEi
+MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCz5ywp0mwqU9129y0SWixuS0+k
+xQT1/tXDBgbtwgiKjMeuqGt+chXreS8nKwy/Qu3GkmMWW3blFpshW1Kc7llCNAlm
+NL78o9e6N9Uy+GPUGjBLsBQVK9J19/kfSn7k6o6/nWZBwfE+XcLUqrSLlImj63Rr
+o6Vbd29cLmOdl4gjTorVNBWbhWmOvxnvbgIKqNwc6NEiM6f+o4Te9Pi3ypRw5mHk
+RrfQEVxK3RUZ9Qm4d7WpGauuEg5b0Utj0lBN+QEOhDNWTA6Gyw2XBWeH+FuFB3V4
+BvN4ciPYLm3upG4M0NQlfrV14Bi+K1Ejiyrh+WLe7OY3Xvt0/JLUfpG6pK1jAgMB
+AAGjgYkwgYYwHQYDVR0OBBYEFGMDVXD6gHjRYbWQq4fvQ0S4Yaj2MB8GA1UdIwQY
+MBaAFGMDVXD6gHjRYbWQq4fvQ0S4Yaj2MA8GA1UdEwEB/wQFMAMBAf8wMwYDVR0R
+BCwwKoIQbWV0YWRhdGEuZXhhbXBsZYcQJgZHAEcAAAAAAAAAAAAREYcEXbjYIjAN
+BgkqhkiG9w0BAQsFAAOCAQEARPtgZ9y+0Rc/nCWEZC8jbZgZFclwyJHZUtEEG5OP
+Q0eGOnjyUHv3GLF+V2bde8eX9dN8rEIhZeKYkmKqkBsQnBMKjo+pi/NWZh7UBKGD
+VIvxNQGh695ED7F/OO3uObiT0PGuJ3HBcMWB9uRgTGbz/4N0ZLwDDurLFsBGrXVG
+9TmEkyAtpnsFXMt3GRv8be0OCMHSSObzEXGrQTAWggYw+Xbme/4wrx/99fadgyxb
+ngUREM6dacfAa++qc+lV4WQGiQFasE2x02bT0bphdez4zsOGXYXY0ETNi12l84uO
+Wa28MwOHyAK8waN2fSGBka/taMlFw/IWPiRJ58ynk55pCw==
+-----END CERTIFICATE-----`).toLegacyObject();
 
 // Exercise Node's real ClientRequest and HTTP parser without opening sockets.
 class MemorySocket extends Duplex {
@@ -89,8 +112,31 @@ describe("bounded metadata HTTP production transport", () => {
     expect(Resolver.prototype.resolve6).not.toHaveBeenCalled();
     if (url.startsWith("https")) {
       expect(connections[0]).toMatchObject({ host: "2606:4700:4700::1111", family: 6, servername: "", rejectUnauthorized: true });
-      expect(connections[0].checkServerIdentity!("wrong", { subjectaltname: "IP Address:2606:4700:4700::1111" } as PeerCertificate)).toBeUndefined();
+      expect(connections[0].checkServerIdentity!("wrong", ipCertificate)).toBeUndefined();
     }
+    reply();
+    await expect(result).resolves.toHaveProperty("name");
+  });
+
+  it.each(["https://[2606:4700:4700::2222]/", "https://93.184.216.35/"])("rejects an IP SAN mismatch for %s", async (url) => {
+    const result = fetchNftMetadataJson(url);
+    const rejected = expect(result).rejects.toThrow("Metadata download failed.");
+    await tick();
+    expect(connections[0].rejectUnauthorized).toBe(true);
+    const mismatch = connections[0].checkServerIdentity!("ignored", ipCertificate);
+    expect(mismatch).toBeInstanceOf(Error);
+    sockets[0].destroy(mismatch!);
+    await rejected;
+    expect(connections).toHaveLength(1);
+  });
+
+  it("accepts an IPv4 SAN but never trusts a missing or malformed certificate", async () => {
+    const result = fetchNftMetadataJson("https://93.184.216.34/");
+    await tick();
+    const check = connections[0].checkServerIdentity!;
+    expect(check("ignored", ipCertificate)).toBeUndefined();
+    expect(check("ignored", {} as PeerCertificate)).toBeInstanceOf(Error);
+    expect(check("ignored", { raw: Buffer.from("not a certificate") } as PeerCertificate)).toBeInstanceOf(Error);
     reply();
     await expect(result).resolves.toHaveProperty("name");
   });

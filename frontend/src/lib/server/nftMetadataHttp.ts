@@ -1,3 +1,4 @@
+import { X509Certificate } from "node:crypto";
 import { Resolver } from "node:dns/promises";
 import http, { type ClientRequest, type IncomingMessage } from "node:http";
 import https from "node:https";
@@ -224,7 +225,18 @@ export function fetchNftMetadataJson(input: string): Promise<Record<string, unkn
       if (url.protocol === "https:") {
         options.servername = isIP(hostname) ? "" : hostname;
         options.rejectUnauthorized = true;
-        options.checkServerIdentity = (_name, certificate) => checkServerIdentity(hostname, certificate);
+        options.checkServerIdentity = (_name, certificate) => {
+          if (!isIP(hostname)) return checkServerIdentity(hostname, certificate);
+          // Node 22.23.2 IDNA-normalizes IPv6 literals in checkServerIdentity,
+          // losing the IP identity. Check IP SANs with Node's native X509 API.
+          // TLS still verifies certificate trust/expiry via rejectUnauthorized.
+          try {
+            if (new X509Certificate(certificate.raw).checkIP(hostname)) return undefined;
+          } catch {
+            // An absent or invalid certificate must also fail closed.
+          }
+          return new MetadataHttpError("network");
+        };
       }
       // Use a numeric destination, never the original DNS name. TLS still checks
       // the original identity, and Host still selects the original virtual host.
