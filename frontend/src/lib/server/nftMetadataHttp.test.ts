@@ -6,7 +6,7 @@ import https from "node:https";
 import type { Socket } from "node:net";
 import { Duplex } from "node:stream";
 import { setImmediate as immediate } from "node:timers";
-import type { PeerCertificate } from "node:tls";
+import type { DetailedPeerCertificate } from "node:tls";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchNftMetadataJson, MAX_NFT_METADATA_BYTES } from "@/lib/server/nftMetadataHttp";
 
@@ -30,7 +30,8 @@ VIvxNQGh695ED7F/OO3uObiT0PGuJ3HBcMWB9uRgTGbz/4N0ZLwDDurLFsBGrXVG
 9TmEkyAtpnsFXMt3GRv8be0OCMHSSObzEXGrQTAWggYw+Xbme/4wrx/99fadgyxb
 ngUREM6dacfAa++qc+lV4WQGiQFasE2x02bT0bphdez4zsOGXYXY0ETNi12l84uO
 Wa28MwOHyAK8waN2fSGBka/taMlFw/IWPiRJ58ynk55pCw==
------END CERTIFICATE-----`).toLegacyObject();
+-----END CERTIFICATE-----`).toLegacyObject() as DetailedPeerCertificate;
+ipCertificate.issuerCertificate = ipCertificate;
 
 // Exercise Node's real ClientRequest and HTTP parser without opening sockets.
 class MemorySocket extends Duplex {
@@ -98,7 +99,7 @@ describe("bounded metadata HTTP production transport", () => {
     if (protocol === "https") {
       expect(connections[0]).toMatchObject({ servername: "metadata.example", rejectUnauthorized: true });
       const check = connections[0].checkServerIdentity!;
-      expect(check("93.184.216.34", { subjectaltname: "DNS:metadata.example" } as PeerCertificate)).toBeUndefined();
+      expect(check("93.184.216.34", { subjectaltname: "DNS:metadata.example" } as DetailedPeerCertificate)).toBeUndefined();
     }
     reply();
     await expect(result).resolves.toEqual({ name: "Public NFT" });
@@ -135,8 +136,8 @@ describe("bounded metadata HTTP production transport", () => {
     await tick();
     const check = connections[0].checkServerIdentity!;
     expect(check("ignored", ipCertificate)).toBeUndefined();
-    expect(check("ignored", {} as PeerCertificate)).toBeInstanceOf(Error);
-    expect(check("ignored", { raw: Buffer.from("not a certificate") } as PeerCertificate)).toBeInstanceOf(Error);
+    expect(check("ignored", {} as DetailedPeerCertificate)).toBeInstanceOf(Error);
+    expect(check("ignored", { raw: Buffer.from("not a certificate") } as DetailedPeerCertificate)).toBeInstanceOf(Error);
     reply();
     await expect(result).resolves.toHaveProperty("name");
   });
@@ -354,7 +355,7 @@ describe("bounded metadata HTTP production transport", () => {
       expect(options.servername).toBe("metadata.example");
       const mismatch = options.checkServerIdentity!("93.184.216.34", {
         subjectaltname: "DNS:attacker.example, IP Address:93.184.216.34"
-      } as PeerCertificate);
+      } as DetailedPeerCertificate);
       expect(mismatch).toHaveProperty("code", "ERR_TLS_CERT_ALTNAME_INVALID");
       // The simulated TLS connection supplies the same errors as a failed
       // handshake. Identity checking itself above uses Node's real checker.
