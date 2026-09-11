@@ -35,7 +35,7 @@ docs/POST_DEPLOYMENT_VERIFICATION.md
 * Local deployment sync script for Anvil `31337`
 * Testnet deployment sync script for `frontend/public/deployments/<chainId>.json`
 * Read-only auction views through Next.js server routes
-* Local-dev demo actions guarded by `ENABLE_LOCAL_DEV_ACTIONS=true`
+* Local-dev demo actions guarded by explicit matching Anvil application targets, `ENABLE_LOCAL_DEV_ACTIONS=true`, and an RPC reporting `31337`
 * Wallet-signed UI panels for the production-target transaction model
 * CI for Foundry tests, frontend tests, typecheck, and build
 * Deployment JSON validation command for local and future deployment files
@@ -73,10 +73,14 @@ RPC = http://127.0.0.1:8545
 
 Local-dev actions remain strictly limited to:
 
-* `/api/dev/*`
+* `/api/dev/*` and `/api/local-create-context`
 * Anvil only
 * chain ID `31337` only
 * Codespaces MVP testing only
+
+Local UI and server routes require `NEXT_PUBLIC_CHAIN_ID=31337`, `BIDBACK_CHAIN_ID=31337`, and `ENABLE_LOCAL_DEV_ACTIONS=true` exactly. Missing, malformed, or non-local chain IDs fail closed, even if the read-only configuration helpers would fall back to Anvil. The server additionally requires `ANVIL_RPC_URL` to report `0x7a69` (31337). UI visibility reflects the configuration policy, not RPC health.
+
+Every guard refusal returns HTTP 404 with `{"error":"Not available."}`. Public-target rejection happens before RPC access, request-body parsing, local writers, or the local create-context reader. RPC failures inside the guard use the same fixed response without exposing upstream errors or configuration values. This is a runtime boundary; local code remains in the build.
 
 They must never be enabled in production or in a hosted testnet frontend.
 
@@ -108,6 +112,43 @@ It does not deploy `LocalERC721`, does not mint NFTs, and does not create a demo
 Server-side reads should use a server-side RPC URL.
 
 Wallet-signed actions require the connected wallet to access the target RPC directly.
+
+---
+
+## Controlled Frontend Environment Prerequisite
+
+For the bounded Base Sepolia reference profile, prepare a separate environment with:
+
+```env
+NEXT_PUBLIC_CHAIN_ID=84532
+BIDBACK_CHAIN_ID=84532
+ENABLE_LOCAL_DEV_ACTIONS=false
+NEXT_PUBLIC_WALLET_RPC_URL=<browser-reachable-http-or-https-rpc-url>
+BIDBACK_RPC_URL=<server-side-http-or-https-rpc-url>
+```
+
+Unset all `ANVIL_DEV_*PRIVATE_KEY` variables (including seller, both bidders, and fee recipient). Omit the Anvil RPC variables. Do not copy the active Anvil defaults and dummy-key assignments from `frontend/.env.example` into this environment. Public URLs must not contain secret credentials. No deployer or testnet signing key belongs in the frontend environment; user transactions remain wallet-signed.
+
+With the intended environment exported, run from the repository root:
+
+```bash
+npm --prefix frontend run validate:env:controlled
+node --test frontend/scripts/validate-controlled-testnet-env.test.mjs
+```
+
+The validator reads **only its process environment**, not Next.js `.env*` files. If using an environment file, explicitly load it with Node (shell values take precedence):
+
+```bash
+node --env-file=/path/to/controlled-frontend.env frontend/scripts/validate-controlled-testnet-env.mjs
+```
+
+Keep the validator, build, and server runtime configurations aligned, and remove conflicting local `.env*` files from the controlled environment. `NEXT_PUBLIC_*` values are fixed during the Next.js build; rebuild when they change. Changing runtime variables alone is not proof that an existing browser bundle targets the intended chain.
+
+This deterministic command performs no DNS, RPC, or other network access. It requires both chain IDs to be exactly `84532`, local actions unset/false, empty/unset Anvil key variables, explicit HTTP(S) browser/server RPC URLs, and the existing valid `public/deployments/84532.json` with matching chain ID and core addresses. Browser RPCs with embedded credentials, localhost/local names, or recognized loopback/private/link-local literals are rejected. Failure exits with code 1 and fixed messages without environment values; success exits with code 0.
+
+The validator reuses the deployment JSON shape/address check. It does not prove DNS resolution, RPC reachability, reported chain ID, bytecode, contract wiring, secret-free provider URL paths/query strings, or on-chain correctness. The standalone validator tests are run separately from current GitHub CI; runtime-boundary tests are included in the existing frontend suite. No CI change is made by this lot.
+
+This prerequisite does not select a host or production chain, deploy a frontend, establish access control, prove a public wallet lifecycle, or advance a readiness gate. Hosting/environment isolation, supported wallet/RPC reachability, repeatable Base Sepolia sessions, and minimum operational evidence remain later work. Wallet-signed creation, bidding, finalization, claims, and withdrawals remain independent of local routes.
 
 ---
 
@@ -311,7 +352,10 @@ NEXT_PUBLIC_CHAIN_ID=31337
 NEXT_PUBLIC_CHAIN_NAME=Anvil Local
 NEXT_PUBLIC_WALLET_RPC_URL=http://127.0.0.1:8545
 NEXT_PUBLIC_ANVIL_RPC_URL=http://127.0.0.1:8545
+BIDBACK_CHAIN_ID=31337
+BIDBACK_RPC_URL=http://127.0.0.1:8545
 ANVIL_RPC_URL=http://127.0.0.1:8545
+ENABLE_LOCAL_DEV_ACTIONS=true
 ```
 
 ### Controlled Testnet Deployment Variables

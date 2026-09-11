@@ -10,10 +10,11 @@ const walletSignedComponents = [
 ];
 
 describe("wallet-signed component separation", () => {
-  it.each(walletSignedComponents)("%s does not fetch /api/dev routes", (fileName) => {
+  it.each(walletSignedComponents)("%s does not depend on local-only routes or their guard", (fileName) => {
     const componentPath = path.resolve(process.cwd(), "src", "components", fileName);
     const source = readFileSync(componentPath, "utf8");
 
-    expect(source).not.toMatch(/fetch\s*\(\s*["'`]\/api\/dev(?:\/|\b)/);
+    expect(source).not.toMatch(/fetch\s*\(\s*["'`]\/api\/(?:dev(?:\/|\b)|local-create-context\b)/);
+    expect(source).not.toMatch(/(?:isLocalDevUiEnabled|assertLocalDevActionsEnabled|localDevEnvironment)/);
   });
 });

@@ -1,8 +1,5 @@
-import { anvilChainId, targetChainId } from "@/lib/chains";
+import { isLocalDevEnvironment } from "@/lib/localDevEnvironment";
 
-export function isLocalDevUiEnabled(
-  chainId = targetChainId,
-  enabledValue = process.env.ENABLE_LOCAL_DEV_ACTIONS
-) {
-  return chainId === anvilChainId && enabledValue === "true";
+export function isLocalDevUiEnabled() {
+  return isLocalDevEnvironment();
 }

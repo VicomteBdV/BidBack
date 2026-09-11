@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { DevBidderRole } from "@/lib/auctionTypes";
-import { assertLocalDevActionsEnabled } from "@/lib/server/localDevGuard";
+import { assertLocalDevActionsEnabled, localDevGuardResponse } from "@/lib/server/localDevGuard";
 import { claimDemoReward } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,9 @@ export async function POST(request: Request) {
       ...payload
     });
   } catch (error) {
+    const unavailable = localDevGuardResponse(error);
+    if (unavailable) return unavailable;
+
     return NextResponse.json(
       {
         status: "error",

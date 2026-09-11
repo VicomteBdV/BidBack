@@ -1,85 +1,51 @@
-const REQUIRED_CHAIN_ID = 31337;
-const REQUIRED_CHAIN_ID_HEX = "0x7a69";
-
-type JsonRpcResponse = {
-  jsonrpc?: string;
-  id?: number;
-  result?: string;
-  error?: {
-    code?: number;
-    message?: string;
-  };
-};
+import { NextResponse } from "next/server";
+import { isLocalDevEnvironment } from "@/lib/localDevEnvironment";
 
 export class LocalDevGuardError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor() {
+    super("Not available.");
     this.name = "LocalDevGuardError";
   }
 }
 
+export function localDevGuardResponse(error: unknown) {
+  return error instanceof LocalDevGuardError
+    ? NextResponse.json({ error: "Not available." }, { status: 404 })
+    : null;
+}
+
 export async function assertLocalDevActionsEnabled(): Promise<void> {
-  if (process.env.ENABLE_LOCAL_DEV_ACTIONS !== "true") {
-    throw new LocalDevGuardError(
-      "Local dev actions are disabled. Set ENABLE_LOCAL_DEV_ACTIONS=true in frontend/.env.local.",
-    );
+  // Reject the application configuration before reading an RPC or entering a writer.
+  if (!isLocalDevEnvironment()) {
+    throw new LocalDevGuardError();
   }
 
   const rpcUrl = process.env.ANVIL_RPC_URL;
-
-  if (!rpcUrl) {
-    throw new LocalDevGuardError(
-      "ANVIL_RPC_URL is required for local dev actions.",
-    );
+  if (!rpcUrl?.trim()) {
+    throw new LocalDevGuardError();
   }
 
-  let response: Response;
-
   try {
-    response = await fetch(rpcUrl, {
+    const response = await fetch(rpcUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
         method: "eth_chainId",
         params: [],
-        id: 1,
+        id: 1
       }),
-      cache: "no-store",
+      cache: "no-store"
     });
+
+    if (!response.ok) throw new LocalDevGuardError();
+
+    const payload = (await response.json()) as { result?: unknown; error?: unknown } | null;
+    if (payload?.error || typeof payload?.result !== "string" || payload.result.toLowerCase() !== "0x7a69") {
+      throw new LocalDevGuardError();
+    }
   } catch {
-    throw new LocalDevGuardError(
-      "Unable to reach ANVIL_RPC_URL. Start Anvil on http://127.0.0.1:8545.",
-    );
-  }
-
-  if (!response.ok) {
-    throw new LocalDevGuardError(
-      `Unable to reach ANVIL_RPC_URL. HTTP status: ${response.status}.`,
-    );
-  }
-
-  const payload = (await response.json()) as JsonRpcResponse;
-
-  if (payload.error) {
-    throw new LocalDevGuardError(
-      `Unable to read Anvil chainId: ${payload.error.message ?? "unknown JSON-RPC error"}.`,
-    );
-  }
-
-  if (!payload.result) {
-    throw new LocalDevGuardError(
-      "Unable to read Anvil chainId: empty JSON-RPC result.",
-    );
-  }
-
-  const chainId = Number.parseInt(payload.result, 16);
-
-  if (payload.result.toLowerCase() !== REQUIRED_CHAIN_ID_HEX || chainId !== REQUIRED_CHAIN_ID) {
-    throw new LocalDevGuardError(
-      "Local dev actions require Anvil chainId 31337.",
-    );
+    // Never expose a URL, an upstream error, or configuration instructions.
+    throw new LocalDevGuardError();
   }
 }
