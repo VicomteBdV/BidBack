@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "runId": "<future-run-id>",
+  "chainId": 84532,
+  "sourceCommit": "<approved-40-character-source-commit>",
+  "manifest": "frontend/public/deployments/84532.json",
+  "auctionId": "<derived-next-auction-id>",
+  "roles": {
+    "owner": "<owner-address>",
+    "seller": "<seller-address>",
+    "feeRecipient": "<fee-recipient-address>",
+    "bidderA": "<bidder-a-address>",
+    "bidderB": "<bidder-b-address>"
+  },
+  "nft": {
+    "address": "<test-only-nft-address>",
+    "tokenId": "<token-id>"
+  }
+}

@@ -110,7 +110,7 @@ npm run verify:base-sepolia:lifecycle -- \
   --output <NEW_JSON_EVIDENCE_PATH>
 ```
 
-The output path is optional. When supplied, it must not already exist. Supported phases are:
+The legacy explicit-argument output path is optional. When supplied, it must not already exist. For a future repeatable run, use the session form in section 14; it requires an output path and adds run/source/manifest identity. Supported phases are:
 
 - `before-create`
 - `after-create`
@@ -124,7 +124,7 @@ The output path is optional. When supplied, it must not already exist. Supported
 - `after-seller-withdraw`
 - `final`
 
-The verifier must print `[OK]` for completed checks and exit non-zero with `[FAIL]`, the failed step, expected value and observed value on any divergence.
+The verifier prints `[OK]` only after the phase succeeds. Divergence exits non-zero with `[FAIL]`. CLI diagnostics are bounded and omit raw provider errors and input values to avoid leaking RPC credentials; the pure lifecycle assertions retain detailed expected/observed errors for deterministic tests.
 
 ## 7. Transaction Sequence and Phase Checks
 
@@ -276,3 +276,109 @@ npm run smoke:local:lifecycle
 ```
 
 Passing Anvil proves the local deterministic lifecycle only. Passing this Base Sepolia run proves one canonical public multi-wallet execution only; neither is a production-readiness claim.
+
+## 14. Repeatable Session Evidence — Lot 7
+
+This procedure prepares evidence for a **separately authorized future session**. Lot 7 itself performs no public transaction. The existing P1 and T1–T11 actions, five roles, amounts and phase checks remain canonical. The first run's evidence is historical and must not be edited or relabelled as a second run.
+
+### Prepare the public session
+
+Copy [SESSION_TEMPLATE.json](./evidence/base-sepolia/SESSION_TEMPLATE.json) into a new evidence workspace **outside the Git checkout** and replace every placeholder. The committed template is deliberately invalid until completed. Store the session, hash input, snapshots, and output in that external workspace; never commit future real run data as part of this implementation lot.
+
+Use schema version `1`, chain ID `84532`, a unique lowercase run ID (letters, digits and hyphens; at most 80 characters), the exact approved 40-character lowercase source SHA, and the literal repository-relative manifest path `frontend/public/deployments/84532.json`. Supply five valid, non-zero, pairwise distinct public role addresses. NFT address must be valid and non-zero; token ID is a decimal uint256 string. Auction ID is the positive decimal `nextAuctionId` observed before creation. Do not assume the historical auction ID `2`.
+
+Only the documented fields are accepted, including within `roles` and `nft`. Private keys, seeds, RPC URLs, credentials, wallet exports and extra fields are unsupported. RPC configuration remains runtime-only. The operator/reviewer must approve the SHA independently: a matching SHA proves checkout consistency, not approval, deployed-source equivalence, or the browser bundle's identity.
+
+### Preflight and phase persistence
+
+Check out the approved source with a clean tracked and untracked worktree, align the browser build/runtime environment, run the controlled-environment validator in `TESTNET_READINESS.md`, and complete the deployment/source/role checks in sections 1–5. Review the manifest's exact bytes before the run. The session loader resolves its manifest from the script's repository root regardless of the command's working directory; it rejects redirected manifest symlinks. It reuses deployment JSON validation, requires precisely the six non-zero core addresses and retains `generatedAt`, `source`, and SHA-256 of the file bytes.
+
+For a separately authorized public session, after P1 preparation and T1 approval but **before T2 creation**, persist the `before-create` preflight:
+
+```bash
+npm --prefix frontend run verify:base-sepolia:lifecycle -- \
+  --rpc-url "$BIDBACK_RPC_URL" \
+  --session /absolute/evidence-workspace/session.json \
+  --phase before-create \
+  --output /absolute/evidence-workspace/snapshots/before-create.json
+```
+
+Create the `snapshots` directory first. Use an explicit runtime RPC value supplied by the authorized operator; this procedure selects no vendor. Never save the value or an environment dump with the evidence. Session invocation checks clean checkout HEAD against `sourceCommit`; legacy role/NFT/auction/manifest overrides are rejected.
+
+Repeat that command immediately after each action, changing only `--phase` and the new output filename:
+
+| Action just completed | Snapshot phase |
+| --- | --- |
+| T1 approval | `before-create` |
+| T2 creation | `after-create` |
+| T3 A initial bid | `after-bid-a` |
+| T4 B bid | `after-bid-b` |
+| T5 A step-up | `after-step-up` |
+| T6 finalization | `after-finalize` |
+| T7 NFT claim | `after-nft-claim` |
+| T8 refund | `after-refund` |
+| T9 reward | `after-reward` |
+| T10 seller withdrawal | `after-seller-withdraw` |
+| T11 fee withdrawal | `final` |
+
+**Wait for each successful snapshot before the next wallet action.** Each snapshot records schema/run/source/chain/auction/phase, UTC generation time, manifest provenance, a block number/hash/UTC timestamp, deployment checks and verified lifecycle state. All reads are pinned to that block and its hash is checked again. File creation is exclusive: an existing snapshot is never overwritten. A failing phase does not produce a successful snapshot; retain its bounded console diagnostic and public receipt separately and stop new economic actions. Preserve previous snapshots. A retry uses a new filename; keep exactly one accepted JSON for each phase in the assembly directory, with failed/retry records outside it.
+
+The legacy explicit arguments still work, but their outputs lack session identity and cannot satisfy this final evidence command. Every future run must use the session form for all eleven phases.
+
+### Supply public transaction hashes
+
+Record the hash displayed by the wallet/frontend immediately after each authorized action. Create `transactions.json` outside the checkout with this exact envelope. Copy `manifestChecksum` from the `manifest.checksum` in the first successful snapshot; it is 64 hexadecimal SHA-256 characters without `0x`.
+
+```json
+{
+  "schemaVersion": 1,
+  "runId": "<same-run-id>",
+  "sourceCommit": "<same-approved-source-sha>",
+  "chainId": 84532,
+  "auctionId": "<same-auction-id>",
+  "manifestChecksum": "<sha256-of-manifest-bytes>",
+  "transactions": {
+    "P1": "<test-only-nft-deployment-hash>",
+    "T1": "<approval-hash>",
+    "T2": "<create-hash>",
+    "T3": "<bid-a-hash>",
+    "T4": "<bid-b-hash>",
+    "T5": "<step-up-hash>",
+    "T6": "<finalize-hash>",
+    "T7": "<nft-claim-hash>",
+    "T8": "<refund-hash>",
+    "T9": "<reward-hash>",
+    "T10": "<seller-withdraw-hash>",
+    "T11": "<fee-withdraw-hash>"
+  }
+}
+```
+
+Every hash must be `0x` plus 64 hex characters and unique across IDs. Actors are P1 owner; T1/T2/T6/T10 seller; T3/T5/T7 bidder A; T4/T8/T9 bidder B; T11 fee recipient. P1 must be the NFT contract-creation receipt for the session NFT. T1–T11 targets, calldata and transaction values are checked against the existing canonical methods, auction/NFT identifiers and amounts. This collector supports the documented direct wallet calls, not batched/router transactions.
+
+### Assemble and validate
+
+After T11 and its saved `final` phase, run:
+
+```bash
+npm --prefix frontend run evidence:base-sepolia -- \
+  --rpc-url "$BIDBACK_RPC_URL" \
+  --session /absolute/evidence-workspace/session.json \
+  --transactions /absolute/evidence-workspace/transactions.json \
+  --snapshots /absolute/evidence-workspace/snapshots \
+  --output /absolute/evidence-workspace/new-evidence-package
+```
+
+The output parent must exist; the output directory must not exist, even if empty or previously failed. Success produces `public-evidence.json` and `REPORT.md`. A failure after reserving the directory retains a bounded `failure.json` with `missing`, `pending`, `failed`, or `invalid` status; it never silently replaces an earlier run. A directory containing `failure.json` or lacking a complete `public-evidence.json` is not successful, even if a report file was written before an output failure. Retry into a new directory.
+
+Assembly requires all twelve successful transactions and eleven unique phases; a correct final state alone is insufficient. It verifies the RPC chain, manifest/source/session identity, actors, receipt/transaction/block agreement, and canonical transaction order. Saved phase blocks must fall after their action and before the next action. The RPC must support historical state reads at all saved blocks; assembly re-runs the existing verifier there and requires equality with the saved snapshot. Unavailable history or reorged/altered evidence fails closed. Receipt logs are retained as deterministic public address/topics/data/log-index records; no decoded-event or explorer-verification claim is inferred.
+
+Transaction records include receipt status, block number/hash/UTC timestamp, from/to, value in wei, gas used, effective gas price when supplied, transaction index, NFT creation address where relevant, and receipt logs. UTC `generatedAt` is operator-machine collection time; block UTC is derived from the chain timestamp.
+
+Assembly verifies current `final`, performs five block-pinned `eth_call` duplicate simulations for NFT/refund/reward claims and seller/fee withdrawals, then verifies current `final` again. Each simulation records actor, target, calldata, block and expected custom-error selector. An RPC/network failure or arbitrary revert string is insufficient: the expected contract error bytes must be available. No signing, broadcasting, private-key handling, `/api/dev/*` or `/api/local-create-context` execution occurs in these scripts.
+
+### Manual evidence and remaining limits
+
+The machine package is a review artifact, not the Orchestrator's verdict or a readiness-gate approval. Independently retain browser/OS/MetaMask/Rabby versions; selected connector/account; frontend build SHA and configuration alignment; wallet prompts, network switching and rejection/recovery observations; redacted screenshots; explorer/source and constructor verification; core deployment/wiring/ownership receipts; and anomaly/retry notes. Session SHA consistency does not prove a served browser build. The collector explicitly marks source verification, core deployment transaction evidence and manual wallet observations as pending/not evidenced; P1 supplies the separate test-only NFT deployment receipt.
+
+Lot 7 adds tooling and deterministic mock tests only. Manual MetaMask and Rabby validation, a second Base Sepolia execution, controlled hosting/access, source-verification evidence, monitoring/support/incident handling and independent evidence review remain open. No Controlled beta-ready claim or other readiness-gate advancement follows from this lot.

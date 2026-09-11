@@ -1,6 +1,6 @@
 # BidBack Product Status
 
-**Checkpoint date:** 25 August 2026
+**Checkpoint date:** 11 September 2026
 
 **Status authority:** This document is the current source of truth for BidBack product status. Procedure documents and older checkpoints must not override it.
 
@@ -10,6 +10,10 @@ BidBack is a functional NFT auction MVP with modular on-chain custody, bidding, 
 
 At this checkpoint:
 
+- Lot 7 entered from clean `main` at `ab6f6493024e88fb3cfc3969b6935cfb641e3054`, after PR #7 / Lot 6 merged; [post-merge CI run 34615073827](https://github.com/VicomteBdV/BidBack/actions/runs/34615073827) completed successfully on that exact SHA (verified through GitHub on 11 September 2026);
+- Lots 5 and 6 implement and deterministically test the controlled public-target/local-dev transaction boundary, desktop injected / EIP-6963 connectors, explicit multi-wallet selection, active-connector transaction-provider authority, and fail-closed non-local browser RPC configuration;
+- MetaMask desktop manual validation and Rabby desktop manual validation remain pending; mock coverage does not establish extension compatibility;
+- Lot 7 adds session metadata, manifest SHA-256, persisted phase evidence, receipt collection, and read-only duplicate simulations for a future separately authorized Base Sepolia session; its deterministic execution evidence belongs to the Lot 7 PR, and no second public lifecycle is established by this tooling;
 - after Lot F integration at commit `607442b6c2da985a373866163fc3cdda8e6ac116`, the `main` CI workflow was reported and confirmed green during the project validation workflow on 25 August 2026; the retained run URL and archival metadata are not recorded here, and this dated observation is not a future guarantee;
 - the complete automated local lifecycle was successfully executed in GitHub Codespaces on 31 July 2026 against a fresh Anvil chain on `31337`;
 - the local run confirmed deployment, three bids across two bidders, delta-only step-up, finalization, all claims and withdrawals, duplicate-action rejection, and verified final balances;
@@ -100,7 +104,8 @@ Authoritative sources are [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC
 | Accessibility | Functional but partial | Native controls, labels, focus styles, ARIA feedback, selected tests | No WCAG audit, keyboard study, or assistive-technology validation. |
 | Transaction feedback | Completed for MVP | Signature, pending, confirmed, rejected, failed, hash, explorer-link states | No production telemetry. |
 | Network handling | Completed for configured target chain | Wrong-network detection and switch flow | RPC and wallet compatibility remain environment-dependent. |
-| Wallet strategy | Functional but partial; blocked by decision | One injected connector through wagmi | WalletConnect, mobile, Coinbase Wallet, Rabby, and broader compatibility are not validated. |
+| Wallet strategy | Desktop injected / EIP-6963 model implemented; manual validation pending | Lot 6 explicit multi-wallet selection and connector-aware transaction provider; deterministic selector/provider tests | MetaMask and Rabby manual validation pending. WalletConnect, mobile and proprietary integrations remain outside validated support. |
+| Controlled environment boundary | Implemented and deterministically tested | Lot 5 excludes local-dev transaction execution on public targets; Lot 6 fails closed for non-local browser RPC configuration | Hosted frontend still absent; deployed environment isolation and browser/server RPC reachability remain unproven. |
 | Visual quality | Functional MVP | Consolidated responsive interface | Not a final premium marketplace design. |
 | External user testing | Not started | No research log or usability results | Required before architecture and UX priorities are frozen. |
 
@@ -123,10 +128,10 @@ Authoritative sources are [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC
 
 | Area | Status | Evidence | Limits |
 | --- | --- | --- | --- |
-| Foundry tests | Passed in CI at checkpoint | `main` CI reported green on 31 July 2026; 26 Solidity tests present | Dated state; no fuzz/invariants. |
-| Frontend Vitest suite | Passed in CI at checkpoint | `main` CI reported green on 31 July 2026; CI runs `npm --prefix frontend run test` | The standalone `.mjs` deployment-validator test is outside current Vitest discovery. |
-| Frontend typecheck | Passed in CI at checkpoint | Dated green `main` CI | Not a future guarantee. |
-| Frontend production build | Passed in CI at checkpoint | Dated green `main` CI | Does not prove hosted runtime behavior. |
+| Foundry tests | Passed in CI at checkpoint | [Run 34615073827](https://github.com/VicomteBdV/BidBack/actions/runs/34615073827) passed on entry SHA `ab6f649` | Dated state; no fuzz/invariants. |
+| Frontend Vitest suite | Passed in CI at checkpoint | Run `34615073827` passed on entry SHA `ab6f649`; CI runs `npm --prefix frontend run test` | Standalone `.mjs` suites, including the session/evidence suites, are outside current CI/Vitest discovery. |
+| Frontend typecheck | Passed in CI at checkpoint | Run `34615073827` passed on entry SHA `ab6f649` | Not a future guarantee. |
+| Frontend production build | Passed in CI at checkpoint | Run `34615073827` passed on entry SHA `ab6f649` | Does not prove hosted runtime behavior. |
 | Economic Model V1 validation and integration | Completed / evaluated | Full Python and Foundry validation was reported complete in Windows and Codespaces; Lot F was integrated at `607442b6c2da985a373866163fc3cdda8e6ac116`; `main` CI was reported green on 25 August 2026 | The retained CI run URL and archival metadata are not recorded here; the result does not approve a candidate or guarantee future CI health. |
 | Local deployment | Validated locally | `DeployLocal.s.sol`, sync tooling, successful Codespaces lifecycle | Uses known local accounts and valueless mock assets. |
 | Automated local lifecycle | Validated locally | Successful Codespaces run on 31 July 2026: `31337`, fresh deployment, 2 bidders, 3 bids, delta step-up, finalization, NFT/refund/reward/proceeds/fees, duplicate rejection, final balances | Does not replace a Base Sepolia public multi-wallet cycle. |
@@ -157,7 +162,7 @@ Authoritative sources are [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC
 - Only one bounded canonical Base Sepolia multi-wallet lifecycle has been demonstrated; repeatability and broader scenario coverage remain unproven.
 - The read model can miss history outside bounded windows.
 - Direct NFT metadata is externally mutable and can fail or be malicious.
-- The wallet strategy is injected-wallet-centric and unvalidated on mobile or multiple providers.
+- Desktop injected wallet selection and provider isolation are deterministically tested; real MetaMask/Rabby multi-extension sessions and mobile remain unvalidated.
 - No fuzz/invariant suite or external audit supports production solvency claims.
 - EOA ownership is not acceptable production governance.
 - There is no monitoring, alerting, incident response, hosted runtime, or operational support model.

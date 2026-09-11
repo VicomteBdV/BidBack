@@ -176,6 +176,24 @@ No Controlled beta-ready claim is made. Hosted access/environment evidence, actu
 
 ---
 
+## Repeatable Session Evidence Tooling — Lot 7
+
+The 11 September 2026 implementation checkpoint adds a strict public session specification, create-only phase snapshots, manifest SHA-256, P1 + T1–T11 receipt collection, historical phase verification, and five read-only duplicate-action simulations followed by another final lifecycle check. See the [session evidence procedure](./BASE_SEPOLIA_SMOKE_TEST.md#14-repeatable-session-evidence--lot-7) and [placeholder template](./evidence/base-sepolia/SESSION_TEMPLATE.json).
+
+The tooling reuses the existing canonical verifier and deployment validator. It checks the session source against a clean checkout HEAD and rejects conflicting static arguments. Assembly requires historical RPC reads at the saved blocks; missing history, missing receipt fields, unexpected custom-error data, mismatched metadata, and incomplete phases prevent success. No provider is selected. All transaction actions remain separately authorized and wallet-signed; the evidence scripts create only public clients and perform no public transaction.
+
+Run the standalone suites separately from existing CI:
+
+```bash
+npm --prefix frontend run test:base-sepolia-verifier
+node --test frontend/scripts/collect-base-sepolia-evidence.test.mjs
+node --test frontend/scripts/validate-controlled-testnet-env.test.mjs
+```
+
+These tests use deterministic mocks without network access. Actual outcomes and delivered SHA are retained in the Lot 7 PR. This prepares a future run; it does not demonstrate repetition. MetaMask and Rabby manual validation, second Base Sepolia execution, hosted controlled access, source-verification evidence, monitoring, support and incident handling remain incomplete. No readiness gate advances, and no Controlled beta-ready claim is made. The 22 August evidence remains unchanged.
+
+---
+
 ## Deployment JSON Format
 
 Deployment files live in:
