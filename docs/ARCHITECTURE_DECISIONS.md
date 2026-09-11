@@ -510,36 +510,41 @@ Future work:
 
 ## NFT Metadata Read Model
 
-The MVP now displays NFT previews when metadata is available, but this is intentionally opportunistic.
+NFT metadata is optional presentation data, never a source of economic or settlement truth. Failed metadata reads preserve auction access, amounts, lifecycle, and settlement evidence.
 
-Current MVP position:
+### Lot 4 — Approved Server JSON Download Policy
 
-* server-side read-only routes call ERC-721 `name()`, `symbol()`, and `tokenURI(tokenId)`;
-* HTTP/HTTPS `tokenURI` values are fetched as JSON metadata;
-* simple `ipfs://<cid>` and `ipfs://ipfs/<cid>` values are converted through a configurable gateway;
-* metadata fields used by the UI are limited to `name`, `description`, `image`, and `external_url`;
-* image IPFS values are converted through the same gateway;
-* failed metadata reads never block auction reads;
-* metadata is rendered as escaped React text, never injected as HTML;
-* there is no persistent NFT metadata cache, media proxy, moderation layer, or production NFT indexer.
+The user approved the Phase A plan and network policy for `BIDBACK-LOT4-METADATA-SAFETY-v1` after Work review. The implementation is in [`nftMetadataHttp.ts`](../frontend/src/lib/server/nftMetadataHttp.ts), called by [`nftMetadataReader.ts`](../frontend/src/lib/server/nftMetadataReader.ts).
 
-This read model improves MVP usability but must not be treated as a source of economic truth.
+* Parse URLs before connecting; allow only HTTP port 80 and HTTPS port 443, including explicit default ports. Reject credentials, other protocols, IPv6 zone identifiers, `localhost` and its subdomains. Use normalized addresses, including alternative numeric IPv4 representations; fragments are not sent.
+* Resolve both A and AAAA through a dedicated Node `dns/promises.Resolver`. Both families must finish before connecting; `ENODATA` is acceptable only when the other family supplies public addresses. Reject any forbidden/invalid answer, empty combined results, or other DNS error.
+* Connect directly to the selected validated numeric IP, preferring the first A address, otherwise the first AAAA address. Do not resolve the name again, retry another IP, use a shared connection pool, or introduce a proxy. Keep the original HTTP `Host` and DNS hostname SNI. HTTPS requires certificate trust validation and Node's `checkServerIdentity` against the original DNS hostname, or native `X509Certificate.checkIP` against the original IP literal, never merely the selected DNS address.
+* Follow no redirects and reject non-2xx responses. Apply the same policy to the final URL produced by simple `ipfs://<cid>` or `ipfs://ipfs/<cid>` conversion, including an environment-configured gateway.
+* Request `Accept-Encoding: identity`; reject every content encoding except absent or `identity`. No decompression is performed. Limit the body to 262144 bytes counted as chunks arrive, before accumulation. An excessive `Content-Length` can reject early but cannot authorize a body; reject incomplete HTTP messages. Keep a 16384-byte HTTP header limit.
+* Apply one 4000 ms deadline to URL handling, DNS, connection/TLS, and the complete HTTP body. At expiry, cancel this download's resolver, destroy active request/response streams, release retained chunks, and suppress all late results before they can create a connection. Cleanup also occurs on success and failure.
+* Parse the bounded body as JSON and accept only a non-null object, not an array or scalar. No extra MIME restriction is imposed. Display only fixed English error messages, without response excerpts, raw DNS/TLS/RPC errors, or internal connection details.
 
-Known risks and limitations:
+The conservative address policy is based on the [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/) and [IPv6 special-purpose registries](https://www.iana.org/assignments/iana-ipv6-special-registry/):
 
-* NFT metadata can be mutable, unavailable, malformed, slow, or malicious;
-* external images can fail independently from the auction state;
-* IPFS availability depends on gateway reliability;
-* unsupported token URI schemes are shown as unavailable;
-* no content validation or media safety pipeline exists yet;
-* no long-term metadata history or collection-level index exists yet.
+| Family | Policy |
+| --- | --- |
+| IPv4 | Reject `0.0.0.0/8`, `10.0.0.0/8`, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `172.16.0.0/12`, `192.0.0.0/24`, `192.0.2.0/24`, `192.88.99.0/24`, `192.168.0.0/16`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`, `224.0.0.0/4`, and `240.0.0.0/4`. |
+| IPv6 | Allow only `2000::/3`, excluding `2001::/23`, `2001:db8::/32`, `2002::/16`, and `3fff::/20`; also reject ISATAP interface identifiers with `0000:5efe` or `0200:5efe` before the embedded IPv4. This excludes loopback, unspecified, ULA, link-local, multicast, IPv4 mapped/compatible/translatable, standard NAT64, Teredo, and 6to4 destinations. |
 
-Future work:
+Whole special blocks are refused even where a more specific globally reachable exception exists. The policy does not infer arbitrary network-specific routing or translation from an address; it is not a substitute for deployment network isolation.
 
-* decide whether production should use a managed NFT metadata service, a dedicated cache, or direct reads plus a media proxy;
-* add cache invalidation and refresh policy;
-* add content safety and image proxying before broader public usage;
-* avoid making bidding, settlement, or claim eligibility depend on off-chain metadata.
+### Preserved Behavior and Limits
+
+* ERC-721 `name()`, `symbol()`, and `tokenURI(tokenId)` reads remain optional and read-only. The HTTP budget starts after these RPC calls, not before them; this lot does not change their timeout behavior or fix local NFT `tokenURI` reverts.
+* Preserve the `loaded`, `no-image`, `unavailable`, `unsupported-token-uri`, and `fetch-failed` states and the existing metadata fields. The UI renders escaped React text, never injected HTML.
+* Images are still fetched directly by the browser, with existing IPFS image conversion. This server JSON policy neither proxies nor validates browser image downloads or external-link destinations.
+* Node [`Resolver.cancel()`](https://nodejs.org/download/release/v22.20.0/docs/api/dns.html#resolvercancel) cancels outstanding queries on that resolver; it cannot recall DNS packets already sent. The completion/deadline guard independently prevents late DNS results from initiating connections. Resolver calls use DNS rather than hosts-file lookup. Deadlines are subject to event-loop scheduling, and synchronous parsing of the bounded body is not preemptible; no hard real-time guarantee is claimed.
+* Redirect-only, compression-only, nonstandard-port, private-network, mixed-DNS, and conservatively excluded special-address metadata becomes unavailable. Selecting one IP without retry can also lose metadata when another address would have worked. These compatibility tradeoffs are approved.
+* Metadata may remain mutable, unavailable, or malicious. There is no shared metadata cache, global rate limiting, new aggregate concurrency budget, image/content moderation pipeline, or production NFT indexer in this lot.
+
+The dedicated transport tests exercise the actual Node HTTP request/parser over simulated connections, with simulated DNS, covering destination pinning, redirects, byte limits, interruption, late resolution, and TLS failure propagation. Certificate identity checks use Node's real TLS/X509 checkers and a public test certificate; IP literals use `X509Certificate.checkIP` because Node 22.23.2's IDNA normalization in `checkServerIdentity` rejects IPv6 literals. TLS trust and expiry checks remain mandatory; trust/expiry handshake failures are simulated, not proof of a live TLS deployment. Reader and auction tests cover optional metadata and preservation of settlement evidence. Test presence is not execution evidence: retain results, CI run links, and tested revisions in the lot PR for independent Work review. This change does not advance any readiness gate or establish production readiness.
+
+Future choices about a managed metadata service, shared cache, media proxy, moderation, and long-term metadata history remain open. Bidding, settlement, and claim eligibility must never depend on off-chain metadata.
 
 ---
 

@@ -179,21 +179,9 @@ describe("auctionReader auction discovery", () => {
   });
 
   it("keeps read-only auction loading available when metadata fetch fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response("not-json", {
-          status: 200,
-          headers: {
-            "content-type": "application/json"
-          }
-        })
-      )
-    );
-
     const { client } = createReaderClient({
       nextAuctionId: 2n,
-      tokenUri: "https://metadata.example/bad.json"
+      tokenUri: "http://127.0.0.1/private-metadata"
     });
 
     const auctions = await readAuctionsByIds([1n], {
@@ -290,6 +278,25 @@ function filterCatalog(auctions: SerializedAuction[], status: "settled" | "final
 }
 
 describe("catalog settlement evidence through discovery and filtering", () => {
+  it.each([false, true])("preserves settlement evidence when metadata is rejected (refund claimed: %s)", async (thirdRefundClaimed) => {
+    const { client, readContract } = catalogSettlementReader({ thirdRefundClaimed });
+    const before = await readAllAuctions({ client, deployment: localDeploymentFixture });
+    const read = readContract.getMockImplementation()!;
+    readContract.mockImplementation(async (request: unknown) => {
+      if ((request as { functionName: string }).functionName === "tokenURI") return "http://169.254.169.254/private";
+      return read(request);
+    });
+    const after = await readAllAuctions({ client, deployment: localDeploymentFixture });
+    expect(after.auctions[0].nftMetadata?.status).toBe("fetch-failed");
+    const { nftMetadata: _beforeMetadata, ...beforeAuction } = before.auctions[0];
+    const { nftMetadata: _afterMetadata, ...afterAuction } = after.auctions[0];
+    expect(afterAuction).toEqual(beforeAuction);
+    expect(afterAuction.settlementReadiness?.status).toBe("complete");
+    expect(afterAuction.settlementReadiness?.refunds).toEqual({ status: "known", value: thirdRefundClaimed ? "0" : "1000" });
+    expect(getAuctionLifecycle(after.auctions[0])).toEqual(getAuctionLifecycle(before.auctions[0]));
+    expect(filterCatalog(after.auctions, "settled")).toEqual(thirdRefundClaimed ? ["1"] : []);
+  });
+
   it("includes a claimed NFT with complete evidence and zero outstanding balances", async () => {
     const { client, readContract } = catalogSettlementReader();
     const payload = await readAllAuctions({ client, deployment: localDeploymentFixture });
