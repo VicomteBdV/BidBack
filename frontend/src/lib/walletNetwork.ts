@@ -28,10 +28,6 @@ type AddEthereumChainParameter = {
   blockExplorerUrls?: string[];
 };
 
-type WindowWithInjectedEthereum = Window & {
-  ethereum?: EIP1193Provider;
-};
-
 const DEFAULT_NATIVE_CURRENCY: NativeCurrency = {
   name: "Ether",
   symbol: "ETH",
@@ -53,37 +49,16 @@ function cleanValue(value: string | undefined) {
   return trimmed ? trimmed : undefined;
 }
 
-function providerErrorCode(error: unknown) {
-  if (!error || typeof error !== "object") return undefined;
-
-  const candidate = error as { code?: unknown };
-
-  if (typeof candidate.code === "number") return candidate.code;
-
-  if (typeof candidate.code === "string") {
-    const parsed = Number(candidate.code);
-    return Number.isFinite(parsed) ? parsed : undefined;
+export function providerErrorCode(error: unknown): number | undefined {
+  // wagmi/viem may wrap EIP-1193 codes in a cause. Bound traversal, including cycles.
+  for (let depth = 0; depth < 8 && error && typeof error === "object"; depth++) {
+    const candidate = error as { code?: unknown; cause?: unknown };
+    const code = typeof candidate.code === "number" ? candidate.code
+      : typeof candidate.code === "string" && candidate.code.trim() ? Number(candidate.code) : undefined;
+    if (code !== undefined && Number.isFinite(code)) return code;
+    error = candidate.cause;
   }
-
   return undefined;
-}
-
-function providerErrorDetail(error: unknown) {
-  if (!error || typeof error !== "object") {
-    return error instanceof Error ? error.message : "";
-  }
-
-  const candidate = error as {
-    shortMessage?: unknown;
-    details?: unknown;
-    message?: unknown;
-  };
-
-  if (typeof candidate.shortMessage === "string") return candidate.shortMessage;
-  if (typeof candidate.details === "string") return candidate.details;
-  if (typeof candidate.message === "string") return candidate.message;
-
-  return error instanceof Error ? error.message : "";
 }
 
 export function chainIdToHex(chainId: number): `0x${string}` {
@@ -92,20 +67,6 @@ export function chainIdToHex(chainId: number): `0x${string}` {
   }
 
   return `0x${chainId.toString(16)}`;
-}
-
-export function getInjectedEthereumProvider(): EIP1193Provider {
-  if (typeof window === "undefined") {
-    throw new WalletNetworkError("Wallet provider is not available in this environment.");
-  }
-
-  const provider = (window as WindowWithInjectedEthereum).ethereum;
-
-  if (!provider) {
-    throw new WalletNetworkError("Wallet provider not found. Install or unlock an injected wallet.");
-  }
-
-  return provider;
 }
 
 export function getTargetWalletNetworkConfig(): WalletNetworkConfig {
@@ -153,13 +114,11 @@ export function walletNetworkErrorMessage(error: unknown) {
     return "A wallet request is already pending. Open your wallet to continue.";
   }
 
-  const detail = providerErrorDetail(error);
-
-  return detail ? `Unable to switch wallet network. ${detail}` : "Unable to switch wallet network.";
+  return "Unable to switch wallet network. Open your connected wallet and try again.";
 }
 
 export async function switchToWalletNetwork(
-  provider: EIP1193Provider,
+  provider: Pick<EIP1193Provider, "request">,
   config: WalletNetworkConfig = getTargetWalletNetworkConfig()
 ) {
   const addChainParams = buildAddEthereumChainParams(config);
@@ -188,6 +147,6 @@ export async function switchToWalletNetwork(
   }
 }
 
-export async function switchToTargetChain(provider: EIP1193Provider) {
+export async function switchToTargetChain(provider: Pick<EIP1193Provider, "request">) {
   return switchToWalletNetwork(provider, getTargetWalletNetworkConfig());
 }

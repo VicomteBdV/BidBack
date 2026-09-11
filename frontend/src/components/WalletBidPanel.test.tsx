@@ -2,12 +2,13 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createPublicClient, createWalletClient } from "viem";
 import { useAccount } from "wagmi";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
-vi.mock("wagmi", () => ({ useAccount: vi.fn() }));
+vi.mock("wagmi", () => ({ useAccount: vi.fn(), useConfig: vi.fn(() => ({})) }));
+vi.mock("wagmi/actions", () => ({ getAccount: () => useAccount() }));
 vi.mock("viem", async () => {
   const actual = await vi.importActual<typeof import("viem")>("viem");
   return {
@@ -19,6 +20,11 @@ vi.mock("viem", async () => {
 });
 
 const txHash = "0x1111111111111111111111111111111111111111111111111111111111111111" as const;
+
+const providerA = { request: vi.fn() };
+const providerB = { request: vi.fn(async ({ method }: { method: string }) =>
+  method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69") };
+const connectorB = { uid: "wallet-b", name: "Wallet B", getProvider: vi.fn(async () => providerB) };
 
 function setupBid({
   currentCap = 0n,
@@ -44,7 +50,7 @@ function setupBid({
   vi.mocked(useAccount).mockReturnValue({
     address: testAddresses.primaryBidder,
     chainId: 31337,
-    isConnected: true
+    isConnected: true, connector: connectorB
   } as unknown as ReturnType<typeof useAccount>);
 
   let minimumReadCount = 0;
@@ -75,15 +81,23 @@ function setupBid({
     readContract,
     waitForTransactionReceipt
   } as unknown as ReturnType<typeof createPublicClient>);
-  vi.mocked(createWalletClient).mockReturnValue({ writeContract } as unknown as ReturnType<typeof createWalletClient>);
+  vi.mocked(createWalletClient).mockImplementation((options) => ({
+    writeContract: async (...args: unknown[]) => {
+      const result = await (writeContract as (...args: unknown[]) => Promise<unknown>)(...args);
+      await (options.transport as unknown as { request: (args: unknown) => Promise<unknown> }).request({
+        method: "eth_sendTransaction", params: [{ from: vi.mocked(useAccount)().address }]
+      });
+      return result;
+    }
+  }) as unknown as ReturnType<typeof createWalletClient>);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(localDeploymentFixture), {
     status: 200,
     headers: { "content-type": "application/json" }
   })));
-  Object.defineProperty(window, "ethereum", {
-    configurable: true,
-    value: { request: vi.fn(async () => "0x7a69") }
-  });
+  providerA.request.mockReset();
+  providerB.request.mockReset();
+  providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69");
+  Object.defineProperty(window, "ethereum", { configurable: true, value: providerA });
 
   render(
     <WalletBidPanel
@@ -125,6 +139,7 @@ describe("WalletBidPanel", () => {
       value: 1_000_000_000_000_000_000n
     })));
     expect(await screen.findByText("Bid placed with 1 ETH sent.")).toBeInTheDocument();
+    await waitFor(() => expect(providerB.request).toHaveBeenCalledWith(expect.objectContaining({ method: "eth_sendTransaction" })));
     expect(readContract.mock.calls.filter(([request]) => request.functionName === "minimumNextBid").length).toBeGreaterThanOrEqual(2);
     expect(readContract.mock.calls.filter(([request]) => request.functionName === "capOf").length).toBeGreaterThanOrEqual(2);
   });
@@ -276,4 +291,9 @@ describe("WalletBidPanel", () => {
     expect(await screen.findByText("Transaction rejected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeEnabled();
   });
+});
+
+// Every component scenario uses B, while the legacy global points at unrelated A.
+afterEach(() => {
+  expect(providerA.request).not.toHaveBeenCalled();
 });

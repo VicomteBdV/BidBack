@@ -26,10 +26,22 @@ export const targetChainName =
 
 export const anvilRpcUrl = cleanEnv(process.env.NEXT_PUBLIC_ANVIL_RPC_URL) ?? "http://127.0.0.1:8545";
 
-export const targetWalletRpcUrl =
-  cleanEnv(process.env.NEXT_PUBLIC_WALLET_RPC_URL) ??
-  (targetChainId === anvilChainId ? anvilRpcUrl : undefined) ??
-  anvilRpcUrl;
+export function resolveWalletRpcUrl(chainId: number, walletRpc?: string, localRpc?: string) {
+  const value = cleanEnv(walletRpc) ??
+    (chainId === anvilChainId ? cleanEnv(localRpc) ?? "http://127.0.0.1:8545" : undefined);
+  if (!value) throw new Error("NEXT_PUBLIC_WALLET_RPC_URL is required for a non-local target chain.");
+  try {
+    const url = new URL(value);
+    if (!/^https?:\/\//i.test(value) || !/^https?:$/.test(url.protocol) || !url.hostname || url.username || url.password) throw new Error();
+  } catch {
+    throw new Error("NEXT_PUBLIC_WALLET_RPC_URL must be a valid HTTP(S) URL without embedded credentials.");
+  }
+  return value;
+}
+
+export const targetWalletRpcUrl = resolveWalletRpcUrl(
+  targetChainId, process.env.NEXT_PUBLIC_WALLET_RPC_URL, anvilRpcUrl
+);
 
 export const targetBlockExplorerUrl = cleanEnv(process.env.NEXT_PUBLIC_BLOCK_EXPLORER_URL) ?? "";
 

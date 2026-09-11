@@ -2,14 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createPublicClient,
-  createWalletClient,
-  custom,
   formatEther,
   type Address,
   type EIP1193Provider
 } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useConfig } from "wagmi";
+import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { ModeBadge } from "@/components/ModeBadge";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
@@ -19,7 +17,7 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
 import { getBidActionState, sameAddress } from "@/lib/auctionActionState";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
+import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, shortenAddress } from "@/lib/format";
 import {
@@ -33,10 +31,6 @@ import {
   unknownConfirmationState,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
-
-type WindowWithInjectedEthereum = Window & {
-  ethereum?: EIP1193Provider;
-};
 
 function walletErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object") {
@@ -61,38 +55,7 @@ function parseChainTimestamp(value?: string) {
   }
 }
 
-function getInjectedEthereum(): EIP1193Provider {
-  if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
-  }
-
-  const provider = (window as WindowWithInjectedEthereum).ethereum;
-
-  if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
-  }
-
-  return provider;
-}
-
-function createBrowserClients(account: Address) {
-  const provider = getInjectedEthereum();
-
-  return {
-    provider,
-    publicClient: createPublicClient({
-      chain: targetChain,
-      transport: custom(provider)
-    }),
-    walletClient: createWalletClient({
-      account,
-      chain: targetChain,
-      transport: custom(provider)
-    })
-  };
-}
-
-async function verifyWalletChain(provider: EIP1193Provider) {
+async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
   let walletChainId: unknown;
 
   try {
@@ -115,7 +78,8 @@ export function WalletBidPanel({
   auction: SerializedAuction;
   onBidComplete: () => Promise<void>;
 }) {
-  const { address, chainId, isConnected } = useAccount();
+  const { address, chainId, isConnected, connector } = useAccount();
+  const config = useConfig();
 
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
@@ -177,7 +141,7 @@ export function WalletBidPanel({
     setBidAmountEth("");
     setTxStatus(null);
     setIsReviewingBid(false);
-  }, [address, chainId, auction.auctionId]);
+  }, [address, chainId, connector?.uid, auction.auctionId]);
 
   const isStepUp = currentCap !== null && currentCap > 0n;
   const bidActionState = getBidActionState({
@@ -208,7 +172,7 @@ export function WalletBidPanel({
       setIsLoadingBidData(true);
       setMessage(null);
 
-      const { provider, publicClient } = createBrowserClients(address);
+      const { provider, publicClient } = await createConnectedWalletClients(config, connector, address);
       await verifyWalletChain(provider);
 
       const [minimumRequired, walletCap] = await Promise.all([
@@ -254,7 +218,7 @@ export function WalletBidPanel({
       setMessage(walletErrorMessage(caught, "Unable to load wallet bid data."));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, auction.auctionId, auctionOpen, deployment, wrongNetwork]);
+  }, [address, connector?.uid, auction.auctionId, auctionOpen, deployment, wrongNetwork]);
 
   async function placeWalletBid() {
     if (!address) {
@@ -279,7 +243,7 @@ export function WalletBidPanel({
       setMessage(null);
       setTxStatus(null);
 
-      const { provider, publicClient, walletClient } = createBrowserClients(address);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, address);
 
       await verifyWalletChain(provider);
 

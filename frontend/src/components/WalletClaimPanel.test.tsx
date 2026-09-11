@@ -2,12 +2,13 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createPublicClient, createWalletClient } from "viem";
 import { useAccount } from "wagmi";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { WalletClaimPanel } from "@/components/WalletClaimPanel";
 import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
-vi.mock("wagmi", () => ({ useAccount: vi.fn() }));
+vi.mock("wagmi", () => ({ useAccount: vi.fn(), useConfig: vi.fn(() => ({})) }));
+vi.mock("wagmi/actions", () => ({ getAccount: () => useAccount() }));
 vi.mock("viem", async () => {
   const actual = await vi.importActual<typeof import("viem")>("viem");
   return {
@@ -19,6 +20,11 @@ vi.mock("viem", async () => {
 });
 
 const txHash = "0x3333333333333333333333333333333333333333333333333333333333333333" as const;
+
+const providerA = { request: vi.fn() };
+const providerB = { request: vi.fn(async ({ method }: { method: string }): Promise<string | (string | undefined)[]> =>
+  method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69") };
+const connectorB = { uid: "wallet-b", name: "Wallet B", getProvider: vi.fn(async () => providerB) };
 
 function setupClaims({
   refundableAmount = 1_000_000_000_000_000_000n,
@@ -42,7 +48,7 @@ function setupClaims({
   failedReads?: Set<string>;
 } = {}) {
   const account = testAddresses.primaryBidder;
-  vi.mocked(useAccount).mockReturnValue({ address: account, chainId: 31337, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+  vi.mocked(useAccount).mockReturnValue({ address: account, chainId: 31337, isConnected: true, connector: connectorB } as unknown as ReturnType<typeof useAccount>);
 
   const liveAuction = { state: 2, nftClaimed: false,
     highestBidder: (auctionOverrides.highestBidder ?? account) as `0x${string}`, seller: account as `0x${string}` };
@@ -60,15 +66,23 @@ function setupClaims({
   const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
   const writeContract = vi.fn(async () => txHash);
   vi.mocked(createPublicClient).mockReturnValue({ readContract, waitForTransactionReceipt } as unknown as ReturnType<typeof createPublicClient>);
-  vi.mocked(createWalletClient).mockReturnValue({ writeContract } as unknown as ReturnType<typeof createWalletClient>);
+  vi.mocked(createWalletClient).mockImplementation((options) => ({
+    writeContract: async (...args: unknown[]) => {
+      const result = await (writeContract as (...args: unknown[]) => Promise<unknown>)(...args);
+      await (options.transport as unknown as { request: (args: unknown) => Promise<unknown> }).request({
+        method: "eth_sendTransaction", params: [{ from: vi.mocked(useAccount)().address }]
+      });
+      return result;
+    }
+  }) as unknown as ReturnType<typeof createWalletClient>);
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(localDeploymentFixture), {
     status: 200,
     headers: { "content-type": "application/json" }
   })));
-  Object.defineProperty(window, "ethereum", {
-    configurable: true,
-    value: { request: vi.fn(async () => "0x7a69") }
-  });
+  providerA.request.mockReset();
+  providerB.request.mockReset();
+  providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69");
+  Object.defineProperty(window, "ethereum", { configurable: true, value: providerA });
 
   render(
     <WalletClaimPanel
@@ -93,6 +107,24 @@ function setupClaims({
 beforeEach(() => vi.clearAllMocks());
 
 describe("WalletClaimPanel", () => {
+  it.each([
+    ["claim nft", "claimNft", [1n]],
+    ["claim refund", "claimRefund", [1n]],
+    ["claim redistribution", "claim", [1n]],
+    ["withdraw proceeds", "withdrawSellerProceeds", undefined],
+    ["withdraw protocol fees", "withdrawProtocolFees", undefined]
+  ])("dispatches %s through connected B with unchanged arguments", async (label, functionName, args) => {
+    const { writeContract } = setupClaims();
+    const review = await screen.findByRole("button", { name: `Review ${label}` });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await waitFor(() => expect(providerB.request).toHaveBeenCalledWith(expect.objectContaining({ method: "eth_sendTransaction" })));
+    expect(writeContract).toHaveBeenCalledWith(expect.objectContaining({ functionName }));
+    expect((writeContract.mock.calls[0] as unknown as [{ args?: unknown }])[0].args).toEqual(args);
+    expect(providerA.request).not.toHaveBeenCalled();
+  });
+
   it("keeps all simultaneously eligible finalized actions visible and marks global credits", async () => {
     setupClaims();
     await screen.findByText("Global seller proceeds credit");
@@ -237,7 +269,7 @@ describe("WalletClaimPanel", () => {
     await waitFor(() => expect(review).toBeEnabled());
     fireEvent.click(review);
     if (failure === "network") {
-      Object.defineProperty(window, "ethereum", { configurable: true, value: { request: vi.fn(async () => "0x1") } });
+      providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [testAddresses.primaryBidder] : "0x1");
     } else failedReads.add(failure);
     fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
     expect(await screen.findByText("Transaction failed")).toBeInTheDocument();
@@ -270,4 +302,9 @@ describe("WalletClaimPanel", () => {
     expect(onActionComplete).not.toHaveBeenCalled();
   });
 
+});
+
+// Every component scenario uses B, while the legacy global points at unrelated A.
+afterEach(() => {
+  expect(providerA.request).not.toHaveBeenCalled();
 });

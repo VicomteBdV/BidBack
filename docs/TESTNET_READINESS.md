@@ -152,6 +152,30 @@ This prerequisite does not select a host or production chain, deploy a frontend,
 
 ---
 
+## Controlled Wallet and RPC Support Contract
+
+Lot 6 (`BIDBACK-CONTROLLED-FOUNDATION-LOT6-WALLET-RPC-READINESS-v2`, superseding V1) retains wallet-signed desktop injected wallets through wagmi. The connector selected in the wallet selector supplies network switching, transaction-related wallet reads, NFT approval, creation, bidding/step-up, finalization, all three claims, and both withdrawals. No transaction provider is chosen independently from `window.ethereum`.
+
+| Surface / target | Code path available | Deterministic coverage | Manual browser/wallet evidence |
+| --- | --- | --- | --- |
+| Generic injected / EIP-6963 desktop connectors | Yes; explicit choice for multiple discovered wallets, direct connection for one, read-only for zero | Selector, active-provider switching, A/B isolation, shared viem dispatch, transaction components, stale/missing provider rejection | Mocks only; no extension or hosted lifecycle validation in this lot |
+| MetaMask desktop extension / Chromium | Generic injected path; no proprietary integration | Generic connector/provider tests only | **Manual validation pending** |
+| Rabby desktop extension / Chromium | Generic injected path; no proprietary integration | Generic connector/provider tests only | **Manual validation pending** |
+| Other injected wallets | May work through the generic path | No wallet-specific validation claimed | Not validated |
+| WalletConnect, mobile links, Coinbase-specific integration | Outside this lot | None added | Not validated |
+
+The tests' executed results and exact tested SHA are retained in the lot PR. Test presence does not itself establish success. When named connectors are discovered, the selector hides the legacy global “Browser wallet” alias. A legacy-only provider can still connect, but that generic label does not prove that all installed extensions were discovered or that a multi-extension session works. Wagmi retains its existing reconnection behavior for previously authorized connections.
+
+For any non-local target, `NEXT_PUBLIC_WALLET_RPC_URL` must be explicit and valid HTTP(S); missing, blank, malformed, or embedded-credential URLs fail configuration initialization. No fallback to either `127.0.0.1:8545` or `NEXT_PUBLIC_ANVIL_RPC_URL` is used. Anvil `31337` retains its local fallback. Configuration failure is a build/start configuration error, not proof that a public RPC is unavailable. URL validation makes no network calls and does not prove DNS, reachability, chain identity, rate limits, or credential-free paths/query strings.
+
+Browser RPC configuration supplies wagmi's transport and add-chain metadata. A wallet with an existing chain entry may retain its own RPC endpoint; a switch/add request does not prove which endpoint the extension uses. Server reads may use a different `BIDBACK_RPC_URL`, but `BIDBACK_CHAIN_ID` and build-time `NEXT_PUBLIC_CHAIN_ID` must agree. Run the [existing controlled-environment preflight](#controlled-frontend-environment-prerequisite) with aligned build/runtime configuration. No RPC vendor is selected.
+
+For later authorized manual validation, retain browser/OS and extension versions, source/build SHA, chain IDs, non-secret environment evidence, and observed results. Test each extension alone, then both together: select the non-first wallet B, confirm its identity/account, switch the wrong network, exercise rejection and pending-request recovery, and verify NFT approval/create, bid/step-up, finalize, NFT/refund/reward claims, seller proceeds, and protocol-fee withdrawal all prompt the selected extension while A remains untouched. Check disconnect/account/connector changes and repeat at desktop and narrow viewport widths. Public transaction portions require a separately authorized testnet session; none are performed by this lot.
+
+No Controlled beta-ready claim is made. Hosted access/environment evidence, actual browser/RPC support validation, repeatable Base Sepolia execution with retained evidence, and minimum monitoring, support, and incident handling remain open.
+
+---
+
 ## Deployment JSON Format
 
 Deployment files live in:

@@ -3,15 +3,13 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createPublicClient,
-  createWalletClient,
-  custom,
   decodeEventLog,
   type Address,
   type EIP1193Provider,
   type PublicClient
 } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useConfig } from "wagmi";
+import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
@@ -20,7 +18,7 @@ import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
 import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
-import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
+import { targetChainId, targetChainLabel } from "@/lib/chains";
 import {
   getCreateAuctionValidationIssue,
   validateCreateAuctionFields,
@@ -53,10 +51,6 @@ type CreateContext = {
   defaultDuration: string;
 };
 
-type WindowWithInjectedEthereum = Window & {
-  ethereum?: EIP1193Provider;
-};
-
 function sameAddress(a?: string | null, b?: string | null) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
@@ -73,37 +67,6 @@ function walletErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function getInjectedEthereum(): EIP1193Provider {
-  if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
-  }
-
-  const provider = (window as WindowWithInjectedEthereum).ethereum;
-
-  if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
-  }
-
-  return provider;
-}
-
-function createBrowserClients(account: Address) {
-  const provider = getInjectedEthereum();
-
-  return {
-    provider,
-    publicClient: createPublicClient({
-      chain: targetChain,
-      transport: custom(provider)
-    }),
-    walletClient: createWalletClient({
-      account,
-      chain: targetChain,
-      transport: custom(provider)
-    })
-  };
-}
-
 function getField<T>(raw: unknown, key: string, index: number): T {
   if (Array.isArray(raw)) return raw[index] as T;
   return (raw as Record<string, unknown>)[key] as T;
@@ -116,7 +79,7 @@ function toBigInt(value: unknown) {
   return 0n;
 }
 
-async function verifyWalletChain(provider: EIP1193Provider) {
+async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
   let walletChainId: unknown;
 
   try {
@@ -156,7 +119,8 @@ async function readCreateParams(publicClient: PublicClient, context: CreateConte
 }
 
 export function WalletCreateAuctionForm() {
-  const { address, chainId, isConnected } = useAccount();
+  const { address, chainId, isConnected, connector } = useAccount();
+  const config = useConfig();
 
   const [context, setContext] = useState<CreateContext | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
@@ -236,7 +200,7 @@ export function WalletCreateAuctionForm() {
     setCreateTxStatus(null);
     setCreatedAuctionId(null);
     setIsReviewing(false);
-  }, [address, chainId, nftContract, tokenId]);
+  }, [address, chainId, connector?.uid, nftContract, tokenId]);
 
   const values = useMemo(
     () => ({ nftContract, tokenId, startPriceEth, durationSeconds }),
@@ -295,7 +259,7 @@ export function WalletCreateAuctionForm() {
       setMessage(null);
 
       const parsed = parseCreateAuctionValues(values);
-      const { provider, publicClient } = createBrowserClients(address);
+      const { provider, publicClient } = await createConnectedWalletClients(config, connector, address);
 
       await verifyWalletChain(provider);
 
@@ -390,7 +354,7 @@ export function WalletCreateAuctionForm() {
       setApprovalTxStatus(awaitingSignatureState("Confirm NFT custody approval in your wallet."));
 
       const parsed = parseCreateAuctionValues(values);
-      const { publicClient, walletClient } = createBrowserClients(address);
+      const { publicClient, walletClient } = await createConnectedWalletClients(config, connector, address);
 
       const txHash = await walletClient.writeContract({
         address: parsed.nftContract,
@@ -472,7 +436,7 @@ export function WalletCreateAuctionForm() {
       }
 
       const parsed = parseCreateAuctionValues(values);
-      const { publicClient, walletClient } = createBrowserClients(address);
+      const { publicClient, walletClient } = await createConnectedWalletClients(config, connector, address);
 
       setCreateTxStatus(awaitingSignatureState("Confirm auction creation in your wallet."));
 

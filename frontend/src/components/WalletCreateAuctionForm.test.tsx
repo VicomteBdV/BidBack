@@ -2,16 +2,17 @@ import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics } from "viem";
 import { useAccount } from "wagmi";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
 vi.mock("wagmi", () => ({
-  useAccount: vi.fn()
+  useAccount: vi.fn(), useConfig: vi.fn(() => ({}))
 }));
 
+vi.mock("wagmi/actions", () => ({ getAccount: () => useAccount() }));
 vi.mock("viem", async () => {
   const actual = await vi.importActual<typeof import("viem")>("viem");
 
@@ -48,6 +49,7 @@ type MinimalConnectedAccount = {
   address: `0x${string}`;
   chainId: number;
   isConnected: true;
+  connector: typeof connectorB;
 };
 
 function paramsTuple() {
@@ -60,11 +62,16 @@ function mockConnectedAccount(chainId = 31337) {
   const account: MinimalConnectedAccount = {
     address: seller,
     chainId,
-    isConnected: true
+    isConnected: true, connector: connectorB
   };
 
   return account as unknown as ReturnType<typeof useAccount>;
 }
+
+const providerA = { request: vi.fn() };
+const providerB = { request: vi.fn(async ({ method }: { method: string }) =>
+  method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69") };
+const connectorB = { uid: "wallet-b", name: "Wallet B", getProvider: vi.fn(async () => providerB) };
 
 function setupWalletCreateForm({
   owner = seller,
@@ -118,9 +125,15 @@ function setupWalletCreateForm({
     waitForTransactionReceipt
   } as unknown as ReturnType<typeof createPublicClient>);
 
-  vi.mocked(createWalletClient).mockReturnValue({
-    writeContract
-  } as unknown as ReturnType<typeof createWalletClient>);
+  vi.mocked(createWalletClient).mockImplementation((options) => ({
+    writeContract: async (...args: unknown[]) => {
+      const result = await (writeContract as (...args: unknown[]) => Promise<unknown>)(...args);
+      await (options.transport as unknown as { request: (args: unknown) => Promise<unknown> }).request({
+        method: "eth_sendTransaction", params: [{ from: vi.mocked(useAccount)().address }]
+      });
+      return result;
+    }
+  }) as unknown as ReturnType<typeof createWalletClient>);
 
   vi.mocked(useAccount).mockReturnValue(mockConnectedAccount(chainId));
 
@@ -136,15 +149,10 @@ function setupWalletCreateForm({
     )
   );
 
-  Object.defineProperty(window, "ethereum", {
-    configurable: true,
-    value: {
-      request: vi.fn(async ({ method }: { method: string }) => {
-        if (method === "eth_chainId") return "0x7a69";
-        throw new Error(`Unexpected provider request: ${method}`);
-      })
-    }
-  });
+  providerA.request.mockReset();
+  providerB.request.mockReset();
+  providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69");
+  Object.defineProperty(window, "ethereum", { configurable: true, value: providerA });
 
   render(<WalletCreateAuctionForm />);
 
@@ -342,6 +350,7 @@ describe("WalletCreateAuctionForm", () => {
       args: [testAddresses.localNft, 2n, 1_000_000_000_000_000_000n, 183600n]
     }));
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
+    expect(providerB.request.mock.calls.filter(([args]) => args.method === "eth_sendTransaction")).toHaveLength(2);
   });
 
   it("keeps zero and invalid day values from reaching auction creation", async () => {
@@ -437,4 +446,9 @@ describe("WalletCreateAuctionForm", () => {
     expect(writeContract).toHaveBeenCalledTimes(1);
   });
 
+});
+
+// Every component scenario uses B, while the legacy global points at unrelated A.
+afterEach(() => {
+  expect(providerA.request).not.toHaveBeenCalled();
 });
