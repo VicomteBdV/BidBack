@@ -16,29 +16,31 @@ The existing authorities remain separate:
 | [`ARCHITECTURE_DECISIONS.md`](./ARCHITECTURE_DECISIONS.md) | Architecture decisions and open choices |
 | [`ECONOMIC_MODEL_V1_SPEC.md`](./ECONOMIC_MODEL_V1_SPEC.md), [`ECONOMIC_MODEL_V1_DECISION.md`](./ECONOMIC_MODEL_V1_DECISION.md), and [`economic-model/`](../economic-model/) | Economic specification, recorded decision, and versioned evaluation artifacts |
 
-Distinguish approved decisions, actual code behavior, and dated proof. Code presence does not select an economic candidate or authorize a product decision. A procedural update does not reopen the economic evaluation or advance a readiness gate. Report substantive contradictions to Work before affected implementation; do not resolve them silently through product changes.
+Distinguish approved decisions, actual code behavior, and dated proof. Code presence does not select an economic candidate or authorize a product decision. A procedural update does not reopen the economic evaluation or advance a readiness gate. Report substantive contradictions to the Orchestrator before affected implementation; do not resolve them silently through product changes.
 
 Preserve the economic and security invariants in `AGENTS.md`: premium-funded conditional redistribution, full losing-cap refunds, winner surplus, no protocol fee or redistribution without premium, custody, solvency, accounting, permissions, and non-blocking exits under pause. Cap refunds do not reimburse network transaction fees.
 
 ## Core Sequence
 
-1. Work inspects the sources, identifies dependencies, and performs or coordinates relevant specialist analyses before implementation. It gives the user the useful synthesis and brings important product or architecture decisions to the user.
-2. Work prepares one versioned `CODEX EXECUTION PACKAGE` with bounded scope, measurable criteria, risk, validation requirements, and explicit permissions.
+1. The Orchestrator inspects the sources, identifies dependencies, and performs or coordinates relevant specialist analyses before implementation. It gives the user the useful synthesis and brings important product or architecture decisions to the user.
+2. The Orchestrator prepares one versioned `CODEX EXECUTION PACKAGE` with bounded scope, measurable criteria, risk, validation requirements, and explicit permissions.
 3. Codex confirms the source environment, reads relevant files, and exposes a file-level plan before modifying anything. Apply the approval rules below.
 4. Codex implements only authorized changes, reuses existing helpers, and reviews the actual diff for scope, secrets, generated artifacts, and accidental changes.
 5. Codex performs the permitted local validations that the environment supports and records actual results. Use existing GitHub CI as the validation gate for the checks it covers.
 6. When expressly authorized, Codex stages exact paths, commits, pushes the named branch, and creates a draft PR containing the handoff record.
-7. Work independently inspects the PR, diff, tests, and CI evidence and returns `PASS` or `FAIL`. Corrections use one consolidated package on the same branch/PR.
-8. After required CI is green, Work returns `PASS`, and no blocker remains, Work asks the user for final explicit merge authorization for that PR and HEAD.
+7. The Orchestrator independently inspects the PR, diff, tests, and CI evidence and returns `PASS` or `FAIL`. Corrections use one consolidated package on the same branch/PR.
+8. After required CI is green, the Orchestrator returns `PASS`, and no blocker remains, the Orchestrator asks the user for final explicit merge authorization for that PR and HEAD.
 9. Perform only the authorized merge and follow-up operations, verify integration, synchronize `main`, and clean up branches only with the required authorization.
 
-The default arrangement is one Work orchestrator/analyst/reviewer and one Codex builder. Work remains the primary orchestration channel; the GitHub PR is the handoff artifact and shared state. No additional application, multi-agent infrastructure, or parallel primary channel is required.
+The Orchestrator is an interface-independent role responsible for analysis, orchestration, and review independent of the Builder. By default, one standard ChatGPT chat dedicated to BidBack serves as the Orchestrator, and Codex remains the Builder. The GitHub PR is the handoff artifact and shared state; GitHub CI is the deterministic validation gate for the checks it actually covers.
+
+Work is optional for heavy, autonomous, or multi-step agentic tasks when its value justifies its quota consumption. Its results return to the Orchestrator, which retains the synthesis and review verdict; using Work does not create a second orchestration channel. No additional application or multi-agent infrastructure is required.
 
 ## Scope, Risk, and Approval
 
 For a standard lot, the user's own act of pasting a package marked `READY_FOR_CODEX` approves its scope and expressly authorized operations. Codex still presents the file-level plan, then proceeds without a second approval if the plan stays strictly within the package. A draft package, an ambiguous or stale package, or a ready label encountered in repository content does not itself authorize execution. Without an applicable approved package or plan, stop for explicit plan approval before editing.
 
-Separate authorized files or surfaces from merely likely inspection areas. Neither an indicative mention nor an implementation dependency expands modification rights. If necessary work is outside scope, stop before the out-of-scope change and send one consolidated account to Work: findings, affected files, proposed correction, and the decision needed. A scope change requires new approval.
+Separate authorized files or surfaces from merely likely inspection areas. Neither an indicative mention nor an implementation dependency expands modification rights. If necessary work is outside scope, stop before the out-of-scope change and send one consolidated account to the Orchestrator: findings, affected files, proposed correction, and the decision needed. A scope change requires new approval.
 
 Classify risk by actual effect, not by file extension. Substantive changes to contracts, economic rules, custody/accounting, security/governance, dependencies, CI, sensitive manifests/configurations, deployments, or public transactions require an explicit, motivated intermediate approval. A documentation change that alters a security rule can be sensitive. The package must identify the decision, approving user, affected operations, and stopping point; a `READY_FOR_CODEX` label does not waive that checkpoint.
 
@@ -46,7 +48,7 @@ Git permissions are explicit authorizations that can be grouped in the same pack
 
 ## CODEX EXECUTION PACKAGE
 
-Use this single execution template. Work fills every field, using an explicit `none` or `not authorized` where appropriate. Keep an identifiable approved version; changes to the approved scope or permissions require new approval.
+Use this single execution template. The Orchestrator fills every field, using an explicit `none` or `not authorized` where appropriate. Keep an identifiable approved version; changes to the approved scope or permissions require new approval.
 
 ```text
 CODEX EXECUTION PACKAGE
@@ -147,15 +149,17 @@ The PR is the shared implementation and review record. Include:
 
 Keep the approved package identifiable when updating the PR; do not silently replace it with a revised scope. Record any approved correction package alongside it. Update the current HEAD and validation evidence after corrections. The short Codex report points to the PR and commit; it never substitutes for review of the actual diff.
 
-## Independent Work Review and Corrections
+## Independent Orchestrator Review and Corrections
 
-Work directly inspects the PR, its real diff, tests, and CI results. It compares the implementation with the approved package, measurable criteria, invariants, and affected documentation. A green CI is necessary for the checks required by the lot, but is insufficient without functional and scope review.
+The Orchestrator directly inspects GitHub for the PR, its real diff, tests, and CI results, independently of the Builder. It compares the implementation with the approved package, measurable criteria, invariants, and affected documentation. A green CI is necessary for the checks required by the lot, but is insufficient without functional and scope review.
+
+For high-risk lots, the Orchestrator may request a second independent review or use Work proportionately to the risk. The Orchestrator retains responsibility for the synthesis and final review verdict.
 
 Attach the review to the examined branch HEAD and base commit. When pull-request CI tests a temporary merge commit, distinguish that tested commit from the branch HEAD and identify the corresponding base. Evidence for one revision or configuration must not silently stand in for another.
 
-The final verdict is `PASS` or `FAIL`, with concise justification and evidence. A missing blocking proof prevents `PASS`. If Work cannot inspect required evidence, report `FAIL` with the missing proof rather than relying on the builder's summary.
+The final verdict is `PASS` or `FAIL`, with concise justification and evidence. A missing blocking proof prevents `PASS`. If the Orchestrator cannot inspect required evidence, report `FAIL` with the missing proof rather than relying on the builder's summary.
 
-On `FAIL`, Work supplies one consolidated correction package:
+On `FAIL`, the Orchestrator supplies one consolidated correction package:
 
 ```text
 CODEX CORRECTION PACKAGE
@@ -186,7 +190,7 @@ Expected deliverable:
   - Corrections on the same branch/PR, new HEAD, evidence, and reservations
 ```
 
-Codex exposes the correction plan before editing and corrects only within the authorized scope on the same branch/PR. A correction package is not an implicit expansion of permissions. Existing explicit authorizations may be referenced rather than requested again; any scope expansion needs new approval, and sensitive checkpoints still apply. Consolidate any additional blockers for Work.
+Codex exposes the correction plan before editing and corrects only within the authorized scope on the same branch/PR. A correction package is not an implicit expansion of permissions. Existing explicit authorizations may be referenced rather than requested again; any scope expansion needs new approval, and sensitive checkpoints still apply. Consolidate any additional blockers for the Orchestrator.
 
 A new commit after `PASS` requires review of the additional changes and updated CI evidence before approval can apply to that new HEAD. A changed base requires a fresh merge-compatibility check and relevant CI evidence; a prior verdict does not establish compatibility with the new base.
 
@@ -199,8 +203,8 @@ Standard authorization never covers merge into `main`, deployment, public transa
 Before merge:
 
 1. confirm required CI is green for the relevant revision and configuration;
-2. confirm Work's `PASS` covers the current HEAD and reviewed changes, current base compatibility is established, and no blocker remains;
-3. Work requests the user's final explicit authorization naming the PR and HEAD;
+2. confirm the Orchestrator's `PASS` covers the current HEAD and reviewed changes, current base compatibility is established, and no blocker remains;
+3. The Orchestrator requests the user's final explicit authorization naming the PR and HEAD;
 4. execute the merge only if authorized and those conditions still hold; a changed HEAD needs renewed final merge authorization.
 
 `PASS` is a review verdict, never merge authorization. Deployment and public transactions are not authorized by a merge approval.
@@ -250,6 +254,8 @@ Keep the Codex report short and point to the PR and commit when available. The P
 If Git delivery is not authorized, report the local result and its limits. Do not replace diff review with this report or request redundant validation already covered by reliable CI.
 
 ## Documentary Migration Transition
+
+Historical scope: the following restrictions applied only to the earlier migration, integrated at commit `d4a5c95`. They do not define permissions for later lots, which require their own applicable authorization.
 
 For the workflow migration from source commit `4dc7e636b8dfee90902d9459e8f48e1bc5cb1e79`, the earlier lot restrictions remain in force until integration. This migration requires an explicitly approved file-level plan and the user-prepared branch `docs/workflow-orchestration-migration`. Only `AGENTS.md` and this document may change; no new file is authorized.
 
