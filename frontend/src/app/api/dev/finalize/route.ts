@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertLocalDevActionsEnabled } from "@/lib/server/localDevGuard";
+import { assertLocalDevActionsEnabled, localDevGuardResponse } from "@/lib/server/localDevGuard";
 import { finalizeDemoAuction } from "@/lib/server/auctionWriter";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,9 @@ export async function POST(request: Request) {
       ...payload
     });
   } catch (error) {
+    const unavailable = localDevGuardResponse(error);
+    if (unavailable) return unavailable;
+
     return NextResponse.json(
       {
         status: "error",

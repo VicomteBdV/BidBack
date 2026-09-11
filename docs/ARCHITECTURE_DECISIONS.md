@@ -548,6 +548,18 @@ Future choices about a managed metadata service, shared cache, media proxy, mode
 
 ---
 
+## Local-Development / Controlled-Testnet Environment Boundary
+
+The approved policy for `BIDBACK-CONTROLLED-FOUNDATION-LOT5-ENV-ISOLATION-v1` keeps server-held transaction tooling strictly local to Anvil. The shared configuration predicate in [`localDevEnvironment.ts`](../frontend/src/lib/localDevEnvironment.ts) requires both `NEXT_PUBLIC_CHAIN_ID` and `BIDBACK_CHAIN_ID` to be exactly `31337`, plus `ENABLE_LOCAL_DEV_ACTIONS=true`. UI visibility uses this predicate; the server guard additionally checks that the configured Anvil RPC reports `31337`.
+
+All eight `/api/dev/*` transaction endpoints and `/api/local-create-context` enforce the guard. Non-local, missing, or invalid application targets are rejected before any RPC, writer, or local context reader runs, including when the flag is accidentally true and the Anvil RPC would report `31337`. Guard refusals return a fixed HTTP 404 response without internal configuration or upstream error details. This runtime exclusion does not remove local code from the build and is not authentication for a publicly exposed Anvil-configured instance.
+
+The offline `npm --prefix frontend run validate:env:controlled` command checks the explicit Base Sepolia reference configuration and existing deployment manifest. Its input/loading rules and limitations are in [`TESTNET_READINESS.md`](./TESTNET_READINESS.md#controlled-frontend-environment-prerequisite). Build-time public values and server runtime configuration must remain aligned. Deterministic tests cover denied writers/readers and retained local behavior; actual results and tested revisions belong in the lot PR, not inferred from test presence.
+
+Public user actions remain wallet-signed. No hosting provider, production blockchain, additional wallet connector, server-held public-chain signer, or deployment is selected or introduced. Hosted access controls, build-time removal if later chosen, RPC/wallet reachability, and subsequent controlled-session evidence remain open; this lot does not establish Controlled beta-ready or Production-ready.
+
+---
+
 ## Production Trust Model
 
 Production users should be able to verify how custody, accounting, and rules work for a specific auction.
@@ -601,7 +613,7 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | Indexing and persistence          | Event-based auction discovery, client-side browsing over loaded windows, and wallet activity discovery with fallbacks  | Event indexer, backend cache, hosted read API                                              | Missing history, RPC log range failures, scalability limits, stale data               | frontend, backend, deployment, monitoring               | Before many simultaneous auctions                  |
 | NFT metadata display              | Opportunistic direct tokenURI reads with HTTP/IPFS support; no cache or media proxy                                    | Metadata cache, media proxy, NFT metadata service, collection indexer                      | Broken media, malicious metadata, stale metadata, external availability                | frontend, future backend, docs                          | Before broader public UX                           |
 | Production trust and verification | JSON validation and expanded on-chain verification exist                                                              | Explorer verification, external audit, monitoring, runbooks                                | Wrong deployment, unverified bytecode, incident response gaps                         | docs, scripts, deployment process, governance           | Before public beta and production                  |
-| Local-dev tooling boundary        | `/api/dev/*` guarded and local only                                                                                   | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
+| Local-dev tooling boundary        | `/api/dev/*` and local create-context require matching explicit Anvil targets and a guarded RPC                                                                                   | Keep local-only, remove from production build, feature flags by environment                | Accidental production exposure, server-held key misuse                                | Next.js routes, env config, docs                        | Before hosted frontend deployment                  |
 | Final UI/UX model                 | Functional MVP UI, not final design                                                                                   | Marketplace UX, bidder dashboard, auction discovery, trust panels                          | Confusing economics, wrong financial framing                                          | frontend, copy, docs, user education                    | After core public testnet mechanics are validated  |
 
 ---

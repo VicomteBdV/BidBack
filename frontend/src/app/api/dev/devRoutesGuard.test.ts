@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as createAuctionPost } from "@/app/api/dev/create-auction/route";
 import { POST as placeBidPost } from "@/app/api/dev/place-bid/route";
 import { POST as finalizePost } from "@/app/api/dev/finalize/route";
@@ -7,7 +7,8 @@ import { POST as claimRefundPost } from "@/app/api/dev/claim-refund/route";
 import { POST as claimRewardPost } from "@/app/api/dev/claim-reward/route";
 import { POST as withdrawSellerPost } from "@/app/api/dev/withdraw-seller-proceeds/route";
 import { POST as withdrawFeesPost } from "@/app/api/dev/withdraw-protocol-fees/route";
-import { createLocalDevAuction } from "@/lib/server/auctionCreator";
+import { GET as localCreateContextGet } from "@/app/api/local-create-context/route";
+import { createLocalDevAuction, readLocalCreateAuctionContext } from "@/lib/server/auctionCreator";
 import {
   claimDemoNft,
   claimDemoRefund,
@@ -19,7 +20,8 @@ import {
 } from "@/lib/server/auctionWriter";
 
 vi.mock("@/lib/server/auctionCreator", () => ({
-  createLocalDevAuction: vi.fn()
+  createLocalDevAuction: vi.fn(),
+  readLocalCreateAuctionContext: vi.fn()
 }));
 
 vi.mock("@/lib/server/auctionWriter", () => ({
@@ -79,57 +81,125 @@ function jsonRequest(body: Record<string, unknown>) {
   });
 }
 
-function expectNoWriterCalled() {
-  for (const writer of writerMocks) {
-    expect(writer).not.toHaveBeenCalled();
+const endpoints = [
+  ...routes.map((route, index) => ({
+    name: route.name,
+    call: () => route.post(jsonRequest(route.body)),
+    mock: writerMocks[index]
+  })),
+  { name: "local-create-context", call: () => localCreateContextGet(), mock: readLocalCreateAuctionContext }
+];
+
+function expectNoLocalActionCalled() {
+  for (const mock of [...writerMocks, readLocalCreateAuctionContext]) {
+    expect(mock).not.toHaveBeenCalled();
   }
 }
 
-describe("/api/dev route guards", () => {
-  it.each(routes)("refuses $name when ENABLE_LOCAL_DEV_ACTIONS is not true", async ({ post, body }) => {
-    process.env.ENABLE_LOCAL_DEV_ACTIONS = "false";
-    delete process.env.ANVIL_RPC_URL;
+async function expectUnavailable(call: () => Promise<Response>) {
+  const response = await call();
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ error: "Not available." });
+  expectNoLocalActionCalled();
+}
 
-    const response = await post(jsonRequest(body));
-    const payload = (await response.json()) as { status?: string; error?: string; localDevOnly?: boolean };
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_CHAIN_ID", "31337");
+  vi.stubEnv("BIDBACK_CHAIN_ID", "31337");
+  vi.stubEnv("ENABLE_LOCAL_DEV_ACTIONS", "true");
+  vi.stubEnv("ANVIL_RPC_URL", "http://127.0.0.1:8545");
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ jsonrpc: "2.0", id: 1, result: "0x7a69" })));
+  vi.mocked(readLocalCreateAuctionContext).mockResolvedValue({
+    chainId: 31337,
+    auctionHouse: "0x0000000000000000000000000000000000001001",
+    nftVault: "0x0000000000000000000000000000000000001002",
+    localNft: "0x0000000000000000000000000000000000001007",
+    paramsController: "0x0000000000000000000000000000000000001005",
+    minAuctionDuration: "60", paused: false, defaultTokenId: "2", defaultDuration: "7200"
+  });
+});
 
-    expect(response.status).toBe(500);
-    expect(payload.status).toBe("error");
-    expect(payload.localDevOnly).toBe(true);
-    expect(payload.error).toContain("Local dev actions are disabled");
-    expectNoWriterCalled();
+afterEach(() => vi.unstubAllEnvs());
+
+describe.each([
+  ["84532", "84532"], ["84532", "31337"], ["31337", "84532"],
+  ["84532", undefined], [undefined, "84532"],
+  ["1", "31337"], ["31337", "1"],
+  ["invalid", "31337"], ["31337", "invalid"],
+  [undefined, "31337"], ["31337", undefined], ["", "31337"], ["31337", ""]
+])("local endpoint exclusion for public/server targets %s / %s", (publicId, serverId) => {
+  it.each(endpoints)("refuses $name before any RPC, writer or local reader", async ({ call }) => {
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_ID", publicId);
+    vi.stubEnv("BIDBACK_CHAIN_ID", serverId);
+    // The flag is true and the supplied RPC would report Anvil if called.
+    await expectUnavailable(call);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("local endpoint guard failures", () => {
+  it.each(endpoints)("refuses $name without exact opt-in", async ({ call }) => {
+    for (const flag of [undefined, "false", "TRUE", "1", "true "]) {
+      vi.stubEnv("ENABLE_LOCAL_DEV_ACTIONS", flag);
+      await expectUnavailable(call);
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(routes)("refuses $name when Anvil chainId is not 31337", async ({ post, body }) => {
-    process.env.ENABLE_LOCAL_DEV_ACTIONS = "true";
-    process.env.ANVIL_RPC_URL = "http://127.0.0.1:8545";
+  it.each(endpoints)("refuses $name without an Anvil RPC", async ({ call }) => {
+    vi.stubEnv("ANVIL_RPC_URL", undefined);
+    await expectUnavailable(call);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            result: "0x1"
-          }),
-          {
-            status: 200,
-            headers: {
-              "content-type": "application/json"
-            }
-          }
-        )
-      )
-    );
+  it.each(endpoints)("refuses $name on a non-Anvil or malformed RPC result", async ({ call }) => {
+    for (const result of ["0x14a34", "0x1", "0x7a69junk", 31337, null, undefined]) {
+      vi.mocked(fetch).mockResolvedValueOnce(Response.json({ result }));
+      await expectUnavailable(call);
+    }
+  });
 
-    const response = await post(jsonRequest(body));
-    const payload = (await response.json()) as { status?: string; error?: string; localDevOnly?: boolean };
+  it.each(endpoints)("sanitizes RPC failures for $name", async ({ call }) => {
+    const internal = "synthetic-private-rpc-detail";
+    vi.mocked(fetch).mockRejectedValueOnce(new Error(internal));
+    await expectUnavailable(call);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(internal, { status: 503 }));
+    await expectUnavailable(call);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(internal));
+    await expectUnavailable(call);
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: { message: internal } }));
+    await expectUnavailable(call);
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json(null));
+    await expectUnavailable(call);
+  });
 
-    expect(response.status).toBe(500);
-    expect(payload.status).toBe("error");
-    expect(payload.localDevOnly).toBe(true);
-    expect(payload.error).toContain("Local dev actions require Anvil chainId 31337");
-    expectNoWriterCalled();
+  it("does not read a transaction body or log environment secrets for a public target", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CHAIN_ID", "84532");
+    vi.stubEnv("ANVIL_DEV_SELLER_PRIVATE_KEY", "synthetic-not-a-key");
+    const log = vi.spyOn(console, "log");
+    const warn = vi.spyOn(console, "warn");
+    const error = vi.spyOn(console, "error");
+    for (const route of routes) {
+      const request = jsonRequest(route.body);
+      const readBody = vi.spyOn(request, "json");
+      await expectUnavailable(() => route.post(request));
+      expect(readBody).not.toHaveBeenCalled();
+    }
+    expect(log).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe("coherent local Anvil endpoints", () => {
+  it.each(endpoints)("allows $name after checking Anvil", async ({ call, mock }) => {
+    const response = await call();
+    expect(response.status).toBe(200);
+    expect(mock).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls[0][1]?.body).toBe(JSON.stringify({
+      jsonrpc: "2.0", method: "eth_chainId", params: [], id: 1
+    }));
+    expect(vi.mocked(fetch).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(mock).mock.invocationCallOrder[0]);
   });
 });
