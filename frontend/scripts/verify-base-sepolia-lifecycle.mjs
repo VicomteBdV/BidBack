@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, realpath } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createPublicClient, getAddress, http, isAddress } from "viem";
 import { assertValidDeploymentJson, coreContractKeys } from "./deployment-json-validator.mjs";
 
@@ -343,7 +345,7 @@ function serializeAuction(raw) {
   };
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
@@ -351,12 +353,17 @@ function parseArgs(argv) {
     if (!key?.startsWith("--") || value === undefined) {
       throw new Error("Arguments must use --name value pairs.");
     }
+    if (Object.hasOwn(values, key.slice(2))) throw new Error("Duplicate argument.");
     values[key.slice(2)] = value;
   }
-  const required = ["rpc-url", "auction-id", "owner", "seller", "fee-recipient", "bidder-a", "bidder-b", "nft", "token-id", "phase", "manifest"];
+  const required = values.session ? ["rpc-url", "session", "phase", "output"] : ["rpc-url", "auction-id", "owner", "seller", "fee-recipient", "bidder-a", "bidder-b", "nft", "token-id", "phase", "manifest"];
   for (const key of required) if (!values[key]) throw new Error(`Missing --${key}.`);
-  if (!/^\d+$/.test(values["auction-id"]) || BigInt(values["auction-id"]) < 1n) throw new Error("--auction-id must be positive.");
-  if (!/^\d+$/.test(values["token-id"])) throw new Error("--token-id must be non-negative.");
+  if (values.session) {
+    if (Object.keys(values).some((key) => !required.includes(key))) throw new Error("Session arguments cannot be overridden.");
+  } else {
+    if (!/^\d+$/.test(values["auction-id"]) || BigInt(values["auction-id"]) < 1n) throw new Error("--auction-id must be positive.");
+    if (!/^\d+$/.test(values["token-id"])) throw new Error("--token-id must be non-negative.");
+  }
   if (!PHASES.includes(values.phase)) throw new Error(`--phase must be one of: ${PHASES.join(", ")}.`);
   return values;
 }
@@ -467,40 +474,136 @@ async function readLifecycleSnapshot(client, manifest, context) {
   };
 }
 
+export const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+export const MANIFEST_PATH = "frontend/public/deployments/84532.json";
+
+export function requireEvidence(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+export function exactKeys(value, keys) {
+  requireEvidence(value && typeof value === "object" && !Array.isArray(value) &&
+    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)),
+  "Invalid or unsupported metadata fields.");
+}
+
+export function uintString(value, positive = false) {
+  requireEvidence(typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value) &&
+    value.length <= 78 && BigInt(value) < 2n ** 256n && (!positive || BigInt(value) > 0n), "Invalid unsigned integer.");
+  return value;
+}
+
+export function validateSession(session) {
+  exactKeys(session, ["schemaVersion", "runId", "chainId", "sourceCommit", "manifest", "auctionId", "roles", "nft"]);
+  requireEvidence(session.schemaVersion === 1 && session.chainId === BASE_SEPOLIA_CHAIN_ID, "Invalid session version or chain.");
+  requireEvidence(typeof session.runId === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/.test(session.runId), "Invalid run ID.");
+  requireEvidence(typeof session.sourceCommit === "string" && /^[a-f0-9]{40}$/.test(session.sourceCommit), "Invalid source commit.");
+  requireEvidence(session.manifest === MANIFEST_PATH, "Session must use the canonical Base Sepolia manifest path.");
+  exactKeys(session.roles, ["owner", "seller", "feeRecipient", "bidderA", "bidderB"]);
+  // Validate before calling the legacy helper, whose detailed errors echo input.
+  requireEvidence(Object.values(session.roles).every((value) => isAddress(value) && value !== ZERO_ADDRESS), "Invalid role address.");
+  const roles = validateDistinctRoleAddresses(session.roles);
+  exactKeys(session.nft, ["address", "tokenId"]);
+  requireEvidence(isAddress(session.nft.address) && session.nft.address !== ZERO_ADDRESS, "Invalid NFT address.");
+  return { ...session, roles, auctionId: uintString(session.auctionId, true),
+    nft: { address: getAddress(session.nft.address), tokenId: uintString(session.nft.tokenId) } };
+}
+
+export function assertSessionSource(session, root = REPO_ROOT) {
+  const git = (args) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  requireEvidence(git(["rev-parse", "HEAD"]) === session.sourceCommit, "Session source commit differs from checkout HEAD.");
+  // Evidence lives outside the checkout. Include untracked files to detect uncommitted tooling.
+  requireEvidence(git(["status", "--porcelain", "--untracked-files=normal"]) === "", "Session requires a clean checkout.");
+}
+
+export function manifestProvenance(bytes) {
+  const manifest = JSON.parse(bytes.toString("utf8"));
+  assertValidDeploymentJson(manifest, BASE_SEPOLIA_CHAIN_ID);
+  exactKeys(manifest, ["chainId", "generatedAt", "source", "contracts"]);
+  exactKeys(manifest.contracts, coreContractKeys);
+  requireEvidence(Object.values(manifest.contracts).every((value) => isAddress(value) && value !== ZERO_ADDRESS), "Invalid core address.");
+  requireEvidence(typeof manifest.generatedAt === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(manifest.generatedAt) && Number.isFinite(Date.parse(manifest.generatedAt)), "Invalid manifest timestamp.");
+  requireEvidence(typeof manifest.source === "string" && /^foundry-broadcast:[A-Za-z0-9_.-]+$/.test(manifest.source), "Unsupported manifest source metadata.");
+  return { manifest, provenance: { path: MANIFEST_PATH, generatedAt: manifest.generatedAt, source: manifest.source,
+    checksumAlgorithm: "sha256", checksum: createHash("sha256").update(bytes).digest("hex") } };
+}
+
+export async function loadSession(filename) {
+  const session = validateSession(JSON.parse(await readFile(filename, "utf8")));
+  assertSessionSource(session);
+  const filenameManifest = path.join(REPO_ROOT, session.manifest);
+  requireEvidence(await realpath(filenameManifest) === filenameManifest, "Manifest must not be redirected by a symlink.");
+  return { session, ...manifestProvenance(await readFile(filenameManifest)) };
+}
+
+export function sessionContext(session, manifest, phase) {
+  return { phase, roles: session.roles, manifest, auctionId: session.auctionId, nft: session.nft.address, tokenId: session.nft.tokenId };
+}
+
+export function publicBlock(block) {
+  requireEvidence(block && typeof block.number === "bigint" && block.number >= 0n && /^0x[a-fA-F0-9]{64}$/.test(block.hash) &&
+    typeof block.timestamp === "bigint" && block.timestamp >= 0n, "Missing or invalid block metadata.");
+  return { number: block.number.toString(), hash: block.hash.toLowerCase(), timestampUtc: new Date(Number(block.timestamp) * 1000).toISOString() };
+}
+
+export async function verifyPhase(client, manifest, context, blockNumber) {
+  assertBaseSepoliaChainId(await client.getChainId());
+  const block = publicBlock(await client.getBlock(blockNumber === undefined ? { blockTag: "latest" } : { blockNumber }));
+  // Every read observes the same block; recheck the hash to detect a reorg during collection.
+  const pinned = Object.fromEntries(["getBytecode", "readContract", "getBalance"].map((method) =>
+    [method, (args) => client[method]({ ...args, blockNumber: BigInt(block.number) })]));
+  const nftCode = await pinned.getBytecode({ address: context.nft });
+  requireEvidence(nftCode && nftCode !== "0x", "NFT bytecode missing.");
+  const deployment = await readDeploymentChecks(pinned, manifest, context.roles);
+  const lifecycle = await readLifecycleSnapshot(pinned, manifest, context);
+  assertLifecyclePhase(lifecycle, context);
+  requireEvidence((await client.getBlock({ blockNumber: BigInt(block.number) })).hash.toLowerCase() === block.hash, "Block changed during verification.");
+  return { block, deployment, lifecycle };
+}
+
+export function phaseEvidence(session, provenance, phase, verified, generatedAt = new Date().toISOString()) {
+  return { schemaVersion: 1, runId: session.runId, sourceCommit: session.sourceCommit, chainId: session.chainId,
+    auctionId: session.auctionId, phase, generatedAt, manifest: provenance, ...verified };
+}
+
+export async function writeSnapshot(filename, output) {
+  await writeFile(filename, `${JSON.stringify(output, null, 2)}\n`, { flag: "wx" });
+}
+
+export function readOnlyClient(rpcUrl) {
+  const url = new URL(rpcUrl);
+  requireEvidence(["http:", "https:"].includes(url.protocol) && !url.hash, "Invalid RPC URL.");
+  return createPublicClient({ transport: http(rpcUrl, { retryCount: 0, timeout: 20_000 }) });
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const roles = validateDistinctRoleAddresses({ owner: args.owner, seller: args.seller, feeRecipient: args["fee-recipient"], bidderA: args["bidder-a"], bidderB: args["bidder-b"] });
-  if (!isAddress(args.nft)) throw new LifecycleVerificationError("NFT address", "valid address", args.nft);
-  const manifestPath = path.resolve(args.manifest);
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  assertValidDeploymentJson(manifest, BASE_SEPOLIA_CHAIN_ID);
-  const chain = { id: BASE_SEPOLIA_CHAIN_ID, name: "Base Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [args["rpc-url"]] } } };
-  const client = createPublicClient({ chain, transport: http(args["rpc-url"]) });
-  assertBaseSepoliaChainId(await client.getChainId());
-  console.log("[OK] Base Sepolia chain ID");
-  const nftCode = await client.getBytecode({ address: getAddress(args.nft) });
-  if (!nftCode || nftCode === "0x") throw new LifecycleVerificationError("NFT bytecode", "present", nftCode ?? "missing");
-  console.log("[OK] NFT bytecode");
-  const deployment = await readDeploymentChecks(client, manifest, roles);
-  console.log("[OK] Deployment bytecode, ownership, parameters and wiring");
-  const context = { phase: args.phase, roles, manifest, auctionId: args["auction-id"], nft: getAddress(args.nft), tokenId: args["token-id"] };
-  const lifecycle = await readLifecycleSnapshot(client, manifest, context);
-  assertLifecyclePhase(lifecycle, context);
-  console.log(`[OK] Lifecycle phase ${args.phase}`);
-  const output = { generatedAt: new Date().toISOString(), manifestPath, deployment, lifecycle };
-  if (args.output) {
-    await writeFile(path.resolve(args.output), `${JSON.stringify(output, null, 2)}\n`, { flag: "wx" });
-    console.log(`[OK] Snapshot written to ${path.resolve(args.output)}`);
+  let output;
+  const client = readOnlyClient(args["rpc-url"]);
+  if (args.session) {
+    const { session, manifest, provenance } = await loadSession(args.session);
+    const verified = await verifyPhase(client, manifest, sessionContext(session, manifest, args.phase));
+    output = phaseEvidence(session, provenance, args.phase, verified);
   } else {
-    console.log(JSON.stringify(output, null, 2));
+    const roles = validateDistinctRoleAddresses({ owner: args.owner, seller: args.seller, feeRecipient: args["fee-recipient"], bidderA: args["bidder-a"], bidderB: args["bidder-b"] });
+    requireEvidence(isAddress(args.nft), "Invalid NFT address.");
+    const manifestPath = path.resolve(args.manifest);
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    assertValidDeploymentJson(manifest, BASE_SEPOLIA_CHAIN_ID);
+    const context = { phase: args.phase, roles, manifest, auctionId: args["auction-id"], nft: getAddress(args.nft), tokenId: args["token-id"] };
+    output = { generatedAt: new Date().toISOString(), manifestPath, ...await verifyPhase(client, manifest, context) };
   }
+  if (args.output) await writeSnapshot(path.resolve(args.output), output);
+  else console.log(JSON.stringify(output, null, 2));
+  console.log(`[OK] Lifecycle phase ${args.phase}`);
 }
 
 const invokedAsScript = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 if (invokedAsScript) {
   main().catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message.startsWith("[FAIL]") ? message : `[FAIL] verifier: ${message}`);
+    // Provider errors may contain URL credentials, headers, or request bodies.
+    const step = error instanceof LifecycleVerificationError ? ` Lifecycle check: ${error.step}.` : "";
+    console.error(`[FAIL] verifier: input, source, RPC, lifecycle or create-only output check failed.${step} No successful snapshot was confirmed.`);
     process.exitCode = 1;
   });
 }
