@@ -203,29 +203,17 @@ Impact on current engine:
 
 ## Multi-Wallet Support
 
-The target application should not be MetaMask-only.
+The approved bounded decision in `BIDBACK-CONTROLLED-FOUNDATION-LOT6-WALLET-RPC-READINESS-v2` is desktop injected EIP-1193 wallets, including EIP-6963 discovery, through the existing wagmi stack. V2 supersedes V1 after inspection found that the four transaction components independently selected `window.ethereum` even when wagmi connected a different wallet.
 
-Wallet support should include at least:
+The authority path is now **selected connector → connector provider → connected account → network verification → wallet client → transaction**. The shared `walletProvider.ts` helper resolves the active wagmi connector without a global-provider fallback. Requests recheck connection/account and provider identity; transaction dispatch also checks the provider's account and target chain. Disconnection or a changed connector/provider fails explicitly. No parallel wallet store or server signer is introduced. Contract calls, arguments, business validations, and economics remain unchanged.
 
-* MetaMask;
-* Rabby;
-* Coinbase Wallet;
-* WalletConnect-compatible mobile and desktop wallets.
+The compact selector offers actual detected connectors and requires explicit choice when several are available. It suppresses the ambiguous legacy injected alias when named connectors are discovered. Without EIP-6963 discovery, a detected legacy injected connector is labelled “Browser wallet”; this does not identify every installed extension or establish multi-extension compatibility. No provider means connection is unavailable and read-only browsing remains available.
 
-Key impacts:
+Non-local targets require explicit HTTP(S) `NEXT_PUBLIC_WALLET_RPC_URL` configuration. Missing/blank/invalid values fail initialization; only Anvil `31337` retains the local fallback. Browser and server read RPCs may differ, but their configured chain IDs must match. The Lot 5 offline validator remains the broader preflight; parsing a URL proves neither reachability nor its reported chain.
 
-* wagmi connector configuration should expand beyond a single injected-wallet assumption;
-* viem client configuration should continue to support deployment JSON files by chain ID;
-* UX must explain wrong-network, unsupported-wallet, and unreachable-RPC states clearly;
-* mobile wallet and WalletConnect flows may require hosted frontend testing rather than Codespaces only;
-* wallet capability differences matter for session keys, account abstraction, and chain support.
+MetaMask and Rabby desktop extensions on Chromium are the initial manual validation targets. Both remain **manual validation pending** for this lot. Generic deterministic tests are not extension validation. See the [support and evidence contract](./TESTNET_READINESS.md#controlled-wallet-and-rpc-support-contract) for coverage and the retained-evidence procedure. No readiness gate is advanced.
 
-Open questions:
-
-* Which wallets are required for the controlled Base Sepolia demonstration?
-* Is WalletConnect required before controlled beta or only before broader public beta?
-* How should the UI present wallet-specific RPC limitations?
-* Which wallets support the selected chain and any future account abstraction model?
+Broader wallet strategy remains open. WalletConnect, mobile links, Coinbase-specific integration, account abstraction, session keys, delegation, relayers, and signed intents are outside this lot. Other injected wallets may work but are not claimed as validated. Hosting, RPC vendor/reachability validation, repeated Base Sepolia sessions, and minimal monitoring/support/incident handling remain Controlled Experience Foundation work.
 
 ---
 
@@ -605,7 +593,7 @@ The frontend should never ask users to trust an opaque reward calculation when t
 | Decision area                     | Current MVP position                                                                                                  | Options under consideration                                                                | Key risks                                                                             | Impacted components                                     | Decision timing                                    |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
 | Bidding authorization model       | Wallet-signed bids plus local-dev server actions for testing                                                          | Session keys, account abstraction, auction-scoped delegation, signed intents, hybrid model | Unauthorized bids, poor UX, relayer trust, replay risk                                | `AuctionHouse`, wallet layer, frontend, future backend  | Before production UX; prototype before public beta |
-| Multi-wallet support              | Wallet-signed panels exist; MetaMask-oriented testing so far                                                          | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps                              | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                  |
+| Multi-wallet support              | Desktop injected connector/provider path; MetaMask and Rabby manual validation pending                                                          | Injected wallets, Rabby, Coinbase Wallet, WalletConnect                                    | Wallet incompatibility, RPC reachability, mobile UX gaps                              | wagmi config, viem clients, UI, docs                    | Before broad public testnet usage                  |
 | Chain selection                   | Local Anvil `31337` plus one validated canonical Base Sepolia `84532` cycle; production chain remains open              | Ethereum L1, L2 EVM, MegaETH, Solana, hybrid settlement, appchain                          | Fees, latency, security assumptions, ecosystem maturity                               | contracts, deployment scripts, frontend config, docs    | Before public beta and production                  |
 | Redistribution computation model  | Deterministic on-chain SCR in MVP                                                                                     | Keep on-chain bounded model, Merkle proofs later, batched settlement                       | Gas growth, opaque off-chain computation, solvency errors                             | `AuctionHouse`, `DistributionVault`, tests, indexer     | Reassess after testnet auction volume data         |
 | Governance controls               | Owner-controlled MVP params; fee recipient affects future auctions; one-time vault locks                               | Multisig, timelock, emergency pause policy, public governance process                      | Arbitrary rule changes, EOA compromise, blocked claims                                | `ParamsController`, ownership, docs, deployment scripts | Before controlled/public beta progression          |

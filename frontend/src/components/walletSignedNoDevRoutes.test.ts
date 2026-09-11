@@ -16,5 +16,7 @@ describe("wallet-signed component separation", () => {
 
     expect(source).not.toMatch(/fetch\s*\(\s*["'`]\/api\/(?:dev(?:\/|\b)|local-create-context\b)/);
     expect(source).not.toMatch(/(?:isLocalDevUiEnabled|assertLocalDevActionsEnabled|localDevEnvironment)/);
+    expect(source).not.toMatch(/window\s*(?:\.|as\b)|getInjectedEthereum/);
+    expect(source).toContain("await createConnectedWalletClients(config, connector,");
   });
 });

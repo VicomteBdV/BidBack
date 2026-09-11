@@ -1,44 +1,81 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import React, { useEffect, useState } from "react";
+import { useAccount, useConnect, useDisconnect, useConfig, type Connector } from "wagmi";
 import { shortenAddress } from "@/lib/format";
 import { targetChainId, targetChainLabel, targetChainName } from "@/lib/chains";
 import {
-  getInjectedEthereumProvider,
+  providerErrorCode,
   switchToTargetChain,
   walletNetworkErrorMessage
 } from "@/lib/walletNetwork";
 
+import { getConnectedWalletProvider } from "@/lib/walletProvider";
+
+function walletName(connector: Connector) {
+  return connector.id === "injected" ? "Browser wallet" : connector.name.trim() || "Browser wallet";
+}
+
 export function WalletButton() {
-  const { address, chainId, isConnected } = useAccount();
-  const { connectors, connect, isPending } = useConnect();
+  const { address, chainId, isConnected, connector } = useAccount();
+  const config = useConfig();
+  const { connectors, connect, isPending, error, reset } = useConnect();
   const { disconnect } = useDisconnect();
 
   const [isSwitchingChain, setIsSwitchingChain] = useState(false);
   const [networkMessage, setNetworkMessage] = useState<string | null>(null);
 
-  const connector = connectors[0];
+  const [available, setAvailable] = useState<readonly Connector[]>([]);
+  const [discovering, setDiscovering] = useState(true);
+  const [selectedUid, setSelectedUid] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setDiscovering(true);
+    Promise.all(connectors.filter((item) => item.type === "injected").map(async (item) => {
+      try {
+        const provider = await item.getProvider();
+        return provider && typeof (provider as { request?: unknown }).request === "function" ? item : null;
+      } catch { return null; }
+    })).then((items) => {
+      if (!active) return;
+      const detected = items.filter((item): item is Connector => item !== null);
+      // EIP-6963 names the actual wallets. The legacy global alias adds ambiguity.
+      setAvailable(detected.some((item) => item.id !== "injected")
+        ? detected.filter((item) => item.id !== "injected") : detected);
+      setDiscovering(false);
+    });
+    return () => { active = false; };
+  }, [connectors]);
+
+  const selected = available.length === 1 ? available[0] : available.find((item) => item.uid === selectedUid);
+  const connectionError = error ? providerErrorCode(error) === 4001
+    ? "Wallet connection was rejected. Try again when you are ready."
+    : providerErrorCode(error) === -32002
+      ? "A wallet request is already pending. Open your wallet to continue."
+      : "Unable to connect this wallet. Open or unlock it and try again." : null;
   const isWrongNetwork = isConnected && chainId !== targetChainId;
   const switchButtonLabel = targetChainName ? `Switch to ${targetChainName}` : "Switch to target chain";
-  const connectUnavailableMessage = !connector
-    ? "No compatible browser wallet connector was found."
+  const connectUnavailableMessage = discovering
+    ? "Checking for browser wallets..."
+    : available.length === 0
+    ? "No compatible browser wallet was detected. You can continue browsing read-only."
     : isPending
       ? "Waiting for the wallet connection request."
-      : null;
+      : connectionError;
 
   useEffect(() => {
     if (!isWrongNetwork) {
       setNetworkMessage(null);
     }
-  }, [isWrongNetwork]);
+  }, [isWrongNetwork, connector?.uid]);
 
   async function handleSwitchNetwork() {
     try {
       setIsSwitchingChain(true);
       setNetworkMessage(null);
 
-      const provider = getInjectedEthereumProvider();
+      const provider = await getConnectedWalletProvider(config, connector, address);
 
       await switchToTargetChain(provider);
 
@@ -53,17 +90,35 @@ export function WalletButton() {
   if (!isConnected) {
     return (
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+        {available.length > 1 ? (
+          <label className="flex w-full flex-col gap-1 text-xs text-slate-300 sm:w-auto">
+            Choose your wallet
+            <select
+              value={available.some((item) => item.uid === selectedUid) ? selectedUid : ""}
+              disabled={isPending || discovering}
+              onChange={(event) => { setSelectedUid(event.target.value); reset(); }}
+              className="min-h-10 max-w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"
+            >
+              <option value="">Select a wallet</option>
+              {available.map((item, index) => (
+                <option key={item.uid} value={item.uid}>
+                  {walletName(item)}{available.filter((other) => walletName(other) === walletName(item)).length > 1 ? ` (${index + 1})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <button
           type="button"
-          disabled={!connector || isPending}
+          disabled={!selected || isPending || discovering}
           aria-describedby={connectUnavailableMessage ? "wallet-connect-unavailable" : "wallet-connect-read-only-note"}
-          onClick={() => connector && connect({ connector })}
+          onClick={() => selected && connect({ connector: selected })}
           className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
-          {isPending ? "Connecting..." : "Connect wallet"}
+          {isPending ? "Connecting..." : selected ? `Connect ${walletName(selected)}` : "Connect wallet"}
         </button>
         {connectUnavailableMessage ? (
-          <p id="wallet-connect-unavailable" className="max-w-sm text-xs text-amber-100">
+          <p role="status" id="wallet-connect-unavailable" className="max-w-sm text-xs text-amber-100">
             {connectUnavailableMessage}
           </p>
         ) : null}
@@ -78,6 +133,7 @@ export function WalletButton() {
     <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:items-end">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+          <span className="mr-2 text-slate-400">{connector ? walletName(connector) : "Connected wallet"}</span>
           <span className="break-all font-mono" title={address}>{shortenAddress(address)}</span>
         </div>
 

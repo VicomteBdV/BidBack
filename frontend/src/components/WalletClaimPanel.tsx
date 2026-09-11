@@ -2,14 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createPublicClient,
-  createWalletClient,
-  custom,
   type Address,
   type EIP1193Provider,
   type PublicClient
 } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useConfig } from "wagmi";
+import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { ModeBadge } from "@/components/ModeBadge";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview, type TransactionReviewItem } from "@/components/TransactionReview";
@@ -26,7 +24,7 @@ import {
   getWithdrawSellerActionState,
   sameAddress
 } from "@/lib/auctionActionState";
-import { targetChain, targetChainId, targetChainLabel } from "@/lib/chains";
+import { targetChainId, targetChainLabel } from "@/lib/chains";
 import { fetchDeployment, type Deployment } from "@/lib/deployment";
 import { formatEth, isZeroAddress, shortenAddress } from "@/lib/format";
 import type { SerializedAuction } from "@/lib/auctionTypes";
@@ -41,10 +39,6 @@ import {
   unknownConfirmationState,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
-
-type WindowWithInjectedEthereum = Window & {
-  ethereum?: EIP1193Provider;
-};
 
 type ClaimAction =
   | "claim-nft"
@@ -75,38 +69,7 @@ function walletErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function getInjectedEthereum(): EIP1193Provider {
-  if (typeof window === "undefined") {
-    throw new Error("Wallet provider not found. Open this page in a browser with a compatible wallet.");
-  }
-
-  const provider = (window as WindowWithInjectedEthereum).ethereum;
-
-  if (!provider) {
-    throw new Error("Wallet provider not found. Install or unlock a compatible browser wallet.");
-  }
-
-  return provider;
-}
-
-function createBrowserClients(account: Address) {
-  const provider = getInjectedEthereum();
-
-  return {
-    provider,
-    publicClient: createPublicClient({
-      chain: targetChain,
-      transport: custom(provider)
-    }),
-    walletClient: createWalletClient({
-      account,
-      chain: targetChain,
-      transport: custom(provider)
-    })
-  };
-}
-
-async function verifyWalletChain(provider: EIP1193Provider) {
+async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
   let walletChainId: unknown;
 
   try {
@@ -129,7 +92,8 @@ export function WalletClaimPanel({
   auction: SerializedAuction;
   onActionComplete: () => Promise<void>;
 }) {
-  const { address, chainId, isConnected } = useAccount();
+  const { address, chainId, isConnected, connector } = useAccount();
+  const config = useConfig();
 
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
@@ -196,7 +160,7 @@ export function WalletClaimPanel({
     setProtocolFeeCredit(null);
     setTxStatus(null);
     setSelectedAction(null);
-  }, [address, chainId, auction.auctionId]);
+  }, [address, chainId, connector?.uid, auction.auctionId]);
 
   function requireWalletContext() {
     if (!address) throw new Error("Wallet not connected.");
@@ -223,7 +187,7 @@ export function WalletClaimPanel({
 
   async function readWalletClaimData(): Promise<WalletClaimData> {
     const context = requireWalletContext();
-    const { provider, publicClient } = createBrowserClients(context.account);
+    const { provider, publicClient } = await createConnectedWalletClients(config, connector, context.account);
 
     await verifyWalletChain(provider);
 
@@ -311,7 +275,7 @@ export function WalletClaimPanel({
       setMessage(walletErrorMessage(caught, "Unable to load wallet claim data."));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, auction.auctionId, deployment, wrongNetwork]);
+  }, [address, connector?.uid, auction.auctionId, deployment, wrongNetwork]);
 
   async function confirmSubmittedTransaction(
     publicClient: PublicClient,
@@ -374,7 +338,7 @@ export function WalletClaimPanel({
 
       const context = requireWalletContext();
 
-      const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       await verifyWalletChain(provider);
       const liveAuction = await publicClient.readContract({
         address: context.deployment.contracts.auctionHouse,
@@ -431,7 +395,7 @@ export function WalletClaimPanel({
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
 
-      const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setRefundableAmount(null);
       setRefundClaimed(null);
       await verifyWalletChain(provider);
@@ -492,7 +456,7 @@ export function WalletClaimPanel({
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
 
-      const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setRewardEntitlement(null);
       setRewardClaimed(null);
       await verifyWalletChain(provider);
@@ -554,7 +518,7 @@ export function WalletClaimPanel({
       if (!auction.finalized) throw new Error("Auction is not finalized.");
       if (!sameAddress(context.account, auction.seller)) throw new Error("Connect the seller wallet.");
 
-      const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setSellerCredit(null);
       await verifyWalletChain(provider);
 
@@ -606,7 +570,7 @@ export function WalletClaimPanel({
         throw new Error("Connect the auction fee recipient wallet.");
       }
 
-      const { provider, publicClient, walletClient } = createBrowserClients(context.account);
+      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setProtocolFeeCredit(null);
       await verifyWalletChain(provider);
 
