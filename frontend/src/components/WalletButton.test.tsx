@@ -27,6 +27,15 @@ function setup(connectors: Connector[], { connected, error, pending = false }: {
 beforeEach(() => vi.clearAllMocks());
 
 describe("wallet choice and connector-aware network switching", () => {
+  it("uses unique accessible descriptions when header and participation controls coexist", async () => {
+    const view = setup([]);
+    view.rerender(<><WalletButton /><WalletButton /></>);
+    await waitFor(() => expect(screen.getAllByText(/No compatible browser wallet was detected/)).toHaveLength(2));
+    const buttons = screen.getAllByRole("button", { name: "Connect wallet" });
+    const ids = buttons.map((button) => button.getAttribute("aria-describedby"));
+    expect(new Set(ids).size).toBe(2);
+    ids.forEach((id) => expect(document.getElementById(id!)).toHaveTextContent("No compatible browser wallet"));
+  });
   it.each([{ connectors: [] }, { connectors: [wallet("injected", "Injected")] }])("remains read-only with no available provider", async ({ connectors }) => {
     // A configured injected connector alone is not proof that an extension exists.
     for (const connector of connectors) vi.mocked(connector.getProvider).mockResolvedValue(undefined);

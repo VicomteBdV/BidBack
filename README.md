@@ -430,17 +430,20 @@ The local-dev panel and wallet-signed panel are intentionally separate. There is
 
 ### Wallet-Signed Bidding
 
-The auction detail page includes a separate **Wallet-signed bid** panel.
+The auction detail page includes a **Wallet-signed actions** area with a dedicated bid panel.
 
 This is the production-target bid flow:
 
 1. The wallet must be connected
 2. The wallet must be on Anvil chain ID `31337`
 3. The auction must be `OPEN`
-4. The frontend reads `AuctionHouse.minimumNextBid(auctionId)`
-5. The frontend reads `EscrowVault.capOf(auctionId, connectedAddress)`
-6. The user enters a new bid cap in ETH
-7. The user signs `AuctionHouse.placeBid(auctionId, newCap)`
+4. At one pinned block, the frontend verifies the displayed auction identity and reads its snapshotted modules, `AuctionHouse.minimumNextBid(auctionId)`, and `EscrowVault.capOf(auctionId, connectedAddress)`
+5. The snapshotted `EscrowVault` is used for the cap read
+6. For a first bid, the user enters the total bid cap in ETH
+7. For a later step-up, the user enters only the additional ETH to add; the frontend derives `newCap = current wallet cap + additional amount`
+8. The user reviews the ETH to send and the resulting total cap
+9. Immediately before opening the wallet, the frontend repeats the pinned reads, requires the auction to remain open and unexpired with the reviewed minimum bid and current cap unchanged, and simulates the exact `placeBid` call at that block
+10. The user signs `AuctionHouse.placeBid(auctionId, newCap)`
 
 BidBack uses step-up-only caps. Therefore the transaction value is not always the full new cap.
 
@@ -450,7 +453,11 @@ value sent = newCap - current wallet cap
 
 For a first bid, the current wallet cap is zero, so value sent = `newCap`.
 
-For a later step-up bid from the same wallet, only the difference is sent.
+For a later step-up bid from the same wallet, the UI accepts that difference as the input and sends only that amount.
+
+After the preflight simulation and before opening the wallet, the frontend stores a tab-scoped recovery marker keyed by target chain, `AuctionHouse`, auction ID, and connected account. Once a transaction hash is available, the marker tracks pending and repriced transactions across page reloads. Every terminal receipt must match the effective tracked hash; a successful receipt is accepted only when its `BidPlaced` event also matches the reviewed auction, bidder, and new cap.
+
+If the wallet request may have been submitted but no transaction hash can be recovered, bidding remains locked to prevent a duplicate submission. Check the wallet's activity for a pending, confirmed, replaced, or cancelled request and do not submit another bid until its outcome is known. This case cannot be resolved automatically without a hash, and recovery state is limited to the current browser tab session.
 
 This flow does not call `/api/dev/*`.
 

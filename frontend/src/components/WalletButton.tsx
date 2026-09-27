@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useConfig, type Connector } from "wagmi";
 import { shortenAddress } from "@/lib/format";
 import { targetChainId, targetChainLabel, targetChainName } from "@/lib/chains";
@@ -17,6 +17,9 @@ function walletName(connector: Connector) {
 }
 
 export function WalletButton() {
+  const instanceId = useId();
+  const unavailableId = `${instanceId}-wallet-connect-unavailable`;
+  const readOnlyId = `${instanceId}-wallet-connect-read-only-note`;
   const { address, chainId, isConnected, connector } = useAccount();
   const config = useConfig();
   const { connectors, connect, isPending, error, reset } = useConnect();
@@ -111,18 +114,18 @@ export function WalletButton() {
         <button
           type="button"
           disabled={!selected || isPending || discovering}
-          aria-describedby={connectUnavailableMessage ? "wallet-connect-unavailable" : "wallet-connect-read-only-note"}
+          aria-describedby={connectUnavailableMessage ? unavailableId : readOnlyId}
           onClick={() => selected && connect({ connector: selected })}
           className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isPending ? "Connecting..." : selected ? `Connect ${walletName(selected)}` : "Connect wallet"}
         </button>
         {connectUnavailableMessage ? (
-          <p role="status" id="wallet-connect-unavailable" className="max-w-sm text-xs text-amber-100">
+          <p role="status" id={unavailableId} className="max-w-sm text-xs text-amber-100">
             {connectUnavailableMessage}
           </p>
         ) : null}
-        <p id="wallet-connect-read-only-note" className="max-w-sm text-xs text-slate-400">
+        <p id={readOnlyId} className="max-w-sm text-xs text-slate-400">
           Wallet connection is optional for the read-only deployment view.
         </p>
       </div>

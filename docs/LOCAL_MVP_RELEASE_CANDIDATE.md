@@ -228,10 +228,15 @@ If MetaMask can access the target RPC, validate wallet-signed bidding:
 1. Open an `OPEN` auction detail page.
 2. Confirm minimum required bid is displayed.
 3. Confirm current wallet cap is displayed.
-4. Enter a bid cap greater than or equal to `minimumNextBid`.
-5. Confirm value sent equals `newCap - current wallet cap`.
-6. Sign the transaction.
-7. Confirm auction state refreshes.
+4. For a first bid, enter a total cap greater than or equal to `minimumNextBid`.
+5. For a later step-up, enter only the additional ETH and confirm the displayed new total cap is greater than or equal to `minimumNextBid`.
+6. Open the review and confirm the displayed ETH to send, current cap, resulting total cap, auction, NFT, token ID, and `AuctionHouse`.
+7. Confirm value sent equals the entered additional amount, and `newCap = current wallet cap + additional amount`.
+8. Reject one wallet request and confirm the panel returns to a safe retry state without a transaction hash.
+9. Submit a bid, reload the page while it is pending, and confirm the same transaction is recovered rather than offering a duplicate submission.
+10. Confirm a successful receipt is accepted only for the effective transaction hash and matching `BidPlaced` event, then confirm the auction state refreshes.
+11. If the panel reports that a wallet request may have been submitted without a saved hash, confirm bidding remains locked and the UI instructs the user to inspect wallet activity before taking another action.
+12. With bidding paused or the auction participant limit reached for a new bidder, confirm preflight simulation blocks the request before the wallet opens and no transaction is submitted.
 
 If MetaMask can access the target RPC, validate wallet-signed claims and withdrawals after finalization:
 
