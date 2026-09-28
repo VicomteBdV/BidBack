@@ -25,9 +25,15 @@ const txHash = "0x11111111111111111111111111111111111111111111111111111111111111
 const replacementHash = "0x2222222222222222222222222222222222222222222222222222222222222222" as const;
 const unrelatedHash = "0x3333333333333333333333333333333333333333333333333333333333333333" as const;
 
+function blockHashFor(blockNumber: bigint, offset = 0n): `0x${string}` {
+  return `0x${(blockNumber + offset).toString(16).padStart(64, "0")}`;
+}
+
 type MockReceipt = {
   status: string;
   transactionHash?: `0x${string}`;
+  blockNumber?: bigint;
+  blockHash?: `0x${string}`;
   logs?: Array<{
     address: `0x${string}`;
     data: `0x${string}`;
@@ -51,6 +57,8 @@ function bidPlacedReceipt({
   return {
     status: "success",
     transactionHash: hash,
+    blockNumber: 102n,
+    blockHash: blockHashFor(102n),
     logs: [{
       address: auctionHouse,
       topics: encodeEventTopics({
@@ -61,6 +69,44 @@ function bidPlacedReceipt({
       data: encodeAbiParameters([{ type: "uint256" }], [amount])
     }]
   };
+}
+
+function storedBidMarker(auctionId: string) {
+  return {
+    version: 2,
+    kind: "submitted-wallet-bid",
+    hash: txHash,
+    expectedNewCap: "1200000000000000000",
+    lot: {
+      chainId: 31337,
+      auctionHouse: auctionDetailFixture.auctionHouse,
+      auctionId,
+      bidder: testAddresses.primaryBidder,
+      seller: auctionDetailFixture.auction.seller,
+      nft: auctionDetailFixture.auction.nft,
+      tokenId: auctionDetailFixture.auction.tokenId,
+      startPrice: auctionDetailFixture.auction.startPrice,
+      startTime: auctionDetailFixture.auction.startTime,
+      initialEndTime: auctionDetailFixture.auction.initialEndTime,
+      modules: {
+        nftVault: testAddresses.nftVault,
+        escrowVault: testAddresses.escrowVault,
+        distributionVault: testAddresses.distributionVault,
+        reputationAdapter: testAddresses.reputationAdapter
+      },
+      reviewBlock: { number: "101", hash: blockHashFor(101n) }
+    }
+  };
+}
+
+function pendingBidKeyFor(auctionId: string) {
+  return [
+    "bidback:pending-wallet-bid:v1",
+    "31337",
+    localDeploymentFixture.contracts.auctionHouse.toLowerCase(),
+    auctionId,
+    testAddresses.primaryBidder.toLowerCase()
+  ].join(":");
 }
 
 type ReplacementEvent = {
@@ -90,6 +136,13 @@ type OnchainAuctionOverrides = Partial<{
   state: number;
 }>;
 
+type OnchainModuleOverrides = Partial<{
+  nftVault: `0x${string}`;
+  escrowVault: `0x${string}`;
+  distributionVault: `0x${string}`;
+  reputationAdapter: `0x${string}`;
+}>;
+
 function setupBid({
   currentCap = 0n,
   minimumNextBid = 1_200_000_000_000_000_000n,
@@ -99,10 +152,16 @@ function setupBid({
   preflightBlockTimestamp,
   initialBlockNumber = 100n,
   preflightBlockNumber = 101n,
+  historicalBlockHashOffset = 0n,
+  postReceiptHistoricalBlockHashOffset = 0n,
+  receiptBlockHashOffset = 0n,
   snapshotEscrowVault = testAddresses.escrowVault,
   preflightSnapshotEscrowVault,
+  snapshotModuleOverrides = {},
+  preflightSnapshotModuleOverrides,
   onchainAuctionOverrides = {},
   preflightOnchainAuctionOverrides,
+  postReceiptOnchainAuctionOverrides,
   expectedChainId = auctionDetailFixture.chainId,
   expectedAuctionHouse = auctionDetailFixture.auctionHouse,
   auctionOverrides = {},
@@ -119,10 +178,16 @@ function setupBid({
   preflightBlockTimestamp?: bigint;
   initialBlockNumber?: bigint;
   preflightBlockNumber?: bigint;
+  historicalBlockHashOffset?: bigint;
+  postReceiptHistoricalBlockHashOffset?: bigint;
+  receiptBlockHashOffset?: bigint;
   snapshotEscrowVault?: `0x${string}`;
   preflightSnapshotEscrowVault?: `0x${string}`;
+  snapshotModuleOverrides?: OnchainModuleOverrides;
+  preflightSnapshotModuleOverrides?: OnchainModuleOverrides;
   onchainAuctionOverrides?: OnchainAuctionOverrides;
   preflightOnchainAuctionOverrides?: OnchainAuctionOverrides;
+  postReceiptOnchainAuctionOverrides?: OnchainAuctionOverrides;
   expectedChainId?: number;
   expectedAuctionHouse?: `0x${string}`;
   auctionOverrides?: Partial<SerializedAuction>;
@@ -172,19 +237,26 @@ function setupBid({
       return {
         ...baseOnchainAuction,
         ...onchainAuctionOverrides,
-        ...(auctionReadCount === 1 ? {} : preflightOnchainAuctionOverrides ?? {})
+        ...(auctionReadCount === 1 ? {} : preflightOnchainAuctionOverrides ?? {}),
+        ...(auctionReadCount >= 3 ? postReceiptOnchainAuctionOverrides ?? {} : {})
       };
     }
     if (functionName === "getAuctionModules") {
       moduleReadCount += 1;
-      return {
+      const initialModules = {
         nftVault: testAddresses.nftVault,
-        escrowVault: moduleReadCount === 1
-          ? snapshotEscrowVault
-          : preflightSnapshotEscrowVault ?? snapshotEscrowVault,
+        escrowVault: snapshotEscrowVault,
         distributionVault: testAddresses.distributionVault,
-        reputationAdapter: testAddresses.reputationAdapter
+        reputationAdapter: testAddresses.reputationAdapter,
+        ...snapshotModuleOverrides
       };
+      return moduleReadCount === 1
+        ? initialModules
+        : {
+            ...initialModules,
+            ...(preflightSnapshotEscrowVault ? { escrowVault: preflightSnapshotEscrowVault } : {}),
+            ...preflightSnapshotModuleOverrides
+          };
     }
     if (functionName === "minimumNextBid") {
       minimumReadCount += 1;
@@ -215,13 +287,28 @@ function setupBid({
     return { request };
   });
   let blockReadCount = 0;
-  const getBlock = vi.fn(async () => {
+  const historicalBlockReadCounts = new Map<bigint, number>();
+  const getBlock = vi.fn(async (request: { blockNumber?: bigint } = {}) => {
+    if (request.blockNumber !== undefined) {
+      const historicalReadCount = (historicalBlockReadCounts.get(request.blockNumber) ?? 0) + 1;
+      historicalBlockReadCounts.set(request.blockNumber, historicalReadCount);
+      const offset = request.blockNumber === 102n
+        ? receiptBlockHashOffset
+        : historicalBlockHashOffset + (historicalReadCount > 1 ? postReceiptHistoricalBlockHashOffset : 0n);
+      return {
+        timestamp: latestBlockTimestamp,
+        number: request.blockNumber,
+        hash: blockHashFor(request.blockNumber, offset)
+      };
+    }
     blockReadCount += 1;
+    const number = blockReadCount === 1 ? initialBlockNumber : preflightBlockNumber;
     return {
       timestamp: blockReadCount === 1
         ? latestBlockTimestamp
         : preflightBlockTimestamp ?? latestBlockTimestamp,
-      number: blockReadCount === 1 ? initialBlockNumber : preflightBlockNumber
+      number,
+      hash: blockHashFor(number)
     };
   });
   vi.mocked(createPublicClient).mockReturnValue({
@@ -269,7 +356,13 @@ function queueReplacement(
   waitForTransactionReceipt.mockImplementationOnce(async (request) => {
     const transactionReceipt = status === "success"
       ? bidPlacedReceipt({ hash: replacementHash })
-      : { status, transactionHash: replacementHash, logs: [] };
+      : {
+          status,
+          transactionHash: replacementHash,
+          blockNumber: 102n,
+          blockHash: blockHashFor(102n),
+          logs: []
+        };
     request?.onReplaced?.({
       reason,
       transaction: { hash: replacementHash },
@@ -608,7 +701,15 @@ describe("WalletBidPanel", () => {
   });
 
   it("never confirms a reverted receipt or an unverifiable submitted hash", async () => {
-    const first = setupBid({ receipt: { status: "reverted", transactionHash: txHash, logs: [] } });
+    const first = setupBid({
+      receipt: {
+        status: "reverted",
+        transactionHash: txHash,
+        blockNumber: 102n,
+        blockHash: blockHashFor(102n),
+        logs: []
+      }
+    });
     let reviewButton = await screen.findByRole("button", { name: "Review bid" });
     await waitFor(() => expect(reviewButton).toBeEnabled());
     fireEvent.click(reviewButton);
@@ -629,6 +730,28 @@ describe("WalletBidPanel", () => {
     fireEvent.click(screen.getByText("Transaction evidence and technical details"));
     expect(screen.getByText("0x11111111...11111111")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeDisabled();
+  });
+
+  it("uses the receipt block canonicality read as the final RPC before settling a revert", async () => {
+    const { getBlock, readContract } = setupBid({
+      receipt: {
+        status: "reverted",
+        transactionHash: txHash,
+        blockNumber: 102n,
+        blockHash: blockHashFor(102n),
+        logs: []
+      }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("The transaction was included on-chain but reverted.");
+
+    expect(getBlock.mock.calls.at(-1)?.[0]).toEqual({ blockNumber: 102n });
+    expect(getBlock.mock.invocationCallOrder.at(-1))
+      .toBeGreaterThan(readContract.mock.invocationCallOrder.at(-1) ?? 0);
+    expect(window.sessionStorage).toHaveLength(0);
   });
 
   it("preserves reviewed amounts while the wallet signature is pending", async () => {
@@ -688,9 +811,29 @@ describe("WalletBidPanel", () => {
     expect(window.sessionStorage).toHaveLength(1);
     const marker = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
     expect(marker).toMatchObject({
-      version: 1,
+      version: 2,
+      kind: "submitted-wallet-bid",
       hash: txHash,
-      expectedNewCap: "1200000000000000000"
+      expectedNewCap: "1200000000000000000",
+      lot: {
+        chainId: 31337,
+        auctionHouse: auctionDetailFixture.auctionHouse,
+        auctionId: "1",
+        bidder: testAddresses.primaryBidder,
+        seller: auctionDetailFixture.auction.seller,
+        nft: auctionDetailFixture.auction.nft,
+        tokenId: auctionDetailFixture.auction.tokenId,
+        startPrice: auctionDetailFixture.auction.startPrice,
+        startTime: auctionDetailFixture.auction.startTime,
+        initialEndTime: auctionDetailFixture.auction.initialEndTime,
+        modules: {
+          nftVault: testAddresses.nftVault,
+          escrowVault: testAddresses.escrowVault,
+          distributionVault: testAddresses.distributionVault,
+          reputationAdapter: testAddresses.reputationAdapter
+        },
+        reviewBlock: { number: "101", hash: blockHashFor(101n) }
+      }
     });
   });
 
@@ -721,6 +864,63 @@ describe("WalletBidPanel", () => {
     expect(window.sessionStorage).toHaveLength(1);
   });
 
+  it.each([
+    {
+      label: "missing receipt block number",
+      receipt: { ...bidPlacedReceipt(), blockNumber: undefined }
+    },
+    {
+      label: "missing receipt block hash",
+      receipt: { ...bidPlacedReceipt(), blockHash: undefined }
+    },
+    {
+      label: "non-canonical receipt block hash",
+      receipt: { ...bidPlacedReceipt(), blockHash: unrelatedHash }
+    }
+  ])("keeps recovery locked for $label", async ({ receipt }) => {
+    const { onBidComplete } = setupBid({ receipt });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.queryByText("Transaction confirmed")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeDisabled();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it("rechecks the review block after a receipt and keeps an orphaned preflight marker locked", async () => {
+    const { onBidComplete } = setupBid({ historicalBlockHashOffset: 10_000n });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Transaction evidence and technical details"));
+    expect(screen.getByText("The canonical review block changed or is unavailable.")).toBeInTheDocument();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it("rechecks immutable lot identity after a receipt before settling", async () => {
+    const { onBidComplete } = setupBid({
+      postReceiptOnchainAuctionOverrides: { tokenId: 999n }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Transaction evidence and technical details"));
+    expect(screen.getByText("Persisted bid lot mismatch (token ID).")).toBeInTheDocument();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
   it("restores a receipt with missing bid evidence after remount and confirms only matching evidence", async () => {
     const first = setupBid({
       auctionOverrides: { auctionId: "911" },
@@ -744,6 +944,264 @@ describe("WalletBidPanel", () => {
     expect(window.sessionStorage).toHaveLength(0);
   });
 
+  it.each([
+    ["seller", { seller: testAddresses.secondBidder }],
+    ["NFT contract", { nft: testAddresses.paramsController }],
+    ["token ID", { tokenId: "999" }],
+    ["start price", { startPrice: "1000000000000000001" }],
+    ["start time", { startTime: "1780000001" }],
+    ["initial end time", { initialEndTime: "1780007201" }]
+  ] as const)("refuses recovery when the current lot reuses the same context with a different %s", async (
+    expectedMismatch,
+    changedLot
+  ) => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "913" },
+      receipt: { status: "success", transactionHash: txHash, logs: [] }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    first.view.unmount();
+
+    const second = setupBid({
+      auctionOverrides: { auctionId: "913", ...changedLot }
+    });
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Recovery identity not verified")).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`Displayed auction does not match the persisted bid lot \\(${expectedMismatch}\\)`)).length)
+      .toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(second.writeContract).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it.each([
+    ["NFTVault snapshot", { nftVault: testAddresses.paramsController }],
+    ["EscrowVault snapshot", { escrowVault: testAddresses.distributionVault }],
+    ["DistributionVault snapshot", { distributionVault: testAddresses.paramsController }],
+    ["ReputationAdapter snapshot", { reputationAdapter: testAddresses.paramsController }]
+  ] as const)("refuses recovery when the current auction has a different %s", async (
+    expectedMismatch,
+    snapshotModuleOverrides
+  ) => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "914" },
+      receipt: { status: "success", transactionHash: txHash, logs: [] }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    first.view.unmount();
+
+    const second = setupBid({
+      auctionOverrides: { auctionId: "914" },
+      snapshotModuleOverrides
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Recovery identity not verified")).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`Persisted bid lot mismatch \\(${expectedMismatch}\\)`)).length)
+      .toBeGreaterThan(0);
+    expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it("refuses recovery when the canonical review block changed after a reset or reorg", async () => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "915" },
+      receipt: { status: "success", transactionHash: txHash, logs: [] }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    first.view.unmount();
+
+    const second = setupBid({
+      auctionOverrides: { auctionId: "915" },
+      historicalBlockHashOffset: 10_000n
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Recovery identity not verified")).toBeInTheDocument();
+    expect(screen.getAllByText(/canonical review block changed or is unavailable/).length).toBeGreaterThan(0);
+    expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      label: "review block changes after the initial recovery check",
+      secondSetup: { postReceiptHistoricalBlockHashOffset: 10_000n },
+      expectedDetail: "The canonical review block changed or is unavailable."
+    },
+    {
+      label: "lot identity changes after the initial recovery check",
+      secondSetup: { postReceiptOnchainAuctionOverrides: { tokenId: 999n } },
+      expectedDetail: "Persisted bid lot mismatch (token ID)."
+    }
+  ])("keeps recovery locked when $label", async ({ secondSetup, expectedDetail }) => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "920" },
+      receipt: new Error("RPC timeout")
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    first.view.unmount();
+
+    const second = setupBid({ auctionOverrides: { auctionId: "920" }, ...secondSetup });
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Transaction evidence and technical details"));
+    expect(screen.getByText(expectedDetail)).toBeInTheDocument();
+    expect(second.waitForTransactionReceipt).toHaveBeenCalledTimes(1);
+    expect(second.onBidComplete).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it("binds recovery to the displayed immutable lot even when RPC still reports the stored lot", async () => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "921" },
+      receipt: new Error("RPC timeout")
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    first.view.unmount();
+
+    const second = setupBid({
+      auctionOverrides: { auctionId: "921", tokenId: "999" },
+      onchainAuctionOverrides: { tokenId: BigInt(auctionDetailFixture.auction.tokenId) }
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Recovery identity not verified")).toBeInTheDocument();
+    expect(screen.getAllByText(/Displayed auction does not match the persisted bid lot \(token ID\)/).length)
+      .toBeGreaterThan(0);
+    expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      label: "confirmed outcome",
+      auctionId: "927",
+      terminal: {
+        resolvedOutcome: {
+          kind: "confirmed",
+          hash: txHash,
+          blockNumber: "102",
+          blockHash: blockHashFor(102n)
+        }
+      },
+      terminalMessage: "This bid was confirmed on-chain, but recovery storage cleanup is incomplete."
+    },
+    {
+      label: "resolved replacement",
+      auctionId: "928",
+      terminal: {
+        resolvedReplacement: {
+          reason: "replaced",
+          hash: replacementHash,
+          originalHash: txHash,
+          outcome: "confirmed",
+          blockNumber: "102",
+          blockHash: blockHashFor(102n)
+        }
+      },
+      terminalMessage: "The original reviewed bid was replaced and was not confirmed."
+    }
+  ] as const)("keeps a reloaded $label marker locked after its terminal block is reorganized", async ({
+    auctionId,
+    terminal,
+    terminalMessage
+  }) => {
+    const marker = { ...storedBidMarker(auctionId), ...terminal };
+    const key = pendingBidKeyFor(auctionId);
+    window.sessionStorage.setItem(key, JSON.stringify(marker));
+    const { waitForTransactionReceipt } = setupBid({
+      auctionOverrides: { auctionId },
+      receiptBlockHashOffset: 1n
+    });
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    const checkConfirmation = screen.getByRole("button", { name: "Check transaction confirmation" });
+    fireEvent.click(checkConfirmation);
+
+    await waitFor(() => expect(checkConfirmation).toBeEnabled());
+    expect(screen.getByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.queryByText(terminalMessage)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Transaction evidence and technical details"));
+    expect(screen.getByText(/stored terminal transaction block is no longer canonical/)).toBeInTheDocument();
+    expect(waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(key)).not.toBeNull();
+  });
+
+  it.each([
+    ["chain ID", (marker: Record<string, any>) => { marker.lot.chainId = 1; }],
+    ["AuctionHouse", (marker: Record<string, any>) => { marker.lot.auctionHouse = testAddresses.paramsController; }],
+    ["auction ID", (marker: Record<string, any>) => { marker.lot.auctionId = "999"; }],
+    ["bidder", (marker: Record<string, any>) => { marker.lot.bidder = testAddresses.secondBidder; }]
+  ] as const)("refuses a structurally valid marker whose persisted %s conflicts with its recovery key", async (
+    expectedMismatch,
+    mutateMarker
+  ) => {
+    const first = setupBid({
+      auctionOverrides: { auctionId: "917" },
+      receipt: { status: "success", transactionHash: txHash, logs: [] }
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    const key = window.sessionStorage.key(0)!;
+    const marker = JSON.parse(window.sessionStorage.getItem(key)!);
+    mutateMarker(marker);
+    window.sessionStorage.setItem(key, JSON.stringify(marker));
+    first.view.unmount();
+
+    const second = setupBid({ auctionOverrides: { auctionId: "917" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Recovery identity not verified")).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`Persisted bid context mismatch \\(${expectedMismatch}\\)`)).length)
+      .toBeGreaterThan(0);
+    expect(second.getBlock).toHaveBeenCalledTimes(1);
+    expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+  });
+
+  it("renders recovery controls as distinct primary and secondary actions in one labelled group", async () => {
+    setupBid({ receipt: new Error("RPC timeout") });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+
+    const actions = screen.getByRole("group", { name: "Bid recovery actions" });
+    const confirmationAction = within(actions).getByRole("button", { name: "Check transaction confirmation" });
+    const refreshAction = within(actions).getByRole("button", { name: "Refresh wallet bid data" });
+    expect(confirmationAction).toHaveClass("transaction-primary-action");
+    expect(refreshAction).toHaveClass("transaction-secondary-action");
+    expect(confirmationAction).not.toBe(refreshAction);
+  });
+
   it("confirms a repriced bid with the effective transaction hash", async () => {
     const { waitForTransactionReceipt, writeContract } = setupBid();
     queueReplacement(waitForTransactionReceipt, "repriced");
@@ -756,6 +1214,74 @@ describe("WalletBidPanel", () => {
     fireEvent.click(screen.getByText("Transaction evidence and technical details"));
     expect(screen.getByTitle(replacementHash)).toBeInTheDocument();
     expect(writeContract).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage).toHaveLength(0);
+  });
+
+  it("keeps a repriced bid locked when its receipt block is no longer canonical", async () => {
+    const { waitForTransactionReceipt, onBidComplete } = setupBid({ receiptBlockHashOffset: 1n });
+    queueReplacement(waitForTransactionReceipt, "repriced");
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.queryByText("Transaction confirmed")).not.toBeInTheDocument();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+      hash: replacementHash
+    });
+  });
+
+  it("does not resolve a replaced bid when the replacement receipt block is no longer canonical", async () => {
+    const { waitForTransactionReceipt, onBidComplete } = setupBid({ receiptBlockHashOffset: 1n });
+    queueReplacement(waitForTransactionReceipt, "replaced");
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.queryByText("The original reviewed bid was replaced and was not confirmed.")).not.toBeInTheDocument();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    const retained = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
+    expect(retained.hash).toBe(txHash);
+    expect(retained).not.toHaveProperty("resolvedReplacement");
+  });
+
+  it("recovers a repriced hash and its complete lot identity after reload once replacement was observed", async () => {
+    const first = setupBid({ auctionOverrides: { auctionId: "916" } });
+    first.waitForTransactionReceipt.mockImplementationOnce(async (request) => {
+      request?.onReplaced?.({
+        reason: "repriced",
+        transaction: { hash: replacementHash },
+        replacedTransaction: { hash: txHash },
+        transactionReceipt: bidPlacedReceipt({ hash: replacementHash, auctionId: 916n })
+      });
+      throw new Error("RPC disconnected after observing repricing");
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Confirmation not verified");
+    const stored = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
+    expect(stored).toMatchObject({
+      version: 2,
+      kind: "submitted-wallet-bid",
+      hash: replacementHash,
+      lot: { auctionId: "916", tokenId: auctionDetailFixture.auction.tokenId }
+    });
+    first.view.unmount();
+
+    const second = setupBid({ auctionOverrides: { auctionId: "916" } });
+    second.waitForTransactionReceipt.mockResolvedValueOnce(
+      bidPlacedReceipt({ hash: replacementHash, auctionId: 916n })
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Check transaction confirmation" }));
+
+    expect(await screen.findByText("Your submitted bid is confirmed on-chain.")).toBeInTheDocument();
+    expect(second.writeContract).not.toHaveBeenCalled();
     expect(window.sessionStorage).toHaveLength(0);
   });
 
@@ -801,6 +1327,54 @@ describe("WalletBidPanel", () => {
       expect(window.sessionStorage).toHaveLength(0);
     } finally {
       if (!setItemRestored) setItem.mockRestore();
+    }
+  });
+
+  it("detects a silently ignored repriced hash write and retains the complete replacement state", async () => {
+    const originalSetItem = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (value.includes(replacementHash)) return undefined;
+      return originalSetItem.call(this, key, value);
+    });
+    let restored = false;
+    try {
+      const first = setupBid({ auctionOverrides: { auctionId: "933" } });
+      first.waitForTransactionReceipt.mockImplementationOnce(async (request) => {
+        request?.onReplaced?.({
+          reason: "repriced",
+          transaction: { hash: replacementHash },
+          replacedTransaction: { hash: txHash },
+          transactionReceipt: bidPlacedReceipt({ hash: replacementHash, auctionId: 933n })
+        });
+        throw new Error("RPC disconnected after repricing");
+      });
+
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      await screen.findByText("Confirmation not verified");
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByText(/stored value does not match the latest recovery state/)).toBeInTheDocument();
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+        hash: txHash,
+        lot: { auctionId: "933" }
+      });
+
+      setItem.mockRestore();
+      restored = true;
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+      await waitFor(() => expect(screen.queryByText("Recovery storage unavailable")).not.toBeInTheDocument());
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+        version: 2,
+        kind: "submitted-wallet-bid",
+        hash: replacementHash,
+        lot: { auctionId: "933", tokenId: auctionDetailFixture.auction.tokenId }
+      });
+      expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeDisabled();
+    } finally {
+      if (!restored) setItem.mockRestore();
     }
   });
 
@@ -874,7 +1448,13 @@ describe("WalletBidPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check transaction confirmation" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Check transaction confirmation" })).toBeEnabled());
     expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeDisabled();
-    waitForTransactionReceipt.mockResolvedValueOnce({ status: "reverted", transactionHash: txHash, logs: [] });
+    waitForTransactionReceipt.mockResolvedValueOnce({
+      status: "reverted",
+      transactionHash: txHash,
+      blockNumber: 102n,
+      blockHash: blockHashFor(102n),
+      logs: []
+    });
     fireEvent.click(screen.getByRole("button", { name: "Check transaction confirmation" }));
     await screen.findByText("The transaction was included on-chain but reverted.");
     expect(screen.getByRole("button", { name: "Continue in wallet" })).toBeEnabled();
@@ -948,19 +1528,98 @@ describe("WalletBidPanel", () => {
       "909",
       testAddresses.primaryBidder.toLowerCase()
     ].join(":");
-    window.sessionStorage.setItem(key, JSON.stringify({ version: 1, hash: "not-a-hash" }));
+    window.sessionStorage.setItem(key, JSON.stringify({
+      version: 2,
+      kind: "submitted-wallet-bid",
+      hash: "not-a-hash",
+      expectedNewCap: "1200000000000000000"
+    }));
     const { writeContract } = setupBid({ auctionOverrides: { auctionId: "909" } });
 
     const review = await screen.findByRole("button", { name: "Review bid" });
     expect(await screen.findByText("Recovery storage unavailable")).toBeInTheDocument();
-    expect(screen.getByText(/contains an invalid bid marker/)).toBeInTheDocument();
+    expect(screen.getByText(/contains an invalid or incomplete bid marker/)).toBeInTheDocument();
     expect(review).toBeDisabled();
     expect(screen.queryByText("Confirmation not verified")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(key)).not.toBeNull();
     expect(writeContract).not.toHaveBeenCalled();
   });
 
-  it("uses one recovery key for equivalent canonical auction IDs", async () => {
+  it("rejects a terminal marker with missing canonical block evidence", async () => {
+    const auctionId = "925";
+    const marker = {
+      ...storedBidMarker(auctionId),
+      resolvedOutcome: {
+        kind: "confirmed",
+        hash: txHash,
+        blockNumber: "102"
+      }
+    };
+    const key = pendingBidKeyFor(auctionId);
+    window.sessionStorage.setItem(key, JSON.stringify(marker));
+    const { writeContract } = setupBid({ auctionOverrides: { auctionId } });
+
+    expect(await screen.findByText("Recovery storage unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/invalid or incomplete bid marker/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check transaction confirmation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    expect(window.sessionStorage.getItem(key)).not.toBeNull();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["outcome hash", (marker: Record<string, any>) => {
+      marker.resolvedOutcome = {
+        kind: "confirmed",
+        hash: unrelatedHash,
+        blockNumber: "102",
+        blockHash: blockHashFor(102n)
+      };
+    }],
+    ["replacement original hash", (marker: Record<string, any>) => {
+      marker.resolvedReplacement = {
+        reason: "replaced",
+        hash: replacementHash,
+        originalHash: unrelatedHash,
+        outcome: "confirmed",
+        blockNumber: "102",
+        blockHash: blockHashFor(102n)
+      };
+    }]
+  ] as const)("rejects a terminal marker with a mismatched %s", async (_label, mutateMarker) => {
+    const auctionId = "926";
+    const marker = storedBidMarker(auctionId);
+    mutateMarker(marker);
+    const key = pendingBidKeyFor(auctionId);
+    window.sessionStorage.setItem(key, JSON.stringify(marker));
+    setupBid({ auctionOverrides: { auctionId } });
+
+    expect(await screen.findByText("Recovery storage unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/invalid or incomplete bid marker/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check transaction confirmation" })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(key)).not.toBeNull();
+  });
+
+  it("fails closed and retains malformed recovery storage", async () => {
+    const key = [
+      "bidback:pending-wallet-bid:v1",
+      "31337",
+      localDeploymentFixture.contracts.auctionHouse.toLowerCase(),
+      "918",
+      testAddresses.primaryBidder.toLowerCase()
+    ].join(":");
+    window.sessionStorage.setItem(key, "{not-json");
+    const { writeContract } = setupBid({ auctionOverrides: { auctionId: "918" } });
+
+    expect(await screen.findByText("Recovery storage unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/contains a malformed bid marker/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Check transaction confirmation" })).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(key)).toBe("{not-json");
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it("fails closed instead of silently migrating a legacy v1 submitted marker", async () => {
     const key = [
       "bidback:pending-wallet-bid:v1",
       "31337",
@@ -975,9 +1634,11 @@ describe("WalletBidPanel", () => {
     }));
     const { writeContract } = setupBid({ auctionOverrides: { auctionId: "01" } });
 
-    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check transaction confirmation" })).toBeEnabled();
+    expect(await screen.findByText("Recovery storage unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/legacy bid marker without a complete immutable lot identity/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Check transaction confirmation" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    expect(window.sessionStorage.getItem(key)).not.toBeNull();
     expect(writeContract).not.toHaveBeenCalled();
   });
 
@@ -1092,7 +1753,7 @@ describe("WalletBidPanel", () => {
     }
   });
 
-  it("keeps a durable hash-unknown intent locked across a remount when hash persistence fails", async () => {
+  it("keeps a newer in-memory submitted hash locked across a remount when persistence fails", async () => {
     const originalSetItem = Storage.prototype.setItem;
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
       if (key.endsWith(":capability-probe") || JSON.parse(value).kind === "wallet-dispatch-intent") {
@@ -1119,11 +1780,67 @@ describe("WalletBidPanel", () => {
 
     const second = setupBid({ auctionOverrides: { auctionId: "903" } });
     expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
-    expect(screen.getByText("A wallet bid request may have been submitted, but no transaction hash was saved.")).toBeInTheDocument();
-    expect(screen.getByText(/Check this account's wallet activity/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Check transaction confirmation" })).not.toBeInTheDocument();
+    expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check transaction confirmation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
     expect(second.writeContract).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+    await waitFor(() => expect(screen.queryByText("Recovery storage unavailable")).not.toBeInTheDocument());
+    expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+      version: 2,
+      hash: txHash
+    });
+  });
+
+  it("detects a silently ignored initial hash write and retains the complete submission in memory", async () => {
+    const originalSetItem = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      const marker = JSON.parse(value) as { kind?: string };
+      if (marker.kind === "submitted-wallet-bid") return undefined;
+      return originalSetItem.call(this, key, value);
+    });
+    let restored = false;
+    try {
+      const first = setupBid({
+        auctionOverrides: { auctionId: "932" },
+        receipt: new Error("RPC disconnected after submission")
+      });
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      await screen.findByText("Confirmation not verified");
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByText(/stored value does not match the latest recovery state/)).toBeInTheDocument();
+      expect(first.writeContract).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toEqual({
+        version: 1,
+        kind: "wallet-dispatch-intent"
+      });
+      first.view.unmount();
+      setItem.mockRestore();
+      restored = true;
+
+      const second = setupBid({ auctionOverrides: { auctionId: "932" } });
+      expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+      expect(second.writeContract).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+      await waitFor(() => expect(screen.queryByText("Recovery storage unavailable")).not.toBeInTheDocument());
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+        version: 2,
+        kind: "submitted-wallet-bid",
+        hash: txHash,
+        lot: { auctionId: "932", tokenId: auctionDetailFixture.auction.tokenId }
+      });
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    } finally {
+      if (!restored) setItem.mockRestore();
+    }
   });
 
   it("keeps an ambiguous wallet error fail-closed without checking a nonexistent hash", async () => {
@@ -1194,9 +1911,280 @@ describe("WalletBidPanel", () => {
     expect(window.sessionStorage).toHaveLength(0);
   });
 
+  it("keeps the complete confirmed marker locked when storage silently ignores cleanup", async () => {
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, key) {
+      if (key.endsWith(":capability-probe")) return originalRemoveItem.call(this, key);
+      return undefined;
+    });
+    let restored = false;
+    try {
+      setupBid({ auctionOverrides: { auctionId: "931" } });
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+        version: 2,
+        kind: "submitted-wallet-bid",
+        hash: txHash,
+        lot: { auctionId: "931", tokenId: auctionDetailFixture.auction.tokenId },
+        resolvedOutcome: {
+          kind: "confirmed",
+          hash: txHash,
+          blockNumber: "102",
+          blockHash: blockHashFor(102n)
+        }
+      });
+
+      removeItem.mockRestore();
+      restored = true;
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+      await waitFor(() => expect(screen.queryByText("Recovery storage unavailable")).not.toBeInTheDocument());
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeEnabled();
+      expect(window.sessionStorage).toHaveLength(0);
+    } finally {
+      if (!restored) removeItem.mockRestore();
+    }
+  });
+
+  it("retains a newer same-hash confirmed outcome in memory when terminal persistence fails", async () => {
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const originalSetItem = Storage.prototype.setItem;
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, key) {
+      if (key.endsWith(":capability-probe")) return originalRemoveItem.call(this, key);
+      throw new Error("remove blocked");
+    });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (value.includes("\"resolvedOutcome\"")) throw new Error("resolved outcome write blocked");
+      return originalSetItem.call(this, key, value);
+    });
+    let restored = false;
+    try {
+      const first = setupBid({ auctionOverrides: { auctionId: "922" } });
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      const staleStored = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
+      expect(staleStored.hash).toBe(txHash);
+      expect(staleStored).not.toHaveProperty("resolvedOutcome");
+      first.view.unmount();
+      removeItem.mockRestore();
+      setItem.mockRestore();
+      restored = true;
+
+      const second = setupBid({ auctionOverrides: { auctionId: "922" } });
+      expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Check transaction confirmation" }));
+
+      expect(await screen.findByText("This bid was confirmed on-chain, but recovery storage cleanup is incomplete."))
+        .toBeInTheDocument();
+      expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+      expect(window.sessionStorage).toHaveLength(1);
+    } finally {
+      if (!restored) {
+        removeItem.mockRestore();
+        setItem.mockRestore();
+      }
+    }
+  });
+
+  it("detects a silently ignored terminal rewrite and preserves its proof until verified cleanup", async () => {
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const originalSetItem = Storage.prototype.setItem;
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, key) {
+      if (key.endsWith(":capability-probe")) return originalRemoveItem.call(this, key);
+      throw new Error("cleanup blocked");
+    });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (value.includes("\"resolvedOutcome\"")) return undefined;
+      return originalSetItem.call(this, key, value);
+    });
+    let setItemRestored = false;
+    let removeItemRestored = false;
+    try {
+      setupBid({ auctionOverrides: { auctionId: "934" } });
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByText(/stored value does not match the latest recovery state/)).toBeInTheDocument();
+      const staleStored = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
+      expect(staleStored).toMatchObject({ hash: txHash, lot: { auctionId: "934" } });
+      expect(staleStored).not.toHaveProperty("resolvedOutcome");
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+
+      setItem.mockRestore();
+      setItemRestored = true;
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+      await waitFor(() => expect(
+        JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!).resolvedOutcome
+      ).toMatchObject({
+        kind: "confirmed",
+        hash: txHash,
+        blockNumber: "102",
+        blockHash: blockHashFor(102n)
+      }));
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+
+      removeItem.mockRestore();
+      removeItemRestored = true;
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+      await waitFor(() => expect(screen.queryByText("Recovery storage unavailable")).not.toBeInTheDocument());
+      expect(window.sessionStorage).toHaveLength(0);
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeEnabled();
+    } finally {
+      if (!setItemRestored) setItem.mockRestore();
+      if (!removeItemRestored) removeItem.mockRestore();
+    }
+  });
+
+  it("retains a newer same-hash resolved replacement in memory when persistence fails", async () => {
+    const originalSetItem = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key, value) {
+      if (value.includes("\"resolvedReplacement\"")) throw new Error("replacement write blocked");
+      return originalSetItem.call(this, key, value);
+    });
+    let restored = false;
+    try {
+      const neverRefresh = vi.fn(() => new Promise<void>(() => undefined));
+      const first = setupBid({ auctionOverrides: { auctionId: "923" }, onBidComplete: neverRefresh });
+      queueReplacement(first.waitForTransactionReceipt, "replaced");
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+      expect(await screen.findByText("The original reviewed bid was replaced and was not confirmed."))
+        .toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      const staleStored = JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!);
+      expect(staleStored.hash).toBe(txHash);
+      expect(staleStored).not.toHaveProperty("resolvedReplacement");
+      first.view.unmount();
+      setItem.mockRestore();
+      restored = true;
+
+      const second = setupBid({ auctionOverrides: { auctionId: "923" } });
+      expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Check transaction confirmation" }));
+
+      expect(await screen.findByText("The original reviewed bid was replaced and was not confirmed."))
+        .toBeInTheDocument();
+      expect(second.waitForTransactionReceipt).not.toHaveBeenCalled();
+      expect(window.sessionStorage).toHaveLength(1);
+    } finally {
+      if (!restored) setItem.mockRestore();
+    }
+  });
+
+  it("keeps delayed confirmed-outcome cleanup locked when its terminal block reorganizes", async () => {
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, key) {
+      if (key.endsWith(":capability-probe")) return originalRemoveItem.call(this, key);
+      throw new Error("remove blocked");
+    });
+    let restored = false;
+    try {
+      const { getBlock } = setupBid({ auctionOverrides: { auctionId: "929" } });
+      const review = await screen.findByRole("button", { name: "Review bid" });
+      await waitFor(() => expect(review).toBeEnabled());
+      fireEvent.click(review);
+      fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+      expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+      expect(screen.getByText("Recovery storage unavailable")).toBeInTheDocument();
+      expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+        hash: txHash,
+        resolvedOutcome: {
+          hash: txHash,
+          blockNumber: "102",
+          blockHash: blockHashFor(102n)
+        }
+      });
+
+      removeItem.mockRestore();
+      restored = true;
+      getBlock.mockImplementation(async (request: { blockNumber?: bigint } = {}) => {
+        const number = request.blockNumber ?? 200n;
+        return {
+          timestamp: 1n,
+          number,
+          hash: blockHashFor(number, request.blockNumber === 102n ? 1n : 0n)
+        };
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Retry recovery storage access" }));
+
+      expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+      expect(screen.getAllByText(/stored terminal transaction block is no longer canonical/).length)
+        .toBeGreaterThan(0);
+      expect(window.sessionStorage).toHaveLength(1);
+      expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+    } finally {
+      if (!restored) removeItem.mockRestore();
+    }
+  });
+
+  it("keeps delayed replacement refresh locked when its terminal block reorganizes", async () => {
+    const onBidComplete = vi.fn()
+      .mockRejectedValueOnce(new Error("auction refresh unavailable"))
+      .mockResolvedValue(undefined);
+    const { getBlock, waitForTransactionReceipt } = setupBid({
+      auctionOverrides: { auctionId: "930" },
+      onBidComplete
+    });
+    queueReplacement(waitForTransactionReceipt, "replaced");
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect(await screen.findByText("The original reviewed bid was replaced and was not confirmed."))
+      .toBeInTheDocument();
+    expect(window.sessionStorage).toHaveLength(1);
+    expect(JSON.parse(window.sessionStorage.getItem(window.sessionStorage.key(0)!)!)).toMatchObject({
+      hash: txHash,
+      resolvedReplacement: {
+        hash: replacementHash,
+        originalHash: txHash,
+        blockNumber: "102",
+        blockHash: blockHashFor(102n)
+      }
+    });
+
+    getBlock.mockImplementation(async (request: { blockNumber?: bigint } = {}) => {
+      const number = request.blockNumber ?? 200n;
+      return {
+        timestamp: 1n,
+        number,
+        hash: blockHashFor(number, request.blockNumber === 102n ? 1n : 0n)
+      };
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh resolved transaction state" }));
+
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.queryByText("The original reviewed bid was replaced and was not confirmed.")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/stored terminal transaction block is no longer canonical/).length)
+      .toBeGreaterThan(0);
+    expect(window.sessionStorage).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
+  });
+
   it("discards preflight results after the wallet identity changes", async () => {
     const { view, getBlock, writeContract } = setupBid();
-    let resolveBlock!: (block: { timestamp: bigint; number: bigint }) => void;
+    let resolveBlock!: (block: { timestamp: bigint; number: bigint; hash: `0x${string}` }) => void;
     const review = await screen.findByRole("button", { name: "Review bid" });
     await waitFor(() => expect(review).toBeEnabled());
     getBlock.mockImplementationOnce(() => new Promise((resolve) => { resolveBlock = resolve; }));
@@ -1208,14 +2196,14 @@ describe("WalletBidPanel", () => {
     view.rerender(<WalletBidPanel auction={auctionDetailFixture.auction}
       expectedChainId={auctionDetailFixture.chainId} expectedAuctionHouse={auctionDetailFixture.auctionHouse}
       onBidComplete={async () => undefined} />);
-    await act(async () => resolveBlock({ timestamp: 1n, number: 102n }));
+    await act(async () => resolveBlock({ timestamp: 1n, number: 102n, hash: blockHashFor(102n) }));
     expect(writeContract).not.toHaveBeenCalled();
     expect(screen.queryByText("Waiting for wallet signature")).not.toBeInTheDocument();
   });
 
   it("does not let an old operation clear the busy state of a new wallet identity", async () => {
     const { view, renderedAuction, getBlock, writeContract } = setupBid();
-    let resolveOldBlock!: (block: { timestamp: bigint; number: bigint }) => void;
+    let resolveOldBlock!: (block: { timestamp: bigint; number: bigint; hash: `0x${string}` }) => void;
     const firstReview = await screen.findByRole("button", { name: "Review bid" });
     await waitFor(() => expect(firstReview).toBeEnabled());
     getBlock.mockImplementationOnce(() => new Promise((resolve) => { resolveOldBlock = resolve; }));
@@ -1238,10 +2226,36 @@ describe("WalletBidPanel", () => {
     await screen.findByText("Waiting for wallet signature");
     expect(screen.getByRole("button", { name: "Working..." })).toBeDisabled();
 
-    await act(async () => resolveOldBlock({ timestamp: 1n, number: 102n }));
+    await act(async () => resolveOldBlock({ timestamp: 1n, number: 102n, hash: blockHashFor(102n) }));
     expect(screen.getByRole("button", { name: "Working..." })).toBeDisabled();
     await act(async () => resolveNewWrite(txHash));
     await screen.findByText("Transaction confirmed");
+  });
+
+  it("invalidates an in-flight receipt when the displayed immutable lot changes under the same recovery key", async () => {
+    const { view, renderedAuction, waitForTransactionReceipt, onBidComplete } = setupBid({
+      auctionOverrides: { auctionId: "924" }
+    });
+    let resolveReceipt!: (receipt: MockReceipt) => void;
+    waitForTransactionReceipt.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveReceipt = resolve;
+    }));
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await screen.findByText("Bid transaction submitted. Waiting for confirmation.");
+
+    view.rerender(<WalletBidPanel auction={{ ...renderedAuction, tokenId: "999" }}
+      expectedChainId={auctionDetailFixture.chainId} expectedAuctionHouse={auctionDetailFixture.auctionHouse}
+      onBidComplete={onBidComplete} />);
+    expect(await screen.findByText("Confirmation not verified")).toBeInTheDocument();
+    await act(async () => resolveReceipt(bidPlacedReceipt({ auctionId: 924n })));
+
+    expect(screen.queryByText("Transaction confirmed")).not.toBeInTheDocument();
+    expect(onBidComplete).not.toHaveBeenCalled();
+    expect(window.sessionStorage).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeDisabled();
   });
 
   it("keeps the review available for retry after a rejected signature", async () => {

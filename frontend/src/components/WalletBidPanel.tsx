@@ -77,8 +77,15 @@ const transactionHashPattern = /^0x[0-9a-fA-F]{64}$/;
 type ResolvedBidReplacement = {
   reason: "cancelled" | "replaced";
   hash: `0x${string}`;
-  originalHash?: `0x${string}`;
-  outcome?: "confirmed" | "reverted";
+  originalHash: `0x${string}`;
+  outcome: "confirmed" | "reverted";
+  blockNumber: string;
+  blockHash: `0x${string}`;
+};
+
+type StoredTerminalBlockEvidence = {
+  blockNumber: string;
+  blockHash: `0x${string}`;
 };
 
 type StoredBidIntent = {
@@ -96,14 +103,41 @@ type StoredPreDispatchCleanup = {
   kind: "wallet-not-opened-cleanup-pending";
 };
 
+type StoredBidLotIdentity = {
+  chainId: number;
+  auctionHouse: `0x${string}`;
+  auctionId: string;
+  bidder: `0x${string}`;
+  seller: `0x${string}`;
+  nft: `0x${string}`;
+  tokenId: string;
+  startPrice: string;
+  startTime: string;
+  initialEndTime: string;
+  modules: {
+    nftVault: `0x${string}`;
+    escrowVault: `0x${string}`;
+    distributionVault: `0x${string}`;
+    reputationAdapter: `0x${string}`;
+  };
+  reviewBlock: {
+    number: string;
+    hash: `0x${string}`;
+  };
+};
+
 type StoredBidSubmission = {
-  version: 1;
+  version: 2;
+  kind: "submitted-wallet-bid";
   hash: `0x${string}`;
   expectedNewCap: string;
+  lot: StoredBidLotIdentity;
   resolvedReplacement?: ResolvedBidReplacement;
   resolvedOutcome?: {
     kind: "confirmed" | "reverted";
     hash: `0x${string}`;
+    blockNumber: string;
+    blockHash: `0x${string}`;
   };
 };
 
@@ -127,6 +161,7 @@ type ReviewedBid = {
   auctionId: bigint;
   bidder: `0x${string}`;
   expectedNewCap: bigint;
+  submission: StoredBidSubmission;
 };
 
 type BidPublicClient = Awaited<ReturnType<typeof createConnectedWalletClients>>["publicClient"];
@@ -143,6 +178,20 @@ type TerminalReceiptClassification =
 
 function isTransactionHash(value: unknown): value is `0x${string}` {
   return typeof value === "string" && transactionHashPattern.test(value);
+}
+
+function isStoredAddress(value: unknown): value is `0x${string}` {
+  return typeof value === "string" && /^0x[0-9a-fA-F]{40}$/.test(value);
+}
+
+function isUnsignedDecimal(value: unknown) {
+  return typeof value === "string" && /^\d+$/.test(value);
+}
+
+function isStoredTerminalBlockEvidence(value: unknown): value is StoredTerminalBlockEvidence {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StoredTerminalBlockEvidence>;
+  return isUnsignedDecimal(candidate.blockNumber) && isTransactionHash(candidate.blockHash);
 }
 
 function pendingBidStorageKey(auctionHouse: string, auctionId: string, account: string) {
@@ -192,19 +241,41 @@ function removeSessionStorage(key: string): StorageResult<undefined> {
 function isStoredBidSubmission(value: unknown): value is StoredBidSubmission {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<StoredBidSubmission>;
-  if (candidate.version !== 1 || !isTransactionHash(candidate.hash) ||
+  if (candidate.version !== 2 || candidate.kind !== "submitted-wallet-bid" || !isTransactionHash(candidate.hash) ||
     typeof candidate.expectedNewCap !== "string" || !/^[1-9]\d*$/.test(candidate.expectedNewCap)) return false;
+  const lot = candidate.lot as Partial<StoredBidLotIdentity> | undefined;
+  if (!lot || !Number.isSafeInteger(lot.chainId) || Number(lot.chainId) <= 0 ||
+    !isStoredAddress(lot.auctionHouse) || !isUnsignedDecimal(lot.auctionId) ||
+    !isStoredAddress(lot.bidder) || !isStoredAddress(lot.seller) || !isStoredAddress(lot.nft) ||
+    !isUnsignedDecimal(lot.tokenId) || !isUnsignedDecimal(lot.startPrice) ||
+    !isUnsignedDecimal(lot.startTime) || !isUnsignedDecimal(lot.initialEndTime)) return false;
+  const modules = lot.modules as Partial<StoredBidLotIdentity["modules"]> | undefined;
+  if (!modules || !isStoredAddress(modules.nftVault) || !isStoredAddress(modules.escrowVault) ||
+    !isStoredAddress(modules.distributionVault) || !isStoredAddress(modules.reputationAdapter)) return false;
+  const reviewBlock = lot.reviewBlock as Partial<StoredBidLotIdentity["reviewBlock"]> | undefined;
+  if (!reviewBlock || !isUnsignedDecimal(reviewBlock.number) || !isTransactionHash(reviewBlock.hash)) return false;
+  if (candidate.resolvedReplacement && candidate.resolvedOutcome) return false;
   if (candidate.resolvedReplacement) {
     const { reason, hash, originalHash, outcome } = candidate.resolvedReplacement;
     if ((reason !== "cancelled" && reason !== "replaced") || !isTransactionHash(hash)) return false;
-    if (originalHash !== undefined && !isTransactionHash(originalHash)) return false;
-    if (outcome !== undefined && outcome !== "confirmed" && outcome !== "reverted") return false;
+    if (!isTransactionHash(originalHash) || originalHash.toLowerCase() !== candidate.hash.toLowerCase()) return false;
+    if (outcome !== "confirmed" && outcome !== "reverted") return false;
+    if (!isStoredTerminalBlockEvidence(candidate.resolvedReplacement)) return false;
   }
   if (candidate.resolvedOutcome) {
     const { kind, hash } = candidate.resolvedOutcome;
     if ((kind !== "confirmed" && kind !== "reverted") || !isTransactionHash(hash)) return false;
+    if (hash.toLowerCase() !== candidate.hash.toLowerCase()) return false;
+    if (!isStoredTerminalBlockEvidence(candidate.resolvedOutcome)) return false;
   }
   return true;
+}
+
+function isLegacyStoredBidSubmission(value: unknown) {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { version?: unknown; hash?: unknown; expectedNewCap?: unknown; kind?: unknown };
+  return candidate.version === 1 && candidate.kind === undefined &&
+    (candidate.hash !== undefined || candidate.expectedNewCap !== undefined);
 }
 
 function isStoredBidIntent(value: unknown): value is StoredBidIntent {
@@ -250,25 +321,44 @@ function readStoredBidRecovery(key: string): StoredBidReadResult {
   try {
     parsed = JSON.parse(read.value);
   } catch {
+    if (memory?.storageWriteFailed) {
+      return {
+        ok: false,
+        error: "Session recovery storage is older than the bid recovery state retained in memory.",
+        fallback: memory.recovery
+      };
+    }
+    pendingBidMemoryRegistry.delete(key);
     return {
       ok: false,
-      error: "Session recovery storage contains a malformed bid marker. It was retained because a previous wallet request cannot be ruled out.",
-      fallback: memory?.recovery ?? null
+      error: "Session recovery storage contains a malformed bid marker. It was retained because a previous wallet request cannot be ruled out."
     };
   }
   if (!isStoredBidRecovery(parsed)) {
+    if (memory?.storageWriteFailed) {
+      return {
+        ok: false,
+        error: "Session recovery storage is older than the bid recovery state retained in memory.",
+        fallback: memory.recovery
+      };
+    }
+    pendingBidMemoryRegistry.delete(key);
     return {
       ok: false,
-      error: "Session recovery storage contains an invalid bid marker. It was retained because a previous wallet request cannot be ruled out.",
-      fallback: memory?.recovery ?? null
+      error: isLegacyStoredBidSubmission(parsed)
+        ? "Session recovery storage contains a legacy bid marker without a complete immutable lot identity. It was retained and cannot be migrated safely."
+        : "Session recovery storage contains an invalid or incomplete bid marker without a verifiable lot identity. It was retained because a previous wallet request cannot be ruled out."
     };
   }
-  if (memory?.storageWriteFailed && isStoredBidSubmission(memory.recovery) &&
-    isStoredBidSubmission(parsed) && memory.recovery.hash.toLowerCase() !== parsed.hash.toLowerCase() &&
-    memory.recovery.expectedNewCap === parsed.expectedNewCap) {
+  if (memory?.storageWriteFailed && JSON.stringify(memory.recovery) !== JSON.stringify(parsed)) {
+    const repricedHashIsNewer = isStoredBidSubmission(memory.recovery) && isStoredBidSubmission(parsed) &&
+      memory.recovery.hash.toLowerCase() !== parsed.hash.toLowerCase() &&
+      memory.recovery.expectedNewCap === parsed.expectedNewCap;
     return {
       ok: false,
-      error: "Session recovery storage contains an older transaction hash than the repriced bid retained in memory.",
+      error: repricedHashIsNewer
+        ? "Session recovery storage contains an older transaction hash than the repriced bid retained in memory."
+        : "Session recovery storage contains an older bid state than the recovery state retained in memory.",
       fallback: memory.recovery
     };
   }
@@ -277,41 +367,66 @@ function readStoredBidRecovery(key: string): StoredBidReadResult {
   return { ok: true, value: parsed };
 }
 
-function writeStoredBidRecovery(key: string, recovery: StoredBidRecovery): StorageResult<undefined> {
+function writeAndVerifyStoredBidRecovery(key: string, recovery: StoredBidRecovery): StorageResult<undefined> {
+  const serializedRecovery = JSON.stringify(recovery);
+  pendingBidMemoryRegistry.set(key, { recovery, storageWriteFailed: true });
+  const write = writeSessionStorage(key, serializedRecovery);
+  if (!write.ok) return write;
+
+  const read = readSessionStorage(key);
+  if (!read.ok) {
+    return {
+      ok: false,
+      error: `Session recovery storage write could not be verified. ${read.error}`
+    };
+  }
+  if (read.value !== serializedRecovery) {
+    return {
+      ok: false,
+      error: "Session recovery storage write could not be verified because the stored value does not match the latest recovery state."
+    };
+  }
+
   pendingBidMemoryRegistry.set(key, { recovery, storageWriteFailed: false });
-  const write = writeSessionStorage(key, JSON.stringify(recovery));
-  if (!write.ok) pendingBidMemoryRegistry.set(key, { recovery, storageWriteFailed: true });
-  return write;
+  return { ok: true, value: undefined };
+}
+
+function writeStoredBidRecovery(key: string, recovery: StoredBidRecovery): StorageResult<undefined> {
+  return writeAndVerifyStoredBidRecovery(key, recovery);
+}
+
+function retainBidRecoveryAfterCleanupFailure(
+  key: string,
+  error: string,
+  resolvedSubmission?: StoredBidSubmission
+): { ok: false; error: string } {
+  const retained = resolvedSubmission ?? pendingBidMemoryRegistry.get(key)?.recovery;
+  if (retained) pendingBidMemoryRegistry.set(key, { recovery: retained, storageWriteFailed: true });
+  if (!resolvedSubmission) return { ok: false, error };
+
+  const markerWrite = writeAndVerifyStoredBidRecovery(key, resolvedSubmission);
+  if (!markerWrite.ok) return { ok: false, error: `${error} ${markerWrite.error}` };
+  return { ok: false, error };
 }
 
 function clearStoredBidRecovery(
   key: string,
-  resolved?: {
-    outcome: NonNullable<StoredBidSubmission["resolvedOutcome"]>;
-    expectedNewCap: bigint;
-  }
+  resolvedSubmission?: StoredBidSubmission
 ): StorageResult<undefined> {
   const remove = removeSessionStorage(key);
-  if (remove.ok) {
-    pendingBidMemoryRegistry.delete(key);
-    return remove;
+  if (!remove.ok) return retainBidRecoveryAfterCleanupFailure(key, remove.error, resolvedSubmission);
+
+  const read = readSessionStorage(key);
+  if (!read.ok) return retainBidRecoveryAfterCleanupFailure(key, read.error, resolvedSubmission);
+  if (read.value !== null) {
+    return retainBidRecoveryAfterCleanupFailure(
+      key,
+      "Session recovery storage cleanup could not be verified.",
+      resolvedSubmission
+    );
   }
 
-  if (resolved) {
-    const resolvedSubmission: StoredBidSubmission = {
-      version: 1,
-      hash: resolved.outcome.hash,
-      expectedNewCap: resolved.expectedNewCap.toString(),
-      resolvedOutcome: resolved.outcome
-    };
-    pendingBidMemoryRegistry.set(key, { recovery: resolvedSubmission, storageWriteFailed: true });
-    const markerWrite = writeSessionStorage(key, JSON.stringify(resolvedSubmission));
-    if (markerWrite.ok) {
-      pendingBidMemoryRegistry.set(key, { recovery: resolvedSubmission, storageWriteFailed: false });
-    } else {
-      return { ok: false, error: `${remove.error} ${markerWrite.error}` };
-    }
-  }
+  pendingBidMemoryRegistry.delete(key);
   return remove;
 }
 
@@ -459,14 +574,14 @@ function isCanonicalUserRejectedTransaction(error: unknown) {
 async function waitForTrackedBidReceipt({
   publicClient,
   hash,
-  expectedNewCap,
+  submission,
   storageKey,
   onRepriced,
   onStorageFailure
 }: {
   publicClient: BidPublicClient;
   hash: `0x${string}`;
-  expectedNewCap: bigint;
+  submission: StoredBidSubmission;
   storageKey: string;
   onRepriced?: (hash: `0x${string}`) => void;
   onStorageFailure?: (error: string) => void;
@@ -479,9 +594,8 @@ async function waitForTrackedBidReceipt({
       replacement = { reason, hash: effectiveHash };
       if (reason === "repriced") {
         const write = writeStoredBidRecovery(storageKey, {
-          version: 1,
+          ...submission,
           hash: effectiveHash,
-          expectedNewCap: expectedNewCap.toString()
         });
         if (!write.ok) onStorageFailure?.(write.error);
         onRepriced?.(effectiveHash);
@@ -547,6 +661,44 @@ function classifyTerminalReceipt(tracked: TrackedBidReceipt): TerminalReceiptCla
   return { ok: true, outcome: receipt.status === "success" ? "confirmed" : "reverted" };
 }
 
+async function verifyCanonicalReceiptBlock(
+  publicClient: BidPublicClient,
+  tracked: TrackedBidReceipt
+): Promise<StoredTerminalBlockEvidence> {
+  const receipt = tracked.receipt as { blockNumber?: unknown; blockHash?: unknown };
+  if (typeof receipt.blockNumber !== "bigint" || receipt.blockNumber < 0n || !isTransactionHash(receipt.blockHash)) {
+    throw new Error(
+      "The receipt does not contain a valid canonical block number and hash. Recovery remains locked."
+    );
+  }
+
+  const canonicalBlock = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
+  if (canonicalBlock.number !== receipt.blockNumber || !isTransactionHash(canonicalBlock.hash) ||
+    canonicalBlock.hash.toLowerCase() !== receipt.blockHash.toLowerCase()) {
+    throw new Error(
+      "The receipt block is no longer canonical or cannot be verified. Recovery remains locked."
+    );
+  }
+  return {
+    blockNumber: receipt.blockNumber.toString(),
+    blockHash: receipt.blockHash
+  };
+}
+
+async function verifyStoredTerminalCanonicalBlock(
+  publicClient: BidPublicClient,
+  evidence: StoredTerminalBlockEvidence
+) {
+  const blockNumber = BigInt(evidence.blockNumber);
+  const canonicalBlock = await publicClient.getBlock({ blockNumber });
+  if (canonicalBlock.number !== blockNumber || !isTransactionHash(canonicalBlock.hash) ||
+    canonicalBlock.hash.toLowerCase() !== evidence.blockHash.toLowerCase()) {
+    throw new Error(
+      "The stored terminal transaction block is no longer canonical or cannot be verified. Recovery remains locked."
+    );
+  }
+}
+
 type OnchainAuctionIdentity = {
   seller: string;
   nft: string;
@@ -555,6 +707,8 @@ type OnchainAuctionIdentity = {
   startTime: bigint;
   initialEndTime: bigint;
 };
+
+type OnchainAuctionModules = StoredBidLotIdentity["modules"];
 
 function numericAuctionFieldMatches(displayed: string, onchain: bigint) {
   try {
@@ -572,6 +726,92 @@ function immutableAuctionMismatches(onchain: OnchainAuctionIdentity, displayed: 
   if (!numericAuctionFieldMatches(displayed.startPrice, onchain.startPrice)) mismatches.push("start price");
   if (!numericAuctionFieldMatches(displayed.startTime, onchain.startTime)) mismatches.push("start time");
   if (!numericAuctionFieldMatches(displayed.initialEndTime, onchain.initialEndTime)) mismatches.push("initial end time");
+  return mismatches;
+}
+
+function storedBidDisplayedLotMismatches(stored: StoredBidLotIdentity, displayed: SerializedAuction) {
+  const mismatches: string[] = [];
+  if (!sameAddress(stored.seller, displayed.seller)) mismatches.push("seller");
+  if (!sameAddress(stored.nft, displayed.nft)) mismatches.push("NFT contract");
+  if (!numericAuctionFieldMatches(displayed.tokenId, BigInt(stored.tokenId))) mismatches.push("token ID");
+  if (!numericAuctionFieldMatches(displayed.startPrice, BigInt(stored.startPrice))) mismatches.push("start price");
+  if (!numericAuctionFieldMatches(displayed.startTime, BigInt(stored.startTime))) mismatches.push("start time");
+  if (!numericAuctionFieldMatches(displayed.initialEndTime, BigInt(stored.initialEndTime))) {
+    mismatches.push("initial end time");
+  }
+  return mismatches;
+}
+
+function storedBidLotIdentity({
+  auctionHouse,
+  auctionId,
+  bidder,
+  onchain,
+  modules,
+  blockNumber,
+  blockHash
+}: {
+  auctionHouse: `0x${string}`;
+  auctionId: bigint;
+  bidder: `0x${string}`;
+  onchain: OnchainAuctionIdentity;
+  modules: OnchainAuctionModules;
+  blockNumber: bigint;
+  blockHash: `0x${string}`;
+}): StoredBidLotIdentity {
+  return {
+    chainId: targetChainId,
+    auctionHouse,
+    auctionId: auctionId.toString(),
+    bidder,
+    seller: onchain.seller as `0x${string}`,
+    nft: onchain.nft as `0x${string}`,
+    tokenId: onchain.tokenId.toString(),
+    startPrice: onchain.startPrice.toString(),
+    startTime: onchain.startTime.toString(),
+    initialEndTime: onchain.initialEndTime.toString(),
+    modules,
+    reviewBlock: {
+      number: blockNumber.toString(),
+      hash: blockHash
+    }
+  };
+}
+
+function storedBidLotMismatches({
+  stored,
+  auctionHouse,
+  auctionId,
+  bidder,
+  onchain,
+  modules
+}: {
+  stored: StoredBidLotIdentity;
+  auctionHouse: `0x${string}`;
+  auctionId: bigint;
+  bidder: `0x${string}`;
+  onchain: OnchainAuctionIdentity;
+  modules: OnchainAuctionModules;
+}) {
+  const mismatches: string[] = [];
+  if (stored.chainId !== targetChainId) mismatches.push("chain ID");
+  if (!sameAddress(stored.auctionHouse, auctionHouse)) mismatches.push("AuctionHouse");
+  if (stored.auctionId !== auctionId.toString()) mismatches.push("auction ID");
+  if (!sameAddress(stored.bidder, bidder)) mismatches.push("bidder");
+  if (!sameAddress(stored.seller, onchain.seller)) mismatches.push("seller");
+  if (!sameAddress(stored.nft, onchain.nft)) mismatches.push("NFT contract");
+  if (stored.tokenId !== onchain.tokenId.toString()) mismatches.push("token ID");
+  if (stored.startPrice !== onchain.startPrice.toString()) mismatches.push("start price");
+  if (stored.startTime !== onchain.startTime.toString()) mismatches.push("start time");
+  if (stored.initialEndTime !== onchain.initialEndTime.toString()) mismatches.push("initial end time");
+  if (!sameAddress(stored.modules.nftVault, modules.nftVault)) mismatches.push("NFTVault snapshot");
+  if (!sameAddress(stored.modules.escrowVault, modules.escrowVault)) mismatches.push("EscrowVault snapshot");
+  if (!sameAddress(stored.modules.distributionVault, modules.distributionVault)) {
+    mismatches.push("DistributionVault snapshot");
+  }
+  if (!sameAddress(stored.modules.reputationAdapter, modules.reputationAdapter)) {
+    mismatches.push("ReputationAdapter snapshot");
+  }
   return mismatches;
 }
 
@@ -621,12 +861,26 @@ export function WalletBidPanel({
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
   const [resolvedReplacement, setResolvedReplacement] = useState<ResolvedBidReplacement | null>(null);
   const [storageRecoveryError, setStorageRecoveryError] = useState<string | null>(null);
-  const [storageCleanupOutcome, setStorageCleanupOutcome] = useState<StoredBidSubmission["resolvedOutcome"]>(undefined);
-  const [storageCleanupExpectedNewCap, setStorageCleanupExpectedNewCap] = useState<bigint | null>(null);
+  const [recoveryIdentityError, setRecoveryIdentityError] = useState<string | null>(null);
+  const [storageCleanupSubmission, setStorageCleanupSubmission] = useState<StoredBidSubmission | null>(null);
   const [rejectedCleanupPending, setRejectedCleanupPending] = useState(false);
   const [preDispatchCleanupPending, setPreDispatchCleanupPending] = useState(false);
 
-  const identity = `${address}:${chainId}:${connector?.uid}:${expectedChainId}:${expectedAuctionHouse.toLowerCase()}:${auction.auctionId}:${isConnected}`;
+  const identity = [
+    address,
+    chainId,
+    connector?.uid,
+    expectedChainId,
+    expectedAuctionHouse.toLowerCase(),
+    auction.auctionId,
+    auction.seller.toLowerCase(),
+    auction.nft.toLowerCase(),
+    auction.tokenId,
+    auction.startPrice,
+    auction.startTime,
+    auction.initialEndTime,
+    isConnected
+  ].join(":");
   const identityRef = useRef(identity);
   identityRef.current = identity;
   const readSequence = useRef(0);
@@ -713,12 +967,14 @@ export function WalletBidPanel({
     setTxStatus(null);
     setResolvedReplacement(null);
     setStorageRecoveryError(null);
-    setStorageCleanupOutcome(undefined);
-    setStorageCleanupExpectedNewCap(null);
+    setRecoveryIdentityError(null);
+    setStorageCleanupSubmission(null);
     setRejectedCleanupPending(false);
     setPreDispatchCleanupPending(false);
     setIsReviewingBid(false);
-  }, [address, chainId, connector?.uid, expectedAuctionHouse, expectedChainId, auction.auctionId, isConnected]);
+  }, [address, chainId, connector?.uid, expectedAuctionHouse, expectedChainId, auction.auctionId,
+    auction.seller, auction.nft, auction.tokenId, auction.startPrice, auction.startTime,
+    auction.initialEndTime, isConnected]);
 
   useEffect(() => {
     if (!pendingBidKey) return;
@@ -751,30 +1007,12 @@ export function WalletBidPanel({
       });
       return;
     }
-    if (stored.resolvedOutcome) {
-      setStorageCleanupOutcome(stored.resolvedOutcome);
-      setStorageCleanupExpectedNewCap(BigInt(stored.expectedNewCap));
-      setStorageRecoveryError(recoveryStorageMessage("A resolved transaction marker still requires cleanup."));
-      setTxStatus(stored.resolvedOutcome.kind === "confirmed"
-        ? confirmedTransactionState(
-            stored.resolvedOutcome.hash,
-            "This bid was confirmed on-chain, but recovery storage cleanup is incomplete.",
-            "Retry recovery storage cleanup before another bid."
-          )
-        : revertedTransactionState(stored.resolvedOutcome.hash));
-      return;
-    }
-    if (stored.resolvedReplacement) {
-      const replacement = {
-        ...stored.resolvedReplacement,
-        originalHash: stored.resolvedReplacement.originalHash ?? stored.hash
-      };
-      setResolvedReplacement(replacement);
-      setTxStatus(replacementTransactionState(replacement, true));
-      return;
-    }
     setResolvedReplacement(null);
-    setTxStatus(unknownConfirmationState(stored.hash, new Error("Restored submitted bid awaiting receipt verification.")));
+    setStorageCleanupSubmission(null);
+    setTxStatus(unknownConfirmationState(
+      stored.hash,
+      new Error("Restored submitted bid awaiting immutable lot identity and receipt verification.")
+    ));
   }, [identity, pendingBidKey]);
 
   const isStepUp = currentCap !== null && currentCap > 0n;
@@ -828,8 +1066,8 @@ export function WalletBidPanel({
     if (targetBindingError) throw new Error(targetBindingError);
 
     const block = await publicClient.getBlock({ blockTag: "latest" });
-    if (typeof block.number !== "bigint") {
-      throw new Error("The latest block number is unavailable.");
+    if (typeof block.number !== "bigint" || !isTransactionHash(block.hash)) {
+      throw new Error("The latest block number or hash is unavailable.");
     }
     const blockNumber = block.number;
     const auctionHouse = deployment.contracts.auctionHouse;
@@ -863,8 +1101,9 @@ export function WalletBidPanel({
         `Displayed auction does not match the on-chain lot at block ${blockNumber.toString()} (${mismatches.join(", ")}). Bidding is locked. Refresh the auction before trying again.`
       );
     }
-    if (!isUsableContractAddress(modules.escrowVault)) {
-      throw new Error("The auction module snapshot does not contain a valid EscrowVault. Bidding is locked.");
+    const invalidModule = Object.entries(modules).find(([, value]) => !isUsableContractAddress(value));
+    if (invalidModule) {
+      throw new Error(`The auction module snapshot does not contain a valid ${invalidModule[0]}. Bidding is locked.`);
     }
 
     const walletCap = await publicClient.readContract({
@@ -881,9 +1120,80 @@ export function WalletBidPanel({
       blockTimestamp: block.timestamp,
       blockNumber,
       escrowVault: modules.escrowVault,
+      lotIdentity: storedBidLotIdentity({
+        auctionHouse,
+        auctionId: auctionIdBigInt,
+        bidder: account,
+        onchain: onchainAuction,
+        modules,
+        blockNumber,
+        blockHash: block.hash
+      }),
       liveState: onchainAuction.state,
       liveEndTime: onchainAuction.endTime
     };
+  }
+
+  async function verifyStoredBidLotIdentity(
+    publicClient: BidPublicClient,
+    stored: StoredBidSubmission,
+    account: `0x${string}`
+  ) {
+    if (!deployment) throw new Error("Deployment missing or stale.");
+    if (!auctionIdBigInt) throw new Error("Invalid auction ID.");
+
+    const auctionHouse = deployment.contracts.auctionHouse;
+    const contextMismatches: string[] = [];
+    if (stored.lot.chainId !== targetChainId) contextMismatches.push("chain ID");
+    if (!sameAddress(stored.lot.auctionHouse, auctionHouse)) contextMismatches.push("AuctionHouse");
+    if (stored.lot.auctionId !== auctionIdBigInt.toString()) contextMismatches.push("auction ID");
+    if (!sameAddress(stored.lot.bidder, account)) contextMismatches.push("bidder");
+    if (contextMismatches.length > 0) {
+      throw new Error(`Persisted bid context mismatch (${contextMismatches.join(", ")}).`);
+    }
+    const displayedMismatches = storedBidDisplayedLotMismatches(stored.lot, auction);
+    if (displayedMismatches.length > 0) {
+      throw new Error(`Displayed auction does not match the persisted bid lot (${displayedMismatches.join(", ")}).`);
+    }
+
+    const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
+    if (typeof latestBlock.number !== "bigint" || !isTransactionHash(latestBlock.hash)) {
+      throw new Error("The latest canonical block number or hash is unavailable.");
+    }
+    const reviewBlockNumber = BigInt(stored.lot.reviewBlock.number);
+    const [reviewBlock, onchainAuction, modules] = await Promise.all([
+      publicClient.getBlock({ blockNumber: reviewBlockNumber }),
+      publicClient.readContract({
+        address: auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuction",
+        args: [auctionIdBigInt],
+        blockNumber: latestBlock.number
+      }),
+      publicClient.readContract({
+        address: auctionHouse,
+        abi: auctionHouseAbi,
+        functionName: "getAuctionModules",
+        args: [auctionIdBigInt],
+        blockNumber: latestBlock.number
+      })
+    ]);
+
+    if (!isTransactionHash(reviewBlock.hash) ||
+      reviewBlock.hash.toLowerCase() !== stored.lot.reviewBlock.hash.toLowerCase()) {
+      throw new Error("The canonical review block changed or is unavailable.");
+    }
+    const mismatches = storedBidLotMismatches({
+      stored: stored.lot,
+      auctionHouse,
+      auctionId: auctionIdBigInt,
+      bidder: account,
+      onchain: onchainAuction,
+      modules
+    });
+    if (mismatches.length > 0) {
+      throw new Error(`Persisted bid lot mismatch (${mismatches.join(", ")}).`);
+    }
   }
 
   async function readWalletBidData(rethrow = false) {
@@ -945,11 +1255,13 @@ export function WalletBidPanel({
       setMessage(walletErrorMessage(caught, "Unable to load wallet bid data."));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, connector?.uid, auction.auctionId, auctionOpen, deployment, expectedAuctionHouse,
-    expectedChainId, targetBindingError, wrongNetwork, isConnected]);
+  }, [address, connector?.uid, auction.auctionId, auction.seller, auction.nft, auction.tokenId,
+    auction.startPrice, auction.startTime, auction.initialEndTime, auctionOpen, deployment,
+    expectedAuctionHouse, expectedChainId, targetBindingError, wrongNetwork, isConnected]);
 
   async function refreshResolvedBidReplacement(
     operation: BidOperation,
+    publicClient: BidPublicClient,
     storageKey: string,
     replacement: ResolvedBidReplacement
   ) {
@@ -957,6 +1269,8 @@ export function WalletBidPanel({
     try { await onBidComplete(); } catch { refreshIncomplete = true; }
     if (!isCurrentBidOperation(operation)) return;
     try { await readWalletBidData(true); } catch { refreshIncomplete = true; }
+    if (!isCurrentBidOperation(operation)) return;
+    await verifyStoredTerminalCanonicalBlock(publicClient, replacement);
     if (!isCurrentBidOperation(operation)) return;
 
     setIsReviewingBid(false);
@@ -978,6 +1292,7 @@ export function WalletBidPanel({
 
   async function settleTrackedBidReceipt({
     operation,
+    publicClient,
     storageKey,
     submittedHash,
     tracked,
@@ -985,6 +1300,7 @@ export function WalletBidPanel({
     confirmedMessage
   }: {
     operation: BidOperation;
+    publicClient: BidPublicClient;
     storageKey: string;
     submittedHash: `0x${string}`;
     tracked: TrackedBidReceipt;
@@ -999,17 +1315,29 @@ export function WalletBidPanel({
       return;
     }
 
+    let terminalBlock: StoredTerminalBlockEvidence;
+    try {
+      await verifyStoredBidLotIdentity(publicClient, reviewedBid.submission, reviewedBid.bidder);
+      terminalBlock = await verifyCanonicalReceiptBlock(publicClient, tracked);
+    } catch (caught) {
+      if (isCurrentBidOperation(operation)) {
+        setTxStatus(unknownConfirmationState(tracked.effectiveHash, caught));
+      }
+      return;
+    }
+    if (!isCurrentBidOperation(operation)) return;
+
     if (tracked.replacement && tracked.replacement.reason !== "repriced") {
       const replacement: ResolvedBidReplacement = {
         reason: tracked.replacement.reason,
         hash: tracked.effectiveHash,
         originalHash: submittedHash,
-        outcome: terminalReceipt.outcome
+        outcome: terminalReceipt.outcome,
+        ...terminalBlock
       };
       const write = writeStoredBidRecovery(storageKey, {
-        version: 1,
+        ...reviewedBid.submission,
         hash: submittedHash,
-        expectedNewCap: reviewedBid.expectedNewCap.toString(),
         resolvedReplacement: replacement
       });
       if (!isCurrentBidOperation(operation)) return;
@@ -1017,7 +1345,7 @@ export function WalletBidPanel({
       setResolvedReplacement(replacement);
       setIsReviewingBid(false);
       setTxStatus(replacementTransactionState(replacement, true));
-      await refreshResolvedBidReplacement(operation, storageKey, replacement);
+      await refreshResolvedBidReplacement(operation, publicClient, storageKey, replacement);
       return;
     }
 
@@ -1033,21 +1361,22 @@ export function WalletBidPanel({
     }
     const resolvedOutcome: NonNullable<StoredBidSubmission["resolvedOutcome"]> = {
       kind: successful ? "confirmed" : "reverted",
-      hash: tracked.effectiveHash
+      hash: tracked.effectiveHash,
+      ...terminalBlock
     };
-    const clear = clearStoredBidRecovery(storageKey, {
-      outcome: resolvedOutcome,
-      expectedNewCap: reviewedBid.expectedNewCap
-    });
+    const resolvedSubmission: StoredBidSubmission = {
+      ...reviewedBid.submission,
+      hash: tracked.effectiveHash,
+      resolvedOutcome
+    };
+    const clear = clearStoredBidRecovery(storageKey, resolvedSubmission);
     if (!isCurrentBidOperation(operation)) return;
     if (!clear.ok) {
       setStorageRecoveryError(recoveryStorageMessage(clear.error));
-      setStorageCleanupOutcome(resolvedOutcome);
-      setStorageCleanupExpectedNewCap(reviewedBid.expectedNewCap);
+      setStorageCleanupSubmission(resolvedSubmission);
     } else {
       setStorageRecoveryError(null);
-      setStorageCleanupOutcome(undefined);
-      setStorageCleanupExpectedNewCap(null);
+      setStorageCleanupSubmission(null);
     }
     if (!successful) {
       setTxStatus(revertedTransactionState(tracked.effectiveHash));
@@ -1073,7 +1402,7 @@ export function WalletBidPanel({
   async function placeWalletBid() {
     if (activeOperationRef.current?.identity === identity ||
       txStatus?.phase === "confirmation-unknown" || resolvedReplacement ||
-      storageRecoveryError || storageCleanupOutcome || preDispatchCleanupPending) return;
+      storageRecoveryError || recoveryIdentityError || storageCleanupSubmission || preDispatchCleanupPending) return;
 
     if (!address) {
       setMessage("Wallet not connected.");
@@ -1229,17 +1558,21 @@ export function WalletBidPanel({
       if (!isTransactionHash(hash)) throw new Error("Wallet returned an invalid transaction hash.");
       submittedHash = hash;
       pendingHash = hash;
+      const submission: StoredBidSubmission = {
+        version: 2,
+        kind: "submitted-wallet-bid",
+        hash,
+        expectedNewCap: liveActionState.parsedBidCap.toString(),
+        lot: snapshot.lotIdentity
+      };
       const reviewedBid: ReviewedBid = {
         auctionHouse: deployment.contracts.auctionHouse,
         auctionId: auctionIdBigInt,
         bidder: address,
-        expectedNewCap: liveActionState.parsedBidCap
+        expectedNewCap: liveActionState.parsedBidCap,
+        submission
       };
-      const write = writeStoredBidRecovery(operationStorageKey, {
-        version: 1,
-        hash,
-        expectedNewCap: reviewedBid.expectedNewCap.toString()
-      });
+      const write = writeStoredBidRecovery(operationStorageKey, submission);
       if (!isCurrentBidOperation(operation)) return;
       if (!write.ok) setStorageRecoveryError(recoveryStorageMessage(write.error));
 
@@ -1249,7 +1582,7 @@ export function WalletBidPanel({
         tracked = await waitForTrackedBidReceipt({
           publicClient,
           hash,
-          expectedNewCap: reviewedBid.expectedNewCap,
+          submission,
           storageKey: operationStorageKey,
           onRepriced: (effectiveHash) => {
             pendingHash = effectiveHash;
@@ -1268,6 +1601,7 @@ export function WalletBidPanel({
 
       await settleTrackedBidReceipt({
         operation,
+        publicClient,
         storageKey: operationStorageKey,
         submittedHash: hash,
         tracked,
@@ -1309,29 +1643,67 @@ export function WalletBidPanel({
     const recoveryRead = readStoredBidRecovery(pendingBidKey);
     const stored = recoveryRead.ok ? recoveryRead.value : recoveryRead.fallback ?? null;
     if (!recoveryRead.ok) setStorageRecoveryError(recoveryStorageMessage(recoveryRead.error));
-    if (!stored || !isStoredBidSubmission(stored) || stored.resolvedOutcome || stored.resolvedReplacement ||
-      stored.hash.toLowerCase() !== hash.toLowerCase()) {
+    if (!stored || !isStoredBidSubmission(stored) || stored.hash.toLowerCase() !== hash.toLowerCase()) {
       setTxStatus(unknownConfirmationState(hash, new Error(
         "The persisted bid identity is unavailable or does not match this transaction hash. Recovery remains locked."
       )));
       return;
     }
-    const reviewedBid: ReviewedBid = {
-      auctionHouse: deployment.contracts.auctionHouse,
-      auctionId: auctionIdBigInt,
-      bidder: address,
-      expectedNewCap: BigInt(stored.expectedNewCap)
-    };
     const operation = beginBidOperation();
     if (!operation) return;
     let pendingHash = hash;
     try {
       const { provider, publicClient } = await createConnectedWalletClients(config, connector, address);
       await verifyWalletChain(provider);
+      try {
+        await verifyStoredBidLotIdentity(publicClient, stored, address);
+      } catch (caught) {
+        if (isCurrentBidOperation(operation)) {
+          const detail = walletErrorMessage(caught, "The persisted lot identity could not be verified.");
+          setRecoveryIdentityError(
+            `This historical transaction cannot be safely linked to the auction currently displayed. Bidding remains locked. ${detail}`
+          );
+          setTxStatus(unknownConfirmationState(hash, caught));
+        }
+        return;
+      }
+      if (!isCurrentBidOperation(operation)) return;
+      setRecoveryIdentityError(null);
+
+      if (stored.resolvedOutcome) {
+        await verifyStoredTerminalCanonicalBlock(publicClient, stored.resolvedOutcome);
+        if (!isCurrentBidOperation(operation)) return;
+        setStorageCleanupSubmission(stored);
+        setStorageRecoveryError(recoveryStorageMessage("A resolved transaction marker still requires cleanup."));
+        setTxStatus(stored.resolvedOutcome.kind === "confirmed"
+          ? confirmedTransactionState(
+              stored.resolvedOutcome.hash,
+              "This bid was confirmed on-chain, but recovery storage cleanup is incomplete.",
+              "Retry recovery storage cleanup before another bid."
+            )
+          : revertedTransactionState(stored.resolvedOutcome.hash));
+        return;
+      }
+      if (stored.resolvedReplacement) {
+        await verifyStoredTerminalCanonicalBlock(publicClient, stored.resolvedReplacement);
+        if (!isCurrentBidOperation(operation)) return;
+        const replacement = stored.resolvedReplacement;
+        setResolvedReplacement(replacement);
+        setTxStatus(replacementTransactionState(replacement, true));
+        return;
+      }
+
+      const reviewedBid: ReviewedBid = {
+        auctionHouse: deployment.contracts.auctionHouse,
+        auctionId: auctionIdBigInt,
+        bidder: address,
+        expectedNewCap: BigInt(stored.expectedNewCap),
+        submission: stored
+      };
       const tracked = await waitForTrackedBidReceipt({
         publicClient,
         hash,
-        expectedNewCap: reviewedBid.expectedNewCap,
+        submission: stored,
         storageKey: pendingBidKey,
         onRepriced: (effectiveHash) => {
           pendingHash = effectiveHash;
@@ -1345,6 +1717,7 @@ export function WalletBidPanel({
       });
       await settleTrackedBidReceipt({
         operation,
+        publicClient,
         storageKey: pendingBidKey,
         submittedHash: hash,
         tracked,
@@ -1363,21 +1736,21 @@ export function WalletBidPanel({
     const operation = beginBidOperation();
     if (!operation) return;
     try {
-      const { provider } = await createConnectedWalletClients(config, connector, address);
+      const { provider, publicClient } = await createConnectedWalletClients(config, connector, address);
       await verifyWalletChain(provider);
       if (!isCurrentBidOperation(operation)) return;
-      await refreshResolvedBidReplacement(operation, pendingBidKey, resolvedReplacement);
+      await refreshResolvedBidReplacement(operation, publicClient, pendingBidKey, resolvedReplacement);
     } catch (caught) {
       if (isCurrentBidOperation(operation)) {
         setMessage(walletErrorMessage(caught, "Unable to refresh the resolved transaction state."));
-        setTxStatus(replacementTransactionState(resolvedReplacement, true));
+        setTxStatus(unknownConfirmationState(resolvedReplacement.hash, caught));
       }
     } finally {
       finishBidOperation(operation);
     }
   }
 
-  function retryRecoveryStorageAccess() {
+  async function retryRecoveryStorageAccess() {
     if (!pendingBidKey) return;
     if (preDispatchCleanupPending) {
       const clear = clearPreDispatchRecoveryAndVerify(pendingBidKey);
@@ -1410,19 +1783,31 @@ export function WalletBidPanel({
       setMessage(null);
       return;
     }
-    if (storageCleanupOutcome && storageCleanupExpectedNewCap !== null) {
-      const clear = clearStoredBidRecovery(pendingBidKey, {
-        outcome: storageCleanupOutcome,
-        expectedNewCap: storageCleanupExpectedNewCap
-      });
-      if (!clear.ok) {
-        setStorageRecoveryError(recoveryStorageMessage(clear.error));
-        return;
+    if (storageCleanupSubmission) {
+      if (!address || !storageCleanupSubmission.resolvedOutcome) return;
+      const operation = beginBidOperation();
+      if (!operation) return;
+      try {
+        const { provider, publicClient } = await createConnectedWalletClients(config, connector, address);
+        await verifyWalletChain(provider);
+        await verifyStoredTerminalCanonicalBlock(publicClient, storageCleanupSubmission.resolvedOutcome);
+        if (!isCurrentBidOperation(operation)) return;
+        const clear = clearStoredBidRecovery(pendingBidKey, storageCleanupSubmission);
+        if (!clear.ok) {
+          setStorageRecoveryError(recoveryStorageMessage(clear.error));
+          return;
+        }
+        setStorageCleanupSubmission(null);
+        setStorageRecoveryError(null);
+        setMessage(null);
+      } catch (caught) {
+        if (isCurrentBidOperation(operation)) {
+          setTxStatus(unknownConfirmationState(storageCleanupSubmission.resolvedOutcome.hash, caught));
+          setMessage(walletErrorMessage(caught, "Unable to verify terminal transaction evidence."));
+        }
+      } finally {
+        finishBidOperation(operation);
       }
-      setStorageCleanupOutcome(undefined);
-      setStorageCleanupExpectedNewCap(null);
-      setStorageRecoveryError(null);
-      setMessage(null);
       return;
     }
 
@@ -1466,7 +1851,12 @@ export function WalletBidPanel({
       : deploymentError ?? bidActionState.disabledReason;
   const confirmationUnknown = txStatus?.phase === "confirmation-unknown";
   const bidResolutionLocked = confirmationUnknown || resolvedReplacement !== null || rejectedCleanupPending ||
-    preDispatchCleanupPending || storageRecoveryError !== null || storageCleanupOutcome !== undefined;
+    preDispatchCleanupPending || storageRecoveryError !== null || recoveryIdentityError !== null ||
+    storageCleanupSubmission !== null;
+  const hasRecoveryActions = Boolean(
+    (confirmationUnknown && txStatus?.txHash && !resolvedReplacement) ||
+    resolvedReplacement || (storageRecoveryError && !resolvedReplacement)
+  );
 
   return (
     <section aria-label="Bid participation" aria-busy={isDeploymentLoading || isLoadingBidData || isPlacingBid} className="bid-participation">
@@ -1544,16 +1934,30 @@ export function WalletBidPanel({
       {storageRecoveryError ? <StateNotice tone="error" title="Recovery storage unavailable" className="mt-4">
         {storageRecoveryError}
       </StateNotice> : null}
-      {confirmationUnknown && txStatus?.txHash && !resolvedReplacement ? <button type="button" className="bid-refresh" disabled={isPlacingBid || wrongNetwork || !isConnected}
-        onClick={checkSubmittedBid}>{isPlacingBid ? "Checking confirmation..." : "Check transaction confirmation"}</button> : null}
-      {resolvedReplacement ? <button type="button" className="bid-refresh" disabled={isPlacingBid || wrongNetwork || !isConnected}
-        onClick={retryResolvedReplacementRefresh}>{isPlacingBid ? "Refreshing resolved transaction..." : "Refresh resolved transaction state"}</button> : null}
-      {storageRecoveryError && !resolvedReplacement ? <button type="button" className="bid-refresh"
-        disabled={isPlacingBid || wrongNetwork || !isConnected} onClick={retryRecoveryStorageAccess}>
-        Retry recovery storage access
-      </button> : null}
+      {recoveryIdentityError ? <StateNotice tone="error" title="Recovery identity not verified" className="mt-4">
+        {recoveryIdentityError}
+      </StateNotice> : null}
       {message ? <p role="status" aria-live="polite" className="mt-4 text-sm leading-6 text-slate-200">{message}</p> : null}
-      {isConnected && !wrongNetwork ? <button type="button"
+      {hasRecoveryActions ? <div role="group" aria-label="Bid recovery actions" className="bid-recovery-actions">
+        <p className="bid-recovery-actions-copy">Resolve the retained transaction before preparing another bid.</p>
+        {confirmationUnknown && txStatus?.txHash && !resolvedReplacement ? <button type="button"
+          className="transaction-primary-action" disabled={isPlacingBid || wrongNetwork || !isConnected}
+          onClick={checkSubmittedBid}>{isPlacingBid ? "Checking confirmation..." : "Check transaction confirmation"}</button> : null}
+        {resolvedReplacement ? <button type="button" className="transaction-primary-action"
+          disabled={isPlacingBid || wrongNetwork || !isConnected} onClick={retryResolvedReplacementRefresh}>
+          {isPlacingBid ? "Refreshing resolved transaction..." : "Refresh resolved transaction state"}
+        </button> : null}
+        {storageRecoveryError && !resolvedReplacement ? <button type="button" className="transaction-secondary-action"
+          disabled={isPlacingBid || wrongNetwork || !isConnected} onClick={retryRecoveryStorageAccess}>
+          Retry recovery storage access
+        </button> : null}
+        {isConnected && !wrongNetwork ? <button type="button"
+          disabled={!auctionOpen || !deployment || isLoadingBidData || isPlacingBid}
+          onClick={() => readWalletBidData().catch((caught) => setMessage(walletErrorMessage(caught, "Unable to load wallet bid data.")))}
+          className="transaction-secondary-action">
+          {isLoadingBidData ? "Loading..." : "Refresh wallet bid data"}
+        </button> : null}
+      </div> : isConnected && !wrongNetwork ? <button type="button"
         disabled={!auctionOpen || !deployment || isLoadingBidData || isPlacingBid}
         onClick={() => readWalletBidData().catch((caught) => setMessage(walletErrorMessage(caught, "Unable to load wallet bid data.")))}
         className="bid-refresh">
