@@ -1527,6 +1527,27 @@ export function WalletBidPanel({
 
       if (!isCurrentBidOperation(operation)) return;
 
+      let reviewBlockIsCanonical = false;
+      try {
+        const reviewBlock = await publicClient.getBlock({ blockNumber: snapshot.blockNumber });
+        reviewBlockIsCanonical = reviewBlock.number === snapshot.blockNumber &&
+          isTransactionHash(reviewBlock.hash) &&
+          reviewBlock.hash.toLowerCase() === snapshot.lotIdentity.reviewBlock.hash.toLowerCase();
+      } catch {
+        // An unavailable canonical block cannot safely back a durable bid intent.
+      }
+      if (!isCurrentBidOperation(operation)) return;
+      if (!reviewBlockIsCanonical) {
+        setIsReviewingBid(false);
+        setTxStatus({
+          phase: "failed",
+          message: "Bid blocked before the wallet request.",
+          nextAction: "The review block changed or could not be verified. Refresh the auction and wallet bid data, then review the bid again."
+        });
+        requestAnimationFrame(() => inputRef.current?.focus());
+        return;
+      }
+
       const intent = establishDurableBidIntent(operationStorageKey);
       if (!intent.ok) {
         let detail = `${intent.error} No wallet request was opened. Enable session storage and try again.`;

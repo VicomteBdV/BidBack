@@ -154,6 +154,8 @@ function setupBid({
   preflightBlockNumber = 101n,
   historicalBlockHashOffset = 0n,
   postReceiptHistoricalBlockHashOffset = 0n,
+  reorgAtPreflightCapRead = false,
+  reorgAtSimulation = false,
   receiptBlockHashOffset = 0n,
   snapshotEscrowVault = testAddresses.escrowVault,
   preflightSnapshotEscrowVault,
@@ -180,6 +182,8 @@ function setupBid({
   preflightBlockNumber?: bigint;
   historicalBlockHashOffset?: bigint;
   postReceiptHistoricalBlockHashOffset?: bigint;
+  reorgAtPreflightCapRead?: boolean;
+  reorgAtSimulation?: boolean;
   receiptBlockHashOffset?: bigint;
   snapshotEscrowVault?: `0x${string}`;
   preflightSnapshotEscrowVault?: `0x${string}`;
@@ -231,6 +235,7 @@ function setupBid({
   let capReadCount = 0;
   let auctionReadCount = 0;
   let moduleReadCount = 0;
+  let preflightReorgHashOffset = 0n;
   const readContract = vi.fn(async ({ functionName }: { functionName: string }) => {
     if (functionName === "getAuction") {
       auctionReadCount += 1;
@@ -264,6 +269,7 @@ function setupBid({
     }
     if (functionName === "capOf") {
       capReadCount += 1;
+      if (reorgAtPreflightCapRead && capReadCount === 2) preflightReorgHashOffset = 1n;
       return capReadCount === 1 ? currentCap : preflightCurrentCap ?? currentCap;
     }
     throw new Error(`Unexpected read: ${functionName}`);
@@ -283,6 +289,7 @@ function setupBid({
     });
   });
   const simulateContract = vi.fn(async (request: unknown) => {
+    if (reorgAtSimulation) preflightReorgHashOffset = 1n;
     if (simulationError) throw simulationError;
     return { request };
   });
@@ -294,7 +301,8 @@ function setupBid({
       historicalBlockReadCounts.set(request.blockNumber, historicalReadCount);
       const offset = request.blockNumber === 102n
         ? receiptBlockHashOffset
-        : historicalBlockHashOffset + (historicalReadCount > 1 ? postReceiptHistoricalBlockHashOffset : 0n);
+        : historicalBlockHashOffset + preflightReorgHashOffset +
+          (historicalReadCount > 1 ? postReceiptHistoricalBlockHashOffset : 0n);
       return {
         timestamp: latestBlockTimestamp,
         number: request.blockNumber,
@@ -596,6 +604,42 @@ describe("WalletBidPanel", () => {
     expect(window.sessionStorage).toHaveLength(0);
   });
 
+  it.each([
+    { label: "during the preflight reads", reorgAtPreflightCapRead: true },
+    { label: "during simulation", reorgAtSimulation: true }
+  ])("blocks a same-height reorg $label before persisting intent or opening the wallet", async (reorg) => {
+    const { getBlock, simulateContract, writeContract } = setupBid(reorg);
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    expect(await screen.findByText("Bid blocked before the wallet request.")).toBeInTheDocument();
+    expect(screen.getByText(/The review block changed or could not be verified\. Refresh the auction and wallet bid data, then review the bid again\./))
+      .toBeInTheDocument();
+    expect(simulateContract).toHaveBeenCalledTimes(1);
+    expect(getBlock).toHaveBeenCalledWith({ blockNumber: 101n });
+    expect(writeContract).not.toHaveBeenCalled();
+    expect(providerB.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: "eth_sendTransaction" }));
+    expect(window.sessionStorage).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Review bid" })).toBeEnabled();
+  });
+
+  it("verifies the review block after simulation and before dispatch on the normal bid path", async () => {
+    const { getBlock, simulateContract, writeContract } = setupBid();
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+
+    await waitFor(() => expect(writeContract).toHaveBeenCalledTimes(1));
+    const reviewBlockCall = getBlock.mock.calls.findIndex(([request]) => request?.blockNumber === 101n);
+    expect(reviewBlockCall).toBeGreaterThanOrEqual(0);
+    expect(simulateContract.mock.invocationCallOrder[0]).toBeLessThan(getBlock.mock.invocationCallOrder[reviewBlockCall]);
+    expect(getBlock.mock.invocationCallOrder[reviewBlockCall]).toBeLessThan(writeContract.mock.invocationCallOrder[0]);
+    expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+  });
+
   it("uses the latest block timestamp and blocks an expired bid before requesting a signature", async () => {
     const { getBlock, writeContract, waitForTransactionReceipt } = setupBid({
       latestBlockTimestamp: 1_000n,
@@ -892,7 +936,7 @@ describe("WalletBidPanel", () => {
   });
 
   it("rechecks the review block after a receipt and keeps an orphaned preflight marker locked", async () => {
-    const { onBidComplete } = setupBid({ historicalBlockHashOffset: 10_000n });
+    const { onBidComplete } = setupBid({ postReceiptHistoricalBlockHashOffset: 10_000n });
     const review = await screen.findByRole("button", { name: "Review bid" });
     await waitFor(() => expect(review).toBeEnabled());
     fireEvent.click(review);
