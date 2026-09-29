@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useConfig, type Connector } from "wagmi";
 import { shortenAddress } from "@/lib/format";
-import { targetChainId, targetChainLabel, targetChainName } from "@/lib/chains";
+import { targetChainLabel, targetChainName } from "@/lib/chains";
 import {
   providerErrorCode,
   switchToTargetChain,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/walletNetwork";
 
 import { getConnectedWalletProvider } from "@/lib/walletProvider";
+import { useActiveWalletChain } from "@/lib/useActiveWalletChain";
 
 function walletName(connector: Connector) {
   return connector.id === "injected" ? "Browser wallet" : connector.name.trim() || "Browser wallet";
@@ -20,8 +21,9 @@ export function WalletButton() {
   const instanceId = useId();
   const unavailableId = `${instanceId}-wallet-connect-unavailable`;
   const readOnlyId = `${instanceId}-wallet-connect-read-only-note`;
-  const { address, chainId, isConnected, connector } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const config = useConfig();
+  const walletChain = useActiveWalletChain(connector, address, isConnected);
   const { connectors, connect, isPending, error, reset } = useConnect();
   const { disconnect } = useDisconnect();
 
@@ -57,7 +59,7 @@ export function WalletButton() {
     : providerErrorCode(error) === -32002
       ? "A wallet request is already pending. Open your wallet to continue."
       : "Unable to connect this wallet. Open or unlock it and try again." : null;
-  const isWrongNetwork = isConnected && chainId !== targetChainId;
+  const isWrongNetwork = isConnected && walletChain.status === "wrong";
   const switchButtonLabel = targetChainName ? `Switch to ${targetChainName}` : "Switch to target chain";
   const connectUnavailableMessage = discovering
     ? "Checking for browser wallets..."
@@ -81,8 +83,10 @@ export function WalletButton() {
       const provider = await getConnectedWalletProvider(config, connector, address);
 
       await switchToTargetChain(provider);
-
-      setNetworkMessage(`Switch request sent. Confirm ${targetChainLabel} in your wallet if prompted.`);
+      const verified = await walletChain.refresh();
+      setNetworkMessage(verified.status === "target"
+        ? `Wallet network verified on ${targetChainLabel}.`
+        : `Switch request sent. Confirm ${targetChainLabel} in your wallet if prompted.`);
     } catch (caught) {
       setNetworkMessage(walletNetworkErrorMessage(caught));
     } finally {
@@ -152,7 +156,7 @@ export function WalletButton() {
       {isWrongNetwork ? (
         <div className="max-w-md rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
           <p>
-            Wallet connected, but not on the target chain ({targetChainLabel}). Read-only deployment view remains
+            Wrong network. Wallet connected, but not on the target chain ({targetChainLabel}). Read-only deployment view remains
             available.
           </p>
 
@@ -167,9 +171,15 @@ export function WalletButton() {
 
           {networkMessage ? <p role="status" aria-live="polite" className="mt-2 text-amber-50">{networkMessage}</p> : null}
         </div>
-      ) : (
+      ) : walletChain.status === "target" ? (
         <p className="max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
           Wallet connected on {targetChainLabel}.
+        </p>
+      ) : (
+        <p role="status" className="max-w-sm rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+          {walletChain.status === "checking"
+            ? "Checking the connected wallet network..."
+            : "Unable to verify the connected wallet network. Unlock or reconnect your wallet, then try again."}
         </p>
       )}
     </div>

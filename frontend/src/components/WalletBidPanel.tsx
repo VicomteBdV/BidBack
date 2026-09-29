@@ -9,6 +9,7 @@ import {
 } from "viem";
 import { useAccount, useConfig } from "wagmi";
 import { createConnectedWalletClients } from "@/lib/walletProvider";
+import { useActiveWalletChain } from "@/lib/useActiveWalletChain";
 import { WalletButton } from "@/components/WalletButton";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { TransactionReview } from "@/components/TransactionReview";
@@ -66,7 +67,8 @@ async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
     );
   }
 
-  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+  if (typeof walletChainId !== "string" || !/^0x[0-9a-f]+$/i.test(walletChainId) ||
+    Number(walletChainId) !== targetChainId) {
     throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
   }
 }
@@ -841,6 +843,8 @@ export function WalletBidPanel({
 }) {
   const { address, chainId, isConnected, connector } = useAccount();
   const config = useConfig();
+  const walletChain = useActiveWalletChain(connector, address, isConnected);
+  const wrongNetwork = isConnected && walletChain.status !== "target";
 
   const [deployment, setDeployment] = useState<Deployment | null>(null);
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
@@ -869,6 +873,7 @@ export function WalletBidPanel({
   const identity = [
     address,
     chainId,
+    walletChain.chainId,
     connector?.uid,
     expectedChainId,
     expectedAuctionHouse.toLowerCase(),
@@ -901,7 +906,6 @@ export function WalletBidPanel({
     if (isReviewingBid) reviewRef.current?.focus();
   }, [isReviewingBid]);
 
-  const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionOpen = auction.state === 0;
   const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
   const targetBindingError = expectedChainId !== targetChainId
@@ -910,9 +914,9 @@ export function WalletBidPanel({
       ? `The displayed AuctionHouse (${expectedAuctionHouse}) does not match the configured AuctionHouse (${deployment.contracts.auctionHouse}). Bidding is locked.`
       : null;
   const pendingBidKey = useMemo(() => {
-    if (!deployment || !address || !isConnected || wrongNetwork || targetBindingError) return null;
+    if (!deployment || !address || !isConnected || walletChain.chainId !== targetChainId || targetBindingError) return null;
     return pendingBidStorageKey(deployment.contracts.auctionHouse, auction.auctionId, address);
-  }, [address, auction.auctionId, deployment, isConnected, targetBindingError, wrongNetwork]);
+  }, [address, auction.auctionId, deployment, isConnected, targetBindingError, walletChain.chainId]);
 
   const auctionIdBigInt = useMemo(() => {
     if (!/^\d+$/.test(auction.auctionId)) return null;
@@ -972,7 +976,7 @@ export function WalletBidPanel({
     setRejectedCleanupPending(false);
     setPreDispatchCleanupPending(false);
     setIsReviewingBid(false);
-  }, [address, chainId, connector?.uid, expectedAuctionHouse, expectedChainId, auction.auctionId,
+  }, [address, chainId, walletChain.chainId, connector?.uid, expectedAuctionHouse, expectedChainId, auction.auctionId,
     auction.seller, auction.nft, auction.tokenId, auction.startPrice, auction.startTime,
     auction.initialEndTime, isConnected]);
 
@@ -1249,7 +1253,7 @@ export function WalletBidPanel({
   }
 
   useEffect(() => {
-    if (!deployment || !address || !isConnected || wrongNetwork || !auctionOpen) return;
+    if (!deployment || !address || !isConnected || wrongNetwork || !auctionOpen || activeOperationRef.current) return;
 
     readWalletBidData().catch((caught) => {
       setMessage(walletErrorMessage(caught, "Unable to load wallet bid data."));
@@ -1401,6 +1405,7 @@ export function WalletBidPanel({
 
   async function placeWalletBid() {
     if (activeOperationRef.current?.identity === identity ||
+      wrongNetwork ||
       txStatus?.phase === "confirmation-unknown" || resolvedReplacement ||
       storageRecoveryError || recoveryIdentityError || storageCleanupSubmission || preDispatchCleanupPending) return;
 
@@ -1867,6 +1872,10 @@ export function WalletBidPanel({
 
   const unavailable = !isConnected
     ? "Connect a wallet to see your cap and prepare a bid. Browsing stays available without a wallet."
+    : walletChain.status === "checking"
+      ? "Checking your connected wallet network before preparing a bid."
+    : walletChain.status === "unavailable"
+      ? "Unable to verify your connected wallet network. Unlock or reconnect your wallet to continue."
     : wrongNetwork
       ? `Switch your wallet to ${targetChainLabel} to continue.`
       : deploymentError ?? bidActionState.disabledReason;
@@ -1988,7 +1997,9 @@ export function WalletBidPanel({
         <div className="grid min-w-0 gap-3 text-sm">
           <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
           <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
-          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="Wallet chain" value={!isConnected ? "Not connected"
+            : walletChain.status === "checking" ? "Checking..."
+            : walletChain.status === "unavailable" || walletChain.chainId === null ? "Not verified" : String(walletChain.chainId)} />
           <InfoItem label="AuctionHouse" value={deployment ? deployment.contracts.auctionHouse : "Not loaded"} mono />
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-400">Your wallet must reach the configured RPC. A forwarded local Anvil RPC may be unavailable to browser wallets.</p>

@@ -8,7 +8,10 @@ import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
-vi.mock("wagmi", () => ({ useAccount: vi.fn(), useConfig: vi.fn(() => ({})) }));
+vi.mock("wagmi", () => {
+  const config = {};
+  return { useAccount: vi.fn(), useConfig: vi.fn(() => config) };
+});
 vi.mock("@/components/WalletButton", () => ({ WalletButton: () => <button>Connect or switch wallet</button> }));
 vi.mock("wagmi/actions", () => ({ getAccount: () => useAccount() }));
 vi.mock("viem", async () => {
@@ -121,7 +124,7 @@ type ReceiptWaitRequest = {
 };
 
 const providerA = { request: vi.fn() };
-const providerB = { request: vi.fn(async ({ method }: { method: string }) =>
+const providerB = { request: vi.fn(async ({ method }: { method: string }): Promise<unknown> =>
   method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69") };
 const connectorB = { uid: "wallet-b", name: "Wallet B", getProvider: vi.fn(async () => providerB) };
 
@@ -170,6 +173,7 @@ function setupBid({
   receipt,
   simulationError,
   writeError,
+  providerChainId = "0x7a69",
   onBidComplete = vi.fn(async () => undefined)
 }: {
   currentCap?: bigint;
@@ -198,6 +202,7 @@ function setupBid({
   receipt?: MockReceipt | Error;
   simulationError?: unknown;
   writeError?: unknown;
+  providerChainId?: string;
   onBidComplete?: () => Promise<void>;
 } = {}) {
   vi.mocked(useAccount).mockReturnValue({
@@ -340,7 +345,7 @@ function setupBid({
   })));
   providerA.request.mockReset();
   providerB.request.mockReset();
-  providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69");
+  providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : providerChainId);
   Object.defineProperty(window, "ethereum", { configurable: true, value: providerA });
 
   const view = render(
@@ -387,6 +392,35 @@ beforeEach(() => {
 });
 
 describe("WalletBidPanel", () => {
+  it("blocks bid preparation when wagmi says Anvil but the selected provider is on Ethereum", async () => {
+    const { getBlock, readContract, writeContract } = setupBid({ providerChainId: "0x1" });
+    expect(await screen.findByText(/Switch your wallet to Anvil 31337 to continue/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review bid" })).not.toBeInTheDocument();
+    expect(screen.getByText("Wallet chain").nextElementSibling).toHaveTextContent("1");
+    expect(getBlock).not.toHaveBeenCalled();
+    expect(readContract).not.toHaveBeenCalled();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
+  it("keeps an in-flight wallet request recoverable when focus triggers a network recheck", async () => {
+    const { writeContract } = setupBid();
+    let finishWalletRequest!: () => void;
+    providerB.request.mockImplementation(async ({ method }) => {
+      if (method === "eth_accounts") return [vi.mocked(useAccount)().address];
+      if (method === "eth_sendTransaction") return new Promise<void>((resolve) => { finishWalletRequest = resolve; });
+      return "0x7a69";
+    });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    await waitFor(() => expect(providerB.request).toHaveBeenCalledWith(expect.objectContaining({ method: "eth_sendTransaction" })));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(writeContract).toHaveBeenCalledTimes(1);
+    await act(async () => { finishWalletRequest(); });
+    expect(await screen.findByText("Bid placed with 1.2 ETH sent.")).toBeInTheDocument();
+  });
+
   it.each([
     {
       label: "chain",
@@ -1508,12 +1542,15 @@ describe("WalletBidPanel", () => {
   it.each([false, true])("offers wallet recovery and blocks bidding when wrongNetwork=%s", async (wrongNetwork) => {
     const { view, writeContract } = setupBid();
     await screen.findByRole("button", { name: "Review bid" });
+    if (wrongNetwork) providerB.request.mockImplementation(async ({ method }) =>
+      method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x1");
     vi.mocked(useAccount).mockReturnValue({ address: wrongNetwork ? testAddresses.primaryBidder : undefined,
       chainId: 1, isConnected: wrongNetwork, connector: connectorB } as unknown as ReturnType<typeof useAccount>);
     view.rerender(<WalletBidPanel auction={auctionDetailFixture.auction}
       expectedChainId={auctionDetailFixture.chainId} expectedAuctionHouse={auctionDetailFixture.auctionHouse}
       onBidComplete={async () => undefined} />);
-    expect(screen.getByRole("button", { name: "Connect or switch wallet" })).toBeInTheDocument();
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByRole("button", { name: "Connect or switch wallet" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Review bid" })).not.toBeInTheDocument();
     expect(writeContract).not.toHaveBeenCalled();
   });
