@@ -4,7 +4,7 @@ import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { formatAddressOrNone, formatEth, formatTimestamp, shortenAddress } from "@/lib/format";
 
-export function AuctionSummary({ auction }: { auction: SerializedAuction }) {
+export function AuctionSummary({ auction, participation }: { auction: SerializedAuction; participation?: React.ReactNode }) {
   const lifecycle = getAuctionLifecycle(auction);
   const hasBid = auction.highestBid !== "0";
   const headlinePriceLabel = auction.finalized ? "Final price" : hasBid ? "Current price" : "Opening price";
@@ -13,8 +13,8 @@ export function AuctionSummary({ auction }: { auction: SerializedAuction }) {
 
   return (
     <section className="premium-surface overflow-hidden p-3 sm:p-5 lg:p-6" aria-labelledby="auction-overview-title">
-      <div className="grid gap-5 lg:grid-cols-[minmax(360px,1.18fr)_minmax(320px,0.82fr)] lg:items-center lg:gap-7">
-        <div>
+      <div className="auction-participation-layout">
+        <div className="auction-participation-art">
           <NftPreview
             metadata={auction.nftMetadata}
             contractAddress={auction.nft}
@@ -24,7 +24,7 @@ export function AuctionSummary({ auction }: { auction: SerializedAuction }) {
           />
         </div>
 
-        <div className="flex min-w-0 flex-col">
+        <div className="auction-participation-overview flex min-w-0 flex-col">
           <div className="flex flex-wrap items-center gap-2">
             <span className="auction-summary-status">{lifecycle.statusLabel}</span>
           </div>
@@ -61,6 +61,7 @@ export function AuctionSummary({ auction }: { auction: SerializedAuction }) {
             </div>
           </div>
         </div>
+        {participation ? <div className="auction-participation-action">{participation}</div> : null}
       </div>
     </section>
   );
