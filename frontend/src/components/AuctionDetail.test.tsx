@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AuctionDetail } from "@/components/AuctionDetail";
 import type { SerializedAuction } from "@/lib/auctionTypes";
@@ -14,12 +14,31 @@ vi.mock("@/components/AuctionDevActions", () => ({
   )
 }));
 
+const bidPanel = vi.hoisted(() => ({
+  refresh: null as null | (() => Promise<void>),
+  expectedChainId: null as number | null,
+  expectedAuctionHouse: null as `0x${string}` | null
+}));
+
 vi.mock("@/components/WalletBidPanel", () => ({
-  WalletBidPanel: () => (
+  WalletBidPanel: ({
+    onBidComplete,
+    expectedChainId,
+    expectedAuctionHouse
+  }: {
+    onBidComplete: () => Promise<void>;
+    expectedChainId: number;
+    expectedAuctionHouse: `0x${string}`;
+  }) => {
+    bidPanel.refresh = onBidComplete;
+    bidPanel.expectedChainId = expectedChainId;
+    bidPanel.expectedAuctionHouse = expectedAuctionHouse;
+    return (
     <section>
       <h3>Wallet-signed bid</h3>
     </section>
-  )
+  );
+  }
 }));
 
 vi.mock("@/components/WalletFinalizePanel", () => ({
@@ -81,6 +100,16 @@ function mockAuctionDetailFetch(auction: SerializedAuction = auctionDetailFixtur
 }
 
 describe("AuctionDetail", () => {
+  it("reports a failed post-bid refresh to the wallet panel while preserving the auction", async () => {
+    mockAuctionDetailFetch({ ...auctionDetailFixture.auction, state: 0, finalized: false,
+      endTime: "9999999999", chainTimestamp: "1" });
+    render(<AuctionDetail auctionId="1" />);
+    await screen.findByRole("heading", { name: "Wallet-signed bid" });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ error: "RPC unavailable" }), { status: 503 }));
+    await act(async () => { await expect(bidPanel.refresh!()).rejects.toThrow("RPC unavailable"); });
+    expect(screen.getByText("Auction refresh failed")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "BidBack Demo NFT #1", level: 1 })).toBeInTheDocument();
+  });
   it("renders the consolidated detail page sections", async () => {
     mockAuctionDetailFetch();
 
@@ -138,6 +167,8 @@ describe("AuctionDetail", () => {
     render(<AuctionDetail auctionId="1" />);
 
     expect(await screen.findByRole("heading", { name: "Wallet-signed bid" })).toBeInTheDocument();
+    expect(bidPanel.expectedChainId).toBe(auctionDetailFixture.chainId);
+    expect(bidPanel.expectedAuctionHouse).toBe(auctionDetailFixture.auctionHouse);
     expect(screen.queryByRole("heading", { name: "Wallet-signed finalization" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wallet-signed claims / withdrawals" })).not.toBeInTheDocument();
   });

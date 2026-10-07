@@ -116,6 +116,24 @@ export const auctionHouseAbi = [
   },
   {
     type: "function",
+    name: "getAuctionModules",
+    stateMutability: "view",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "nftVault", type: "address" },
+          { name: "escrowVault", type: "address" },
+          { name: "distributionVault", type: "address" },
+          { name: "reputationAdapter", type: "address" }
+        ]
+      }
+    ]
+  },
+  {
+    type: "function",
     name: "getAuctionParams",
     stateMutability: "view",
     inputs: [{ name: "auctionId", type: "uint256" }],

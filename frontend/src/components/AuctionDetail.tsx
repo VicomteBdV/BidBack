@@ -33,7 +33,7 @@ export function AuctionDetail({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadAuction = useCallback(async () => {
+  const loadAuction = useCallback(async (propagateError = false) => {
     try {
       setIsLoading(true);
 
@@ -51,6 +51,7 @@ export function AuctionDetail({
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to read auction");
+      if (propagateError) throw caught;
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +80,7 @@ export function AuctionDetail({
           action={
             <button
               type="button"
-              onClick={loadAuction}
+              onClick={() => loadAuction()}
               className="inline-flex min-h-9 items-center justify-center rounded-md border border-rose-200/50 px-3 text-xs font-semibold text-white transition hover:border-white"
             >
               Try again
@@ -108,7 +109,33 @@ export function AuctionDetail({
 
   return (
     <div aria-busy={isLoading} className="min-w-0 grid gap-5">
-      <AuctionSummary auction={auction} />
+      <AuctionSummary
+        auction={auction}
+        participation={
+          <SectionCard
+            title="Wallet-signed actions"
+            badges={<ModeBadge variant="wallet-signed" />}
+            className="participation-section"
+          >
+            {lifecycle.canBid ? (
+              <WalletBidPanel
+                auction={auction}
+                expectedChainId={data.chainId}
+                expectedAuctionHouse={data.auctionHouse}
+                onBidComplete={() => loadAuction(true)}
+              />
+            ) : lifecycle.canFinalize ? (
+              <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
+            ) : lifecycle.isFinalized ? (
+              <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
+            ) : (
+              <StateNotice tone="warning" title="Action state unavailable">
+                Refresh the auction before choosing a wallet-signed action.
+              </StateNotice>
+            )}
+          </SectionCard>
+        }
+      />
 
       {isLoading ? (
         <StateNotice tone="loading" title="Refreshing auction">
@@ -127,7 +154,7 @@ export function AuctionDetail({
         <p className="text-xs leading-5 text-slate-500">Live read-only lot data remains available without connecting a wallet.</p>
         <button
           type="button"
-          onClick={loadAuction}
+          onClick={() => loadAuction()}
           disabled={isLoading}
           className="secondary-link w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
@@ -137,25 +164,6 @@ export function AuctionDetail({
 
       <div className="auction-detail-layout">
         <div className="auction-detail-main">
-          <SectionCard
-            title="Wallet-signed actions"
-            badges={<ModeBadge variant="wallet-signed" />}
-            description="The primary action family follows the authoritative auction lifecycle. Each transaction is reviewed and signed directly by the connected wallet."
-            className="premium-surface"
-          >
-            {lifecycle.canBid ? (
-              <WalletBidPanel auction={auction} onBidComplete={loadAuction} />
-            ) : lifecycle.canFinalize ? (
-              <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
-            ) : lifecycle.isFinalized ? (
-              <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
-            ) : (
-              <StateNotice tone="warning" title="Action state unavailable">
-                Refresh the auction before choosing a wallet-signed action.
-              </StateNotice>
-            )}
-          </SectionCard>
-
           {localDevActionsEnabled ? (
             <AuctionDevActions
               auctionId={auction.auctionId}
