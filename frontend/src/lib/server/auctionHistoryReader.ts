@@ -94,15 +94,6 @@ function normalizeLogIndex(value: number | bigint | null | undefined, fallback: 
   return fallback;
 }
 
-function errorMessage(error: unknown) {
-  if (error && typeof error === "object" && "shortMessage" in error) {
-    const shortMessage = (error as { shortMessage?: unknown }).shortMessage;
-    if (typeof shortMessage === "string") return shortMessage;
-  }
-
-  return error instanceof Error ? error.message : String(error);
-}
-
 function parseAmount(value?: string | null) {
   try {
     return BigInt(value ?? "0");
@@ -202,11 +193,11 @@ async function readBidRecords({
           ? `Bid history is limited to the latest ${MAX_BID_HISTORY_RECORDS} bid records.`
           : undefined
     };
-  } catch (error) {
+  } catch {
     return {
       readSucceeded: false,
       bids: [],
-      warning: `Unable to read bid records from AuctionHouse.getBid: ${errorMessage(error)}`
+      warning: "Unable to read bid records from AuctionHouse.getBid."
     };
   }
 }
@@ -240,10 +231,10 @@ async function readEventsForConfig({
         fallbackIndex: index
       }))
     };
-  } catch (error) {
+  } catch {
     return {
       logs: [],
-      warning: `Unable to read ${config.source}.${config.eventName} logs: ${errorMessage(error)}`
+      warning: `Unable to read ${config.source}.${config.eventName} logs.`
     };
   }
 }
@@ -360,8 +351,8 @@ async function readBlockTimestamps(client: PublicClient, logs: TaggedHistoryLog[
       try {
         const block = await blockClient.getBlock({ blockNumber });
         timestamps.set(blockNumber.toString(), toDecimalString(block.timestamp));
-      } catch (error) {
-        warnings.push(`Unable to read timestamp for block ${blockNumber.toString()}: ${errorMessage(error)}`);
+      } catch {
+        warnings.push(`Unable to read timestamp for block ${blockNumber.toString()}.`);
       }
     })
   );

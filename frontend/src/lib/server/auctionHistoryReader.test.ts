@@ -208,7 +208,7 @@ describe("auctionHistoryReader", () => {
 
     expect(history.source).toBe("bid-records-only");
     expect(history.partial).toBe(true);
-    expect(history.warnings.join(" ")).toMatch(/log failure/);
+    expect(history.warnings.join(" ")).toContain("Unable to read AuctionHouse.BidPlaced logs.");
     expect(history.bids).toHaveLength(1);
     expect(history.events).toEqual([]);
   });

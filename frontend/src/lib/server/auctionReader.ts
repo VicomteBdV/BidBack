@@ -368,15 +368,6 @@ function sameAddress(a?: string | null, b?: string | null) {
   return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
 }
 
-function errorMessage(error: unknown) {
-  if (error && typeof error === "object" && "shortMessage" in error) {
-    const shortMessage = (error as { shortMessage?: unknown }).shortMessage;
-    if (typeof shortMessage === "string") return shortMessage;
-  }
-
-  return error instanceof Error ? error.message : String(error);
-}
-
 function serializeAuction(auctionId: bigint, raw: unknown, chainTimestamp: string): SerializedAuction {
   const state = toAuctionState(getField(raw, "state", 8));
 
@@ -561,14 +552,14 @@ async function discoverAuctionIds({
         warning: "No AuctionCreated logs were returned; used bounded nextAuctionId fallback."
       }
     };
-  } catch (error) {
+  } catch {
     return {
       ids: fallbackAuctionIdsFromNextId(nextAuctionId, limit),
       discovery: {
         strategy: "nextAuctionIdFallback",
         limit,
         requestedLimit,
-        warning: `AuctionCreated event scan failed; used bounded nextAuctionId fallback: ${errorMessage(error)}`
+        warning: "AuctionCreated event scan failed; used bounded nextAuctionId fallback."
       }
     };
   }
@@ -817,8 +808,8 @@ async function readAuctionFeeRecipientSnapshot(
       args: [BigInt(auction.auctionId)],
       blockNumber: auction.readBlockNumber ? BigInt(auction.readBlockNumber) : undefined
     });
-  } catch (error) {
-    auction.auctionFeeRecipientError = `Unable to read auction fee recipient snapshot: ${errorMessage(error)}`;
+  } catch {
+    auction.auctionFeeRecipientError = "Unable to read auction fee recipient snapshot.";
   }
 }
 
@@ -843,8 +834,15 @@ export async function readAuctionSettlementReadiness(
 
   const auctionId = BigInt(auction.auctionId);
   const blockNumber = BigInt(auction.readBlockNumber);
+  // Only errors created here may supply diagnostic text; RPC errors are untrusted.
+  const validationErrors = new Set<Error>();
+  const invalid = (message: string) => {
+    const error = new Error(message);
+    validationErrors.add(error);
+    return error;
+  };
   const uint = (value: unknown): bigint => {
-    if (typeof value !== "bigint" || value < 0n) throw new Error("Invalid economic amount.");
+    if (typeof value !== "bigint" || value < 0n) throw invalid("Invalid economic amount.");
     return value;
   };
   const noBids = auction.participantCount === "0" && auction.highestBid === "0" &&
@@ -868,11 +866,11 @@ export async function readAuctionSettlementReadiness(
           participants.length > limit || BigInt(participants.length) !== BigInt(auction.participantCount) ||
           participants.some((participant) => !isAddress(participant) || sameAddress(participant, ZERO_ADDRESS)) ||
           new Set(participants.map((participant) => participant.toLowerCase())).size !== participants.length) {
-        throw new Error("Participant reads are incomplete or exceed the contract limit.");
+        throw invalid("Participant reads are incomplete or exceed the contract limit.");
       }
       const settled = getField(settlement, "finalized", 0);
       if (settled !== true && !(noBids && settled === false)) {
-        throw new Error("ETH settlement is not confirmed.");
+        throw invalid("ETH settlement is not confirmed.");
       }
       // Each pair preserves the difference between zero and an already claimed amount.
       const refunds: PromiseSettledResult<bigint>[] = [];
@@ -890,13 +888,13 @@ export async function readAuctionSettlementReadiness(
           const amount = amountRead.value;
           const claimed = claimedRead.value;
           uint(amount);
-          if (typeof claimed !== "boolean") throw new Error("Refund claim status is unavailable.");
+          if (typeof claimed !== "boolean") throw invalid("Refund claim status is unavailable.");
           return claimed ? 0n : amount;
         })));
       }
       result.participantsRead = refunds.filter((read) => read.status === "fulfilled").length;
       if (refunds.some((read) => read.status === "rejected")) {
-        throw new Error("Some participant refunds are unavailable.");
+        throw invalid("Some participant refunds are unavailable.");
       }
       result.refunds = known(refunds.reduce((total, read) => total + (read.status === "fulfilled" ? read.value : 0n), 0n));
     })(),
@@ -907,7 +905,7 @@ export async function readAuctionSettlementReadiness(
       const assigned = uint(getField(raw, "totalAssigned", 1));
       const claimed = uint(getField(raw, "totalClaimed", 2));
       if (claimed > assigned || (opened !== true && !(noBids && opened === false && assigned === 0n && claimed === 0n))) {
-        throw new Error("Redistribution settlement is unavailable or inconsistent.");
+        throw invalid("Redistribution settlement is unavailable or inconsistent.");
       }
       result.redistribution = known(assigned - claimed);
     })(),
@@ -919,16 +917,24 @@ export async function readAuctionSettlementReadiness(
     })(),
     (async () => {
       // Never substitute the current global fee recipient for the auction snapshot.
-      if (!auction.auctionFeeRecipient) throw new Error("Auction fee recipient is unavailable.");
+      if (!auction.auctionFeeRecipient) throw invalid("Auction fee recipient is unavailable.");
       result.protocolWalletCredit = known(uint(await client.readContract({
         address: deployment.contracts.escrowVault, abi: escrowVaultAbi,
         functionName: "protocolFeeCredits", args: [auction.auctionFeeRecipient], blockNumber
       })));
     })()
   ]);
-  for (const read of reads) {
-    if (read.status === "rejected") result.warnings.push(errorMessage(read.reason));
-  }
+  const readWarnings = [
+    "Unable to read participant refunds.",
+    "Unable to read redistribution settlement.",
+    "Unable to read seller wallet credit.",
+    "Unable to read protocol wallet credit."
+  ];
+  reads.forEach((read, index) => {
+    if (read.status === "rejected") {
+      result.warnings.push(validationErrors.has(read.reason) ? read.reason.message : readWarnings[index]);
+    }
+  });
   result.status = reads.every((read) => read.status === "fulfilled") ? "complete"
     : reads.every((read) => read.status === "rejected") ? "unavailable" : "partial";
   return result;
@@ -1060,8 +1066,8 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     });
 
     auction.paramsSnapshot = serializeAuctionParams(rawParams);
-  } catch (error) {
-    auction.paramsSnapshotError = `Unable to read auction parameter snapshot: ${errorMessage(error)}`;
+  } catch {
+    auction.paramsSnapshotError = "Unable to read auction parameter snapshot.";
   }
 
   await readAuctionFeeRecipientSnapshot(auction, deployment, client);
@@ -1073,8 +1079,8 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
 
   try {
     auction.economics = await readAuctionEconomics(auctionId, auction, deployment, client);
-  } catch (error) {
-    economicWarnings.push(`Unable to read detailed auction economics: ${errorMessage(error)}`);
+  } catch {
+    economicWarnings.push("Unable to read detailed auction economics.");
   }
 
   auction.economicSummary = buildAuctionEconomicSummary(auction, {

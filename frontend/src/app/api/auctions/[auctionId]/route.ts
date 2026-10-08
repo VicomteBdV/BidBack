@@ -3,10 +3,6 @@ import { AuctionNotFoundError, readAuctionById } from "@/lib/server/auctionReade
 
 export const dynamic = "force-dynamic";
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unable to read auction";
-}
-
 export async function GET(_request: Request, context: { params: Promise<{ auctionId: string }> }) {
   const { auctionId } = await context.params;
 
@@ -16,7 +12,7 @@ export async function GET(_request: Request, context: { params: Promise<{ auctio
   } catch (error) {
     return NextResponse.json(
       {
-        error: errorMessage(error)
+        error: error instanceof AuctionNotFoundError ? "Auction not found" : "Unable to read auction"
       },
       {
         status: error instanceof AuctionNotFoundError ? 404 : 503

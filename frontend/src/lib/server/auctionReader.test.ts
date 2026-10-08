@@ -344,7 +344,7 @@ describe("catalog settlement evidence through discovery and filtering", () => {
     expect(payload.auctions[0].settlementReadiness?.status).toBe("partial");
     expect(payload.auctions[0].settlementReadiness?.[field]).toEqual({ status: "unavailable" });
     if (fail === "getAuctionFeeRecipient") {
-      expect(payload.auctions[0].auctionFeeRecipientError).toContain("snapshot unavailable");
+      expect(payload.auctions[0].auctionFeeRecipientError).toBe("Unable to read auction fee recipient snapshot.");
       expect(readContract).not.toHaveBeenCalledWith(expect.objectContaining({ functionName: "protocolFeeCredits" }));
       expect(readContract).not.toHaveBeenCalledWith(expect.objectContaining({ functionName: "feeRecipient" }));
     }
