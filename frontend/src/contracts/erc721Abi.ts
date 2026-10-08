@@ -1,5 +1,14 @@
 export const erc721Abi = [
   {
+    type: "event",
+    name: "Approval",
+    inputs: [
+      { name: "owner", type: "address", indexed: true },
+      { name: "approved", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true }
+    ]
+  },
+  {
     type: "function",
     name: "name",
     stateMutability: "view",

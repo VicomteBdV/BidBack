@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  decodeEventLog,
+  encodeFunctionData,
   type Address,
   type EIP1193Provider,
   type PublicClient
@@ -32,9 +32,13 @@ import {
   confirmedTransactionState,
   failedTransactionState,
   pendingTransactionState,
-  receiptWasSuccessful,
+  confirmWalletTransaction,
+  matchingWalletActionEvents,
   refreshingTransactionState,
-  revertedTransactionState,
+  walletConfirmationState,
+  walletTransactionSubmission,
+  type WalletConfirmationResult,
+  type WalletTransactionSubmission,
   unknownConfirmationState,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
@@ -144,6 +148,13 @@ export function WalletCreateAuctionForm() {
   const [approvalTxStatus, setApprovalTxStatus] = useState<WalletTransactionState | null>(null);
   const [createTxStatus, setCreateTxStatus] = useState<WalletTransactionState | null>(null);
   const [createdAuctionId, setCreatedAuctionId] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const recovery = useRef<{ action: "approve" | "create"; submission: WalletTransactionSubmission; contextKey: string;
+    values: Readonly<{ nftContract: string; tokenId: string; startPriceEth: string; durationSeconds: string }> } | null>(null);
+  const approvalContextKey = `${address}:${chainId}:${connector?.uid}:${nftContract}:${tokenId}`;
+  const createContextKey = `${approvalContextKey}:${startPriceEth}:${durationSeconds}`;
+  const activeContext = useRef({ approve: approvalContextKey, create: createContextKey });
+  activeContext.current = { approve: approvalContextKey, create: createContextKey };
 
   useEffect(() => {
     let active = true;
@@ -196,11 +207,19 @@ export function WalletCreateAuctionForm() {
     setOwner(null);
     setApprovedAddress(null);
     setApprovedForAll(null);
-    setApprovalTxStatus(null);
-    setCreateTxStatus(null);
+    const stored = recovery.current;
+    setApprovalTxStatus(stored?.action === "approve" ? unknownConfirmationState(stored.submission.effectiveHash) : null);
+    setCreateTxStatus(stored?.action === "create" ? unknownConfirmationState(stored.submission.effectiveHash) : null);
     setCreatedAuctionId(null);
     setIsReviewing(false);
   }, [address, chainId, connector?.uid, nftContract, tokenId]);
+
+  useEffect(() => {
+    if (recovery.current?.action === "create") {
+      setCreateTxStatus(unknownConfirmationState(recovery.current.submission.effectiveHash));
+      setIsReviewing(false);
+    }
+  }, [startPriceEth, durationSeconds]);
 
   const values = useMemo(
     () => ({ nftContract, tokenId, startPriceEth, durationSeconds }),
@@ -239,7 +258,8 @@ export function WalletCreateAuctionForm() {
     : wrongNetwork
       ? `Wallet connected, but not on the target chain (${targetChainLabel}).`
       : null;
-  const isBusy = isChecking || isApproving || isCreating;
+  const isBusy = isChecking || isApproving || isCreating || isVerifying;
+  const confirmationUnknown = approvalTxStatus?.phase === "confirmation-unknown" || createTxStatus?.phase === "confirmation-unknown";
   const checkDisabledReason = validationError ?? modeMessage ?? (isBusy ? "Another wallet step is already in progress." : null);
   const approveDisabledReason = modeMessage ?? (!ownerMatches
     ? owner ? "The connected wallet is not the NFT owner." : "Check ownership and approval first."
@@ -332,6 +352,61 @@ export function WalletCreateAuctionForm() {
     }
   }
 
+  async function finishConfirmation(result: WalletConfirmationResult, stored: NonNullable<typeof recovery.current>) {
+    if (activeContext.current[stored.action] !== stored.contextKey) return;
+    const setStatus = stored.action === "approve" ? setApprovalTxStatus : setCreateTxStatus;
+    if (result.outcome !== "confirmed") {
+      if (result.outcome !== "unknown") { recovery.current = null; setIsReviewing(false); }
+      setStatus(walletConfirmationState(result));
+      return;
+    }
+    const hash = stored.submission.effectiveHash;
+    const original = hash !== stored.submission.originalHash ? `Originally submitted as ${stored.submission.originalHash}.` : undefined;
+    if (stored.action === "create") {
+      const id = result.evidence?.auctionId;
+      if (!id) { setStatus(unknownConfirmationState(hash)); return; }
+      recovery.current = null;
+      setCreatedAuctionId(id);
+      setIsReviewing(false);
+      setCreateTxStatus({ ...confirmedTransactionState(hash, `Auction #${id} created.`,
+        "Open the auction detail to review the live lot and bidding state."), technicalDetail: original });
+      return;
+    }
+    setApprovalTxStatus(refreshingTransactionState(hash, "NFT custody approval confirmed on-chain. Refreshing approval status."));
+    let refreshIncomplete = false;
+    try { await checkOwnershipAndApproval(undefined, true); } catch { refreshIncomplete = true; }
+    if (activeContext.current.approve !== stored.contextKey) return;
+    recovery.current = null;
+    setApprovalTxStatus({ ...confirmedTransactionState(hash,
+      refreshIncomplete ? "NFT custody approved, but displayed approval data could not be fully refreshed." : "NFT custody approved.",
+      refreshIncomplete ? "Run the ownership and approval review again before creating the auction." : "Review and create the auction.",
+      refreshIncomplete), technicalDetail: original });
+  }
+
+  async function verifyTransaction() {
+    const stored = recovery.current;
+    if (!stored || isBusy || activeContext.current[stored.action] !== stored.contextKey) return;
+    try {
+      setIsVerifying(true);
+      const { publicClient } = await createConnectedWalletClients(config, connector, stored.submission.intent.account);
+      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored);
+    } catch {
+      (stored.action === "approve" ? setApprovalTxStatus : setCreateTxStatus)(unknownConfirmationState(stored.submission.effectiveHash));
+    } finally { setIsVerifying(false); }
+  }
+
+  function restoreSubmittedDetails() {
+    const stored = recovery.current;
+    if (!stored || isBusy) return;
+    setNftContract(stored.values.nftContract);
+    setTokenId(stored.values.tokenId);
+    if (stored.action === "create") {
+      setStartPriceEth(stored.values.startPriceEth);
+      setDurationSeconds(stored.values.durationSeconds);
+    }
+    setIsReviewing(false);
+  }
+
   async function approveNftVault() {
     if (!address) {
       setMessage("Wallet not connected.");
@@ -356,50 +431,23 @@ export function WalletCreateAuctionForm() {
       const parsed = parseCreateAuctionValues(values);
       const { publicClient, walletClient } = await createConnectedWalletClients(config, connector, address);
 
-      const txHash = await walletClient.writeContract({
-        address: parsed.nftContract,
-        abi: erc721Abi,
-        functionName: "approve",
-        args: [context.nftVault, parsed.tokenId]
-      });
+      const request = {
+        address: parsed.nftContract, abi: erc721Abi, functionName: "approve" as const,
+        args: [context.nftVault, parsed.tokenId] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: address, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: erc721Abi, eventName: "Approval", address: request.address,
+        expected: Object.freeze({ owner: address, approved: context.nftVault, tokenId: parsed.tokenId }) };
+      const txHash = await walletClient.writeContract(request);
       submittedHash = txHash;
-
-      setApprovalTxStatus(pendingTransactionState(txHash, "NFT custody approval submitted. Waiting for confirmation."));
-      let receipt;
-
-      try {
-        receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      } catch (caught) {
-        setApprovalTxStatus(unknownConfirmationState(txHash, caught));
-        return;
-      }
-
-      if (!receiptWasSuccessful(receipt)) {
-        setApprovalTxStatus(revertedTransactionState(txHash));
-        return;
-      }
-
-      setApprovalTxStatus(refreshingTransactionState(txHash, "NFT custody approval confirmed on-chain. Refreshing approval status."));
-
-      try {
-        await checkOwnershipAndApproval(undefined, true);
-        setApprovalTxStatus(
-          confirmedTransactionState(
-            txHash,
-            "NFT custody approved.",
-            "Review and create the auction."
-          )
-        );
-      } catch {
-        setApprovalTxStatus(
-          confirmedTransactionState(
-            txHash,
-            "NFT custody approved, but displayed approval data could not be fully refreshed.",
-            "Run the ownership and approval review again before creating the auction.",
-            true
-          )
-        );
-      }
+      const submission = walletTransactionSubmission(txHash, intent,
+        (receipt) => matchingWalletActionEvents(receipt, proof).length === 1 ? {} : null);
+      const stored = { action: "approve" as const, submission, contextKey: approvalContextKey, values: Object.freeze({ ...values }) };
+      recovery.current = stored;
+      setApprovalTxStatus(activeContext.current.approve === stored.contextKey
+        ? pendingTransactionState(txHash, "NFT custody approval submitted. Waiting for confirmation.") : unknownConfirmationState(txHash));
+      await finishConfirmation(await confirmWalletTransaction(publicClient, submission), stored);
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -440,63 +488,30 @@ export function WalletCreateAuctionForm() {
 
       setCreateTxStatus(awaitingSignatureState("Confirm auction creation in your wallet."));
 
-      const txHash = await walletClient.writeContract({
-        address: context.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "createAuction",
-        args: [parsed.nftContract, parsed.tokenId, parsed.startPrice, parsed.duration]
-      });
+      const request = {
+        address: context.auctionHouse, abi: auctionHouseAbi, functionName: "createAuction" as const,
+        args: [parsed.nftContract, parsed.tokenId, parsed.startPrice, parsed.duration] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: address, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: auctionHouseAbi, eventName: "AuctionCreated", address: request.address,
+        expected: Object.freeze({ seller: address, nft: parsed.nftContract, tokenId: parsed.tokenId, startPrice: parsed.startPrice }) };
+      const duration = parsed.duration;
+      const txHash = await walletClient.writeContract(request);
       submittedHash = txHash;
-
-      setCreateTxStatus(pendingTransactionState(txHash, "Auction creation transaction submitted. Waiting for confirmation."));
-      let receipt;
-
-      try {
-        receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      } catch (caught) {
-        setCreateTxStatus(unknownConfirmationState(txHash, caught));
-        return;
-      }
-
-      if (!receiptWasSuccessful(receipt)) {
-        setCreateTxStatus(revertedTransactionState(txHash));
-        return;
-      }
-
-      let confirmedAuctionId: string | null = null;
-      try {
-        const matches = (receipt.logs ?? []).flatMap((log) => {
-          if (!sameAddress(log.address, context.auctionHouse)) return [];
-          try {
-            const event = decodeEventLog({ abi: auctionHouseAbi, eventName: "AuctionCreated", data: log.data, topics: log.topics, strict: true });
-            if (event.eventName !== "AuctionCreated") return [];
-            const args = event.args;
-            return args.auctionId > 0n && sameAddress(args.seller, address) &&
-              sameAddress(args.nft, parsed.nftContract) && args.tokenId === parsed.tokenId &&
-              args.startPrice === parsed.startPrice ? [args] : [];
-          } catch {
-            return [];
-          }
-        });
-        if (matches.length === 1) {
-          const block = await publicClient.getBlock({ blockHash: receipt.blockHash });
-          if (matches[0].initialEndTime === block.timestamp + parsed.duration) {
-            confirmedAuctionId = matches[0].auctionId.toString();
-          }
-        }
-      } catch {
-        // Receipt success remains authoritative even if event identification is unavailable.
-      }
-      setCreatedAuctionId(confirmedAuctionId);
-      setIsReviewing(false);
-      setCreateTxStatus(
-        confirmedTransactionState(
-          txHash,
-          confirmedAuctionId ? `Auction #${confirmedAuctionId} created.` : "Auction creation confirmed, but the auction ID could not be determined.",
-          confirmedAuctionId ? "Open the auction detail to review the live lot and bidding state."
-            : "Keep this transaction hash and review its receipt or refresh the auction list. Do not create the auction again."
-        )
-      );
+      const submission = walletTransactionSubmission(txHash, intent, async (receipt, client) => {
+        const matches = matchingWalletActionEvents(receipt, proof);
+        if (matches.length !== 1 || typeof matches[0].auctionId !== "bigint" || matches[0].auctionId <= 0n) return null;
+        const block = await client.getBlock({ blockHash: receipt.blockHash });
+        if (!sameAddress(block.hash, receipt.blockHash) || block.number !== receipt.blockNumber ||
+          typeof block.timestamp !== "bigint" || block.timestamp < 0n || matches[0].initialEndTime !== block.timestamp + duration) return null;
+        return { auctionId: matches[0].auctionId.toString() };
+      });
+      const stored = { action: "create" as const, submission, contextKey: createContextKey, values: Object.freeze({ ...values }) };
+      recovery.current = stored;
+      setCreateTxStatus(activeContext.current.create === stored.contextKey
+        ? pendingTransactionState(txHash, "Auction creation transaction submitted. Waiting for confirmation.") : unknownConfirmationState(txHash));
+      await finishConfirmation(await confirmWalletTransaction(publicClient, submission), stored);
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -510,7 +525,10 @@ export function WalletCreateAuctionForm() {
   async function openCreateReview() {
     try {
       await checkOwnershipAndApproval();
-      setApprovalTxStatus((current) => current?.refreshIncomplete ? null : current);
+      setApprovalTxStatus((current) => current?.phase === "confirmed" && current.refreshIncomplete ? {
+        ...current, refreshIncomplete: false, message: "NFT custody approved.",
+        nextAction: "Review the current ownership and approval state before creating the auction."
+      } : current);
       setIsReviewing(true);
     } catch (caught) {
       setMessage(walletErrorMessage(caught, "Unable to review auction creation."));
@@ -519,12 +537,12 @@ export function WalletCreateAuctionForm() {
 
   const journeyStep = createTxStatus?.phase === "confirmed"
     ? 5
-    : isCreating || (isReviewing && hasApproval)
+    : createTxStatus?.phase === "confirmation-unknown" || isCreating
       ? 4
-      : isApproving
+      : approvalTxStatus?.phase === "confirmation-unknown" || approvalTxStatus?.refreshIncomplete || isApproving
         ? 3
         : isReviewing
-          ? 2
+          ? hasApproval ? 4 : 2
           : 1;
 
   return (
@@ -612,7 +630,7 @@ export function WalletCreateAuctionForm() {
           tokenId={tokenId}
           startPriceEth={startPriceEth}
           durationSeconds={durationSeconds}
-          disabled={isChecking || isApproving || isCreating}
+          disabled={isBusy || confirmationUnknown}
           errors={fieldErrors}
           idPrefix="wallet-create"
           onNftContractChange={(value) => { setNftContract(value); setIsReviewing(false); }}
@@ -638,7 +656,7 @@ export function WalletCreateAuctionForm() {
           <div>
             <button
               type="button"
-              disabled={Boolean(validationError) || !isConnected || wrongNetwork || isChecking || isApproving || isCreating || createTxStatus?.phase === "confirmed" || createTxStatus?.phase === "confirmation-unknown"}
+              disabled={Boolean(validationError) || !isConnected || wrongNetwork || isBusy || confirmationUnknown || createTxStatus?.phase === "confirmed" || createTxStatus?.phase === "confirmation-unknown"}
               aria-describedby={checkDisabledReason ? "check-ownership-disabled-reason" : undefined}
               onClick={openCreateReview}
               className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -669,7 +687,7 @@ export function WalletCreateAuctionForm() {
               : "Currently expected: 2 wallet confirmations"}
             note="This confirmation count reflects the currently read approval state. Existing ownership, approval, parameter, and pause preflights remain authoritative before each transaction."
             primaryLabel={hasApproval ? "Create auction" : "Approve NFT custody"}
-            busy={isApproving || isCreating}
+            busy={isApproving || isCreating || isVerifying}
             disabled={Boolean(hasApproval ? createDisabledReason : approveDisabledReason)
               || approvalTxStatus?.phase === "confirmation-unknown"
               || approvalTxStatus?.refreshIncomplete
@@ -683,6 +701,20 @@ export function WalletCreateAuctionForm() {
       <div className="mt-5 grid gap-3">
         <WalletTransactionStatus title="NFT approval" status={approvalTxStatus} />
         <WalletTransactionStatus title="Auction creation" status={createTxStatus} />
+        {confirmationUnknown ? <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <button type="button" onClick={verifyTransaction}
+            disabled={isBusy || !recovery.current || activeContext.current[recovery.current.action] !== recovery.current.contextKey}
+            className="min-h-11 w-full rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50 sm:w-auto">
+            {isVerifying ? "Verifying..." : "Verify transaction"}
+          </button>
+          {recovery.current && (nftContract !== recovery.current.values.nftContract || tokenId !== recovery.current.values.tokenId ||
+            (recovery.current.action === "create" && (startPriceEth !== recovery.current.values.startPriceEth || durationSeconds !== recovery.current.values.durationSeconds))) ?
+            <button type="button" disabled={isBusy} onClick={restoreSubmittedDetails}
+              className="min-h-11 w-full rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50 sm:w-auto">Restore submitted details</button> : null}
+          </div>
+          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet, network and details before verifying. Do not submit again while the outcome is unknown.</p>
+        </div> : null}
       </div>
 
       {message ? <div role="status" aria-live="polite" className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}

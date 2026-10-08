@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  encodeFunctionData,
   type Address,
   type EIP1193Provider
 } from "viem";
@@ -23,10 +24,14 @@ import {
   confirmedTransactionState,
   failedTransactionState,
   pendingTransactionState,
-  receiptWasSuccessful,
+  confirmWalletTransaction,
+  matchingWalletActionEvents,
   refreshingTransactionState,
-  revertedTransactionState,
   unknownConfirmationState,
+  walletConfirmationState,
+  walletTransactionSubmission,
+  type WalletConfirmationResult,
+  type WalletTransactionSubmission,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
 
@@ -83,9 +88,14 @@ export function WalletFinalizePanel({
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
+  const recovery = useRef<{ submission: WalletTransactionSubmission; contextKey: string } | null>(null);
+  const contextKey = `${address}:${chainId}:${connector?.uid}:${auction.auctionId}`;
+  const activeContext = useRef(contextKey);
+  activeContext.current = contextKey;
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
@@ -125,7 +135,8 @@ export function WalletFinalizePanel({
   }, []);
 
   useEffect(() => {
-    setTxStatus(null);
+    if (!recovery.current) setTxStatus(null);
+    else setTxStatus(unknownConfirmationState(recovery.current.submission.effectiveHash));
     setIsReviewing(false);
   }, [address, chainId, connector?.uid, auction.auctionId]);
 
@@ -137,12 +148,56 @@ export function WalletFinalizePanel({
     deploymentError,
     auctionIdValid: Boolean(auctionIdBigInt),
     loading: isDeploymentLoading,
-    pending: isFinalizing,
+    pending: isFinalizing || txStatus?.phase === "confirmation-unknown" || txStatus?.phase === "confirmed",
     finalized: auction.finalized,
     auctionState: auction.state,
     endTime: auction.endTime,
     nowSeconds: auctionChainTimestamp
   });
+
+  async function finishConfirmation(result: WalletConfirmationResult, submittedContext: string) {
+    if (activeContext.current !== submittedContext) return;
+    if (result.outcome !== "confirmed") {
+      if (result.outcome !== "unknown") recovery.current = null;
+      setTxStatus(walletConfirmationState(result)); return;
+    }
+    const hash = result.submission.effectiveHash;
+    setTxStatus(refreshingTransactionState(hash, "Finalization confirmed on-chain. Refreshing lifecycle and claim data."));
+    let refreshIncomplete = false;
+    try { await onFinalizeComplete(); } catch { refreshIncomplete = true; }
+    if (activeContext.current !== submittedContext) return;
+    recovery.current = null;
+    setIsReviewing(false);
+    setTxStatus({ ...confirmedTransactionState(hash,
+      refreshIncomplete ? "Auction finalized, but displayed lifecycle and claim data could not be fully refreshed." : "Auction finalized.",
+      refreshIncomplete ? "Refresh the auction before starting a claim or withdrawal."
+        : "Eligible wallets can now use the separate pull-based claim and withdrawal actions.", refreshIncomplete),
+      technicalDetail: hash !== result.submission.originalHash ? `Originally submitted as ${result.submission.originalHash}.` : undefined });
+  }
+
+  async function verifyTransaction() {
+    const stored = recovery.current;
+    if (!stored || stored.contextKey !== contextKey || isFinalizing) return;
+    try {
+      setIsFinalizing(true);
+      const { publicClient } = await createConnectedWalletClients(config, connector, stored.submission.intent.account);
+      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored.contextKey);
+    } catch { setTxStatus(unknownConfirmationState(stored.submission.effectiveHash)); }
+    finally { setIsFinalizing(false); }
+  }
+
+  async function refreshConfirmedData() {
+    if (isRefreshingData) return;
+    const submittedContext = contextKey;
+    try {
+      setIsRefreshingData(true);
+      await onFinalizeComplete();
+      if (activeContext.current === submittedContext) setTxStatus((current) => current?.phase === "confirmed"
+        ? { ...current, refreshIncomplete: false, message: "Auction finalized.", nextAction: "Review the refreshed lifecycle and claim data." }
+        : current);
+    } catch { /* Retain the verified result and refresh warning. */ }
+    finally { setIsRefreshingData(false); }
+  }
 
   async function finalizeAuction() {
     if (!address) {
@@ -204,52 +259,24 @@ export function WalletFinalizePanel({
 
       setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: deployment.contracts.auctionHouse,
         abi: auctionHouseAbi,
-        functionName: "finalizeAuction",
-        args: [auctionIdBigInt]
-      });
+        functionName: "finalizeAuction" as const,
+        args: [auctionIdBigInt] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: address, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: auctionHouseAbi, eventName: "AuctionFinalized", address: request.address,
+        expected: Object.freeze({ auctionId: auctionIdBigInt }) };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
-
-      setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
-      let receipt;
-
-      try {
-        receipt = await publicClient.waitForTransactionReceipt({ hash });
-      } catch (caught) {
-        setTxStatus(unknownConfirmationState(hash, caught));
-        return;
-      }
-
-      if (!receiptWasSuccessful(receipt)) {
-        setTxStatus(revertedTransactionState(hash));
-        return;
-      }
-
-      setTxStatus(refreshingTransactionState(hash, "Finalization confirmed on-chain. Refreshing lifecycle and claim data."));
-      let refreshIncomplete = false;
-
-      try {
-        await onFinalizeComplete();
-      } catch {
-        refreshIncomplete = true;
-      }
-
-      setIsReviewing(false);
-      setTxStatus(
-        refreshIncomplete
-          ? confirmedTransactionState(
-              hash,
-              "Auction finalized, but displayed lifecycle and claim data could not be fully refreshed.",
-              "Refresh the auction before starting a claim or withdrawal."
-            )
-          : confirmedTransactionState(
-              hash,
-              "Auction finalized.",
-              "Eligible wallets can now use the separate pull-based claim and withdrawal actions."
-            )
-      );
+      const submission = walletTransactionSubmission(hash, intent,
+        (receipt) => matchingWalletActionEvents(receipt, proof).length === 1 ? {} : null);
+      recovery.current = { submission, contextKey };
+      if (activeContext.current === contextKey) setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
+      else setTxStatus(unknownConfirmationState(hash));
+      await finishConfirmation(await confirmWalletTransaction(publicClient, submission), contextKey);
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -261,7 +288,7 @@ export function WalletFinalizePanel({
   }
 
   return (
-    <section aria-busy={isDeploymentLoading || isFinalizing} className="min-w-0 rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isFinalizing || isRefreshingData} className="min-w-0 rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-base font-semibold text-white">Finalize auction</h3>
         <ModeBadge variant="wallet-signed" />
@@ -344,6 +371,18 @@ export function WalletFinalizePanel({
 
       <div className="mt-4">
         <WalletTransactionStatus title="Auction finalization" status={txStatus} />
+        {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
+          <button type="button" onClick={verifyTransaction}
+            disabled={isFinalizing || recovery.current?.contextKey !== contextKey}
+            className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+            {isFinalizing ? "Verifying..." : "Verify transaction"}
+          </button>
+          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet, network and auction if they changed.</p>
+        </div> : null}
+        {txStatus?.refreshIncomplete ? <button type="button" onClick={refreshConfirmedData} disabled={isRefreshingData}
+          className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          {isRefreshingData ? "Refreshing..." : "Refresh auction data"}
+        </button> : null}
       </div>
 
       {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}

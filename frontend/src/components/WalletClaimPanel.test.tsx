@@ -1,6 +1,9 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createPublicClient, createWalletClient } from "viem";
+import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics, encodeFunctionData, type Abi, type Address, type Hex } from "viem";
+import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
+import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { useAccount } from "wagmi";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { SerializedAuction } from "@/lib/auctionTypes";
@@ -63,9 +66,36 @@ function setupClaims({
     if (functionName === "protocolFeeCredits") return protocolFeeCredit;
     throw new Error(`Unexpected read: ${functionName}`);
   });
-  const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
-  const writeContract = vi.fn(async () => txHash);
-  vi.mocked(createPublicClient).mockReturnValue({ readContract, waitForTransactionReceipt } as unknown as ReturnType<typeof createPublicClient>);
+  const blockHash = `0x${"a".repeat(64)}` as Hex;
+  const transaction = { hash: txHash as Hex, from: account as Address, to: testAddresses.auctionHouse as Address, input: "0x" as Hex,
+    value: 0n, nonce: 5, chainId: 31337, blockHash, blockNumber: 42n, transactionIndex: 0 };
+  const log = { address: transaction.to, topics: [] as Hex[], data: "0x" as Hex,
+    transactionHash: txHash as Hex, blockHash, blockNumber: 42n, transactionIndex: 0, logIndex: 0, removed: false };
+  const receipt = { status: "success", transactionHash: txHash as Hex, from: account as Address, to: transaction.to,
+    blockHash, blockNumber: 42n, transactionIndex: 0, logs: [log] };
+  const waitForTransactionReceipt = vi.fn(async (_options?: unknown) => receipt);
+  const getTransaction = vi.fn(async () => transaction);
+  const getChainId = vi.fn(async () => 31337);
+  const prepareAction = (request: { abi: Abi; address: `0x${string}`; functionName: string; args?: readonly bigint[] }) => {
+    transaction.to = request.address;
+    transaction.input = encodeFunctionData({ abi: request.abi, functionName: request.functionName, args: request.args });
+    const events: Record<string, { abi: Abi; name: string; args: Record<string, bigint | string>; amount?: bigint }> = {
+      claimNft: { abi: auctionHouseAbi, name: "NFTClaimed", args: { auctionId: 1n, claimant: account } },
+      claimRefund: { abi: escrowVaultAbi, name: "RefundClaimed", args: { auctionId: 1n, bidder: account }, amount: refundableAmount },
+      claim: { abi: distributionVaultAbi, name: "DistributionClaimed", args: { auctionId: 1n, claimant: account }, amount: rewardEntitlement },
+      withdrawSellerProceeds: { abi: escrowVaultAbi, name: "SellerProceedsWithdrawn", args: { seller: account }, amount: sellerCredit },
+      withdrawProtocolFees: { abi: escrowVaultAbi, name: "ProtocolFeesWithdrawn", args: { recipient: account }, amount: protocolFeeCredit }
+    };
+    const event = events[request.functionName];
+    log.address = request.address;
+    log.topics = encodeEventTopics({ abi: event.abi, eventName: event.name, args: event.args }) as Hex[];
+    log.data = event.amount === undefined ? "0x" : encodeAbiParameters([{ type: "uint256" }], [event.amount]);
+    receipt.to = request.address;
+  };
+  const writeContract = vi.fn(async (request: { abi: Abi; address: `0x${string}`; functionName: string; args?: readonly bigint[] }) => {
+    prepareAction(request); return txHash;
+  });
+  vi.mocked(createPublicClient).mockReturnValue({ readContract, waitForTransactionReceipt, getTransaction, getChainId } as unknown as ReturnType<typeof createPublicClient>);
   vi.mocked(createWalletClient).mockImplementation((options) => ({
     writeContract: async (...args: unknown[]) => {
       const result = await (writeContract as (...args: unknown[]) => Promise<unknown>)(...args);
@@ -84,24 +114,11 @@ function setupClaims({
   providerB.request.mockImplementation(async ({ method }) => method === "eth_accounts" ? [vi.mocked(useAccount)().address] : "0x7a69");
   Object.defineProperty(window, "ethereum", { configurable: true, value: providerA });
 
-  render(
-    <WalletClaimPanel
-      auction={{
-        ...auctionDetailFixture.auction,
-        state: 2,
-        stateLabel: "FINALIZED",
-        finalized: true,
-        nftClaimed: false,
-        seller: account,
-        highestBidder: account,
-        auctionFeeRecipient: account,
-        ...auctionOverrides
-      }}
-      onActionComplete={onActionComplete}
-    />
-  );
+  const auction = { ...auctionDetailFixture.auction, state: 2 as const, stateLabel: "FINALIZED", finalized: true,
+    nftClaimed: false, seller: account, highestBidder: account, auctionFeeRecipient: account, ...auctionOverrides };
+  const view = render(<WalletClaimPanel auction={auction} onActionComplete={onActionComplete} />);
 
-  return { writeContract, onActionComplete, readContract, liveAuction, failedReads, waitForTransactionReceipt };
+  return { writeContract, onActionComplete, readContract, liveAuction, failedReads, waitForTransactionReceipt, getTransaction, getChainId, transaction, receipt, log, prepareAction, view, auction };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -286,9 +303,9 @@ describe("WalletClaimPanel", () => {
   });
 
   it.each(["rejected", "reverted", "unknown"])("preserves a %s NFT transaction outcome after preflight", async (outcome) => {
-    const { writeContract, waitForTransactionReceipt, onActionComplete } = setupClaims();
+    const { writeContract, waitForTransactionReceipt, onActionComplete, receipt } = setupClaims();
     if (outcome === "rejected") writeContract.mockRejectedValue({ code: 4001 });
-    if (outcome === "reverted") waitForTransactionReceipt.mockResolvedValue({ status: "reverted" });
+    if (outcome === "reverted") waitForTransactionReceipt.mockResolvedValue({ ...receipt, status: "reverted" });
     if (outcome === "unknown") waitForTransactionReceipt.mockRejectedValue(new Error("Receipt unavailable"));
     const review = await screen.findByRole("button", { name: "Review claim nft" });
     await waitFor(() => expect(review).toBeEnabled());
@@ -307,4 +324,140 @@ describe("WalletClaimPanel", () => {
 // Every component scenario uses B, while the legacy global points at unrelated A.
 afterEach(() => {
   expect(providerA.request).not.toHaveBeenCalled();
+});
+
+const claimActions = [
+  { label: "claim nft", success: "NFT claimed." },
+  { label: "claim refund", success: "Refund claimed." },
+  { label: "claim redistribution", success: "Redistribution claimed." },
+  { label: "withdraw proceeds", success: "Proceeds withdrawn." },
+  { label: "withdraw protocol fees", success: "Protocol fees withdrawn." }
+];
+async function submitClaim(label: string) {
+  const review = await screen.findByRole("button", { name: `Review ${label}` });
+  await waitFor(() => expect(review).toBeEnabled());
+  fireEvent.click(review);
+  fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+}
+
+function claimReplacement(f: ReturnType<typeof setupClaims>, reason: string, change: Partial<typeof f.transaction>) {
+  f.waitForTransactionReceipt.mockImplementation(async (options) => {
+    const original = { ...f.transaction };
+    const hash = `0x${"7".repeat(64)}` as Hex;
+    Object.assign(f.transaction, { hash }, change);
+    Object.assign(f.receipt, { transactionHash: hash, to: f.transaction.to, from: f.transaction.from });
+    f.log.transactionHash = hash;
+    (options as { onReplaced: (value: unknown) => void }).onReplaced({ reason,
+      transaction: { ...f.transaction }, replacedTransaction: original, transactionReceipt: { ...f.receipt } });
+    return f.receipt;
+  });
+}
+
+describe.each(claimActions)("$label integrity", ({ label, success }) => {
+  it.each(["rejected", "reverted", "cancelled", "fake repriced", "incompatible target", "incompatible function", "event missing", "event emitter", "wrong hash", "wrong sender"])("does not announce success for %s", async (scenario) => {
+    const f = setupClaims();
+    if (scenario === "rejected") f.writeContract.mockRejectedValue({ code: 4001 });
+    if (scenario === "reverted") f.waitForTransactionReceipt.mockImplementation(async () => ({ ...f.receipt, status: "reverted" }));
+    if (scenario === "cancelled" || scenario === "fake repriced") claimReplacement(f,
+      scenario === "cancelled" ? "cancelled" : "repriced", { to: testAddresses.primaryBidder, input: "0x" });
+    if (scenario === "incompatible target") claimReplacement(f, "repriced", { to: testAddresses.secondBidder });
+    if (scenario === "incompatible function") claimReplacement(f, "repriced", { input: "0x12345678" });
+    if (["event missing", "event emitter", "wrong hash", "wrong sender"].includes(scenario)) {
+      f.waitForTransactionReceipt.mockImplementation(async () => {
+        if (scenario === "event missing") f.receipt.logs = [];
+        if (scenario === "event emitter") f.log.address = testAddresses.secondBidder;
+        if (scenario === "wrong hash") f.receipt.transactionHash = `0x${"7".repeat(64)}`;
+        if (scenario === "wrong sender") { f.transaction.from = testAddresses.secondBidder; f.receipt.from = testAddresses.secondBidder; }
+        return f.receipt;
+      });
+    }
+    await submitClaim(label);
+    const phase = scenario === "rejected" ? "Transaction rejected"
+      : scenario.startsWith("event") || scenario.startsWith("wrong") ? "Confirmation not verified" : "Transaction failed";
+    await screen.findByText(phase);
+    expect(screen.queryByText(success)).not.toBeInTheDocument();
+    expect(f.onActionComplete).not.toHaveBeenCalled();
+    expect(f.writeContract).toHaveBeenCalledTimes(1);
+    if (scenario === "rejected") expect(screen.getByTestId("wallet-transaction-status").querySelector('[title]')).toBeNull();
+  });
+  it("confirms a compatible repricing on its effective hash", async () => {
+    const f = setupClaims();
+    claimReplacement(f, "repriced", {});
+    await submitClaim(label);
+    await screen.findByText(success);
+    expect(f.onActionComplete).toHaveBeenCalledTimes(1);
+    expect(f.getTransaction).toHaveBeenCalledWith({ hash: `0x${"7".repeat(64)}` });
+    const status = screen.getByTestId("wallet-transaction-status");
+    expect(status.querySelector('[title]')).toHaveAttribute("title", `0x${"7".repeat(64)}`);
+    expect(status.textContent).toContain(txHash);
+  });
+  it("keeps favorable data refresh separate from unknown transaction proof and recovers without another signature", async () => {
+    const f = setupClaims();
+    f.waitForTransactionReceipt.mockRejectedValueOnce(new Error("RPC unavailable"));
+    await submitClaim(label);
+    await screen.findByText("Confirmation not verified");
+    expect(f.onActionComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh wallet claim data" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh wallet claim data" })).toBeEnabled());
+    expect(screen.getByText("Confirmation not verified")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Review ${label}` })).toBeDisabled();
+    expect(f.writeContract).toHaveBeenCalledTimes(1);
+    expect(f.waitForTransactionReceipt).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Verify transaction" }));
+    await screen.findByText(success);
+    expect(f.onActionComplete).toHaveBeenCalledTimes(1);
+    expect(f.writeContract).toHaveBeenCalledTimes(1);
+  });
+  it("retains proof of success when the UI refresh fails", async () => {
+    const f = setupClaims({ onActionComplete: vi.fn(async () => { throw new Error("UI unavailable"); }) });
+    await submitClaim(label);
+    expect(await screen.findByText("Transaction confirmed")).toBeInTheDocument();
+    expect(screen.getByText(`${success} Displayed action data could not be fully refreshed.`)).toBeInTheDocument();
+    expect(f.writeContract).toHaveBeenCalledTimes(1);
+  });
+});
+
+it.each(claimActions.filter(({ label }) => label.startsWith("claim")))("a proven $label cannot request a duplicate signature while displayed data is stale", async ({ label, success }) => {
+  const f = setupClaims();
+  await submitClaim(label);
+  await screen.findByText(success);
+  expect(screen.getByRole("button", { name: `Review ${label}` })).toBeDisabled();
+  expect(f.writeContract).toHaveBeenCalledTimes(1);
+});
+
+it.each(["account", "chain", "connector", "auction"])("retains immutable refund proof across a changed %s without attributing completion to it", async (changed) => {
+  const f = setupClaims();
+  const originalAccount = vi.mocked(useAccount)();
+  let release: (receipt: typeof f.receipt) => void = () => {};
+  f.waitForTransactionReceipt.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  await submitClaim("claim refund");
+  await waitFor(() => expect(f.waitForTransactionReceipt).toHaveBeenCalledTimes(1));
+  const nextAccount = changed === "account" ? { ...originalAccount, address: testAddresses.secondBidder }
+    : changed === "chain" ? { ...originalAccount, chainId: 1 }
+      : changed === "connector" ? { ...originalAccount, connector: { ...connectorB, uid: "other-connector" } } : originalAccount;
+  vi.mocked(useAccount).mockReturnValue(nextAccount as unknown as ReturnType<typeof useAccount>);
+  f.view.rerender(<WalletClaimPanel auction={changed === "auction" ? { ...f.auction, auctionId: "2" } : f.auction} onActionComplete={f.onActionComplete} />);
+  release(f.receipt);
+  await screen.findByText("Confirmation not verified");
+  expect(f.onActionComplete).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Verify transaction" })).toBeDisabled());
+  vi.mocked(useAccount).mockReturnValue(originalAccount);
+  f.view.rerender(<WalletClaimPanel auction={f.auction} onActionComplete={f.onActionComplete} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Verify transaction" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Verify transaction" }));
+  await screen.findByText("Refund claimed.");
+  expect(f.writeContract).toHaveBeenCalledTimes(1);
+  expect(f.onActionComplete).toHaveBeenCalledTimes(1);
+});
+
+it("refreshes the UI after a proved claim without changing its transaction result or signing again", async () => {
+  const onRefresh = vi.fn(async () => undefined).mockRejectedValueOnce(new Error("Unavailable"));
+  const f = setupClaims({ onActionComplete: onRefresh });
+  await submitClaim("claim refund");
+  await screen.findByText("Refund claimed. Displayed action data could not be fully refreshed.");
+  fireEvent.click(screen.getByRole("button", { name: "Refresh auction and wallet claim data" }));
+  await screen.findByText("Refund claimed.");
+  expect(onRefresh).toHaveBeenCalledTimes(2);
+  expect(f.writeContract).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Refresh auction and wallet claim data" })).not.toBeInTheDocument();
 });
