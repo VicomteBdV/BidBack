@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  encodeFunctionData,
+  type Abi,
   type Address,
   type EIP1193Provider,
   type PublicClient
@@ -33,10 +35,15 @@ import {
   confirmedTransactionState,
   failedTransactionState,
   pendingTransactionState,
-  receiptWasSuccessful,
+  confirmWalletTransaction,
+  matchingWalletActionEvents,
   refreshingTransactionState,
-  revertedTransactionState,
   unknownConfirmationState,
+  walletConfirmationState,
+  walletTransactionSubmission,
+  type WalletConfirmationResult,
+  type WalletTransactionIntent,
+  type WalletTransactionSubmission,
   type WalletTransactionState
 } from "@/lib/walletTransaction";
 
@@ -108,9 +115,16 @@ export function WalletClaimPanel({
 
   const [isLoadingClaimData, setIsLoadingClaimData] = useState(false);
   const [pendingAction, setPendingAction] = useState<ClaimAction | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [completedClaims, setCompletedClaims] = useState<ClaimAction[]>([]);
   const [selectedAction, setSelectedAction] = useState<ClaimAction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
+  const recovery = useRef<{ submission: WalletTransactionSubmission; contextKey: string;
+    successMessage: string; nextAction: string; refreshingMessage: string; action: ClaimAction } | null>(null);
+  const contextKey = `${address}:${chainId}:${connector?.uid}:${auction.auctionId}`;
+  const activeContext = useRef(contextKey);
+  activeContext.current = contextKey;
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
@@ -158,8 +172,10 @@ export function WalletClaimPanel({
     setRewardClaimed(null);
     setSellerCredit(null);
     setProtocolFeeCredit(null);
-    setTxStatus(null);
+    if (!recovery.current) setTxStatus(null);
+    else setTxStatus(unknownConfirmationState(recovery.current.submission.effectiveHash));
     setSelectedAction(null);
+    setCompletedClaims([]);
   }, [address, chainId, connector?.uid, auction.auctionId]);
 
   function requireWalletContext() {
@@ -280,25 +296,43 @@ export function WalletClaimPanel({
   async function confirmSubmittedTransaction(
     publicClient: PublicClient,
     hash: `0x${string}`,
-    refreshingMessage: string
+    refreshingMessage: string,
+    intent: WalletTransactionIntent,
+    proof: { abi: Abi; eventName: string; address: Address; expected: Readonly<Record<string, string | bigint>>; positiveAmount?: boolean },
+    successMessage: string,
+    nextAction: string,
+    action: ClaimAction
   ) {
-    try {
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      if (!receiptWasSuccessful(receipt)) {
-        setTxStatus(revertedTransactionState(hash));
-        return false;
-      }
-    } catch (caught) {
-      setTxStatus(unknownConfirmationState(hash, caught));
-      return false;
-    }
-
-    setTxStatus(refreshingTransactionState(hash, refreshingMessage));
-    return true;
+    const submission = walletTransactionSubmission(hash, intent,
+      (receipt) => matchingWalletActionEvents(receipt, proof).length === 1 ? {} : null);
+    recovery.current = { submission, contextKey, successMessage, nextAction, refreshingMessage, action };
+    if (activeContext.current !== contextKey) setTxStatus(unknownConfirmationState(hash));
+    await finishConfirmation(await confirmWalletTransaction(publicClient, submission), recovery.current);
   }
 
-  async function afterSuccessfulAction(successMessage: string, nextAction: string, hash: `0x${string}`) {
+  async function finishConfirmation(result: WalletConfirmationResult, stored: NonNullable<typeof recovery.current>) {
+    if (activeContext.current !== stored.contextKey) return;
+    if (result.outcome !== "confirmed") {
+      if (result.outcome !== "unknown") recovery.current = null;
+      setTxStatus(walletConfirmationState(result));
+      return;
+    }
+    setTxStatus(refreshingTransactionState(stored.submission.effectiveHash, stored.refreshingMessage));
+    await afterSuccessfulAction(stored);
+  }
+
+  async function verifyTransaction() {
+    const stored = recovery.current;
+    if (!stored || stored.contextKey !== contextKey || pendingAction || isVerifying) return;
+    try {
+      setIsVerifying(true);
+      const { publicClient } = await createConnectedWalletClients(config, connector, stored.submission.intent.account);
+      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored);
+    } catch { setTxStatus(unknownConfirmationState(stored.submission.effectiveHash)); }
+    finally { setIsVerifying(false); }
+  }
+
+  async function afterSuccessfulAction(stored: NonNullable<typeof recovery.current>) {
     let refreshIncomplete = false;
 
     try {
@@ -309,23 +343,48 @@ export function WalletClaimPanel({
 
     try {
       const next = await readWalletClaimData();
+      if (activeContext.current !== stored.contextKey) return;
       applyClaimData(next);
       refreshIncomplete ||= next.unavailable;
     } catch {
+      if (activeContext.current !== stored.contextKey) return;
       clearClaimData();
       refreshIncomplete = true;
     }
 
+    if (activeContext.current !== stored.contextKey) return;
+    recovery.current = null;
+    if (stored.action.startsWith("claim-")) setCompletedClaims((current) => [...current, stored.action]);
     setSelectedAction(null);
-    setTxStatus(
+    const hash = stored.submission.effectiveHash;
+    const { successMessage, nextAction } = stored;
+    const status =
       refreshIncomplete
         ? confirmedTransactionState(
             hash,
             `${successMessage} Displayed action data could not be fully refreshed.`,
-            "Refresh the auction and wallet claim data before your next action."
+            "Refresh the auction and wallet claim data before your next action.",
+            true
           )
-        : confirmedTransactionState(hash, successMessage, nextAction)
-    );
+        : confirmedTransactionState(hash, successMessage, nextAction);
+    setTxStatus({ ...status, technicalDetail: hash !== stored.submission.originalHash
+      ? `Originally submitted as ${stored.submission.originalHash}.` : undefined });
+  }
+
+  async function refreshConfirmedData() {
+    const submittedContext = contextKey;
+    if (isLoadingClaimData || pendingAction || isVerifying) return;
+    try {
+      setIsLoadingClaimData(true);
+      await onActionComplete();
+      const next = await readWalletClaimData();
+      if (activeContext.current !== submittedContext) return;
+      applyClaimData(next);
+      if (!next.unavailable) setTxStatus((current) => current?.phase === "confirmed" ? { ...current,
+        message: current.message.replace(" Displayed action data could not be fully refreshed.", ""),
+        nextAction: "Review the refreshed auction and wallet claim data.", refreshIncomplete: false } : current);
+    } catch { /* Keep the verified transaction and the refresh warning. */ }
+    finally { setIsLoadingClaimData(false); }
   }
 
   async function claimNft() {
@@ -362,17 +421,22 @@ export function WalletClaimPanel({
       }
       setTxStatus(awaitingSignatureState("Confirm NFT claim in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: context.deployment.contracts.auctionHouse,
         abi: auctionHouseAbi,
-        functionName: "claimNft",
-        args: [context.auctionId]
-      });
+        functionName: "claimNft" as const,
+        args: [context.auctionId] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: context.account, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: auctionHouseAbi, eventName: "NFTClaimed", address: request.address,
+        expected: Object.freeze({ auctionId: context.auctionId, claimant: context.account }), positiveAmount: false };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "NFT claim transaction submitted. Waiting for confirmation."));
-      if (!await confirmSubmittedTransaction(publicClient, hash, "NFT claim confirmed on-chain. Refreshing claimant state.")) return;
-      await afterSuccessfulAction("NFT claimed.", "Review any other available claim or withdrawal.", hash);
+      await confirmSubmittedTransaction(publicClient, hash, "NFT claim confirmed on-chain. Refreshing claimant state.", intent, proof,
+        "NFT claimed.", "Review any other available claim or withdrawal.", "claim-nft");
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -423,17 +487,22 @@ export function WalletClaimPanel({
 
       setTxStatus(awaitingSignatureState("Confirm refund claim in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
-        functionName: "claimRefund",
-        args: [context.auctionId]
-      });
+        functionName: "claimRefund" as const,
+        args: [context.auctionId] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: context.account, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: escrowVaultAbi, eventName: "RefundClaimed", address: request.address,
+        expected: Object.freeze({ auctionId: context.auctionId, bidder: context.account }), positiveAmount: true };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Refund claim transaction submitted. Waiting for confirmation."));
-      if (!await confirmSubmittedTransaction(publicClient, hash, "Refund confirmed on-chain. Refreshing refundable balance.")) return;
-      await afterSuccessfulAction("Refund claimed.", "Review any separate redistribution or withdrawal still available.", hash);
+      await confirmSubmittedTransaction(publicClient, hash, "Refund confirmed on-chain. Refreshing refundable balance.", intent, proof,
+        "Refund claimed.", "Review any separate redistribution or withdrawal still available.", "claim-refund");
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -484,17 +553,22 @@ export function WalletClaimPanel({
 
       setTxStatus(awaitingSignatureState("Confirm redistribution claim in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: context.deployment.contracts.distributionVault,
         abi: distributionVaultAbi,
-        functionName: "claim",
-        args: [context.auctionId]
-      });
+        functionName: "claim" as const,
+        args: [context.auctionId] as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: context.account, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: distributionVaultAbi, eventName: "DistributionClaimed", address: request.address,
+        expected: Object.freeze({ auctionId: context.auctionId, claimant: context.account }), positiveAmount: true };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Redistribution claim submitted. Waiting for confirmation."));
-      if (!await confirmSubmittedTransaction(publicClient, hash, "Redistribution confirmed on-chain. Refreshing entitlement state.")) return;
-      await afterSuccessfulAction("Redistribution claimed.", "Review any separate refund or withdrawal still available.", hash);
+      await confirmSubmittedTransaction(publicClient, hash, "Redistribution confirmed on-chain. Refreshing entitlement state.", intent, proof,
+        "Redistribution claimed.", "Review any separate refund or withdrawal still available.", "claim-reward");
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -535,16 +609,21 @@ export function WalletClaimPanel({
 
       setTxStatus(awaitingSignatureState("Confirm seller proceeds withdrawal in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
-        functionName: "withdrawSellerProceeds"
-      });
+        functionName: "withdrawSellerProceeds" as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: context.account, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: escrowVaultAbi, eventName: "SellerProceedsWithdrawn", address: request.address,
+        expected: Object.freeze({ seller: context.account }), positiveAmount: true };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Seller proceeds withdrawal submitted. Waiting for confirmation."));
-      if (!await confirmSubmittedTransaction(publicClient, hash, "Proceeds withdrawal confirmed on-chain. Refreshing wallet-level credit.")) return;
-      await afterSuccessfulAction("Proceeds withdrawn.", "Review any other available claim or withdrawal.", hash);
+      await confirmSubmittedTransaction(publicClient, hash, "Proceeds withdrawal confirmed on-chain. Refreshing wallet-level credit.", intent, proof,
+        "Proceeds withdrawn.", "Review any other available claim or withdrawal.", "withdraw-seller");
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -587,16 +666,21 @@ export function WalletClaimPanel({
 
       setTxStatus(awaitingSignatureState("Confirm protocol fee withdrawal in your wallet."));
 
-      const hash = await walletClient.writeContract({
+      const request = {
         address: context.deployment.contracts.escrowVault,
         abi: escrowVaultAbi,
-        functionName: "withdrawProtocolFees"
-      });
+        functionName: "withdrawProtocolFees" as const
+      };
+      const intent = Object.freeze({ chainId: targetChainId, account: context.account, to: request.address,
+        data: encodeFunctionData(request), value: 0n });
+      const proof = { abi: escrowVaultAbi, eventName: "ProtocolFeesWithdrawn", address: request.address,
+        expected: Object.freeze({ recipient: context.account }), positiveAmount: true };
+      const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Protocol fee withdrawal submitted. Waiting for confirmation."));
-      if (!await confirmSubmittedTransaction(publicClient, hash, "Protocol fee withdrawal confirmed on-chain. Refreshing wallet-level credit.")) return;
-      await afterSuccessfulAction("Protocol fees withdrawn.", "Review any other available claim or withdrawal.", hash);
+      await confirmSubmittedTransaction(publicClient, hash, "Protocol fee withdrawal confirmed on-chain. Refreshing wallet-level credit.", intent, proof,
+        "Protocol fees withdrawn.", "Review any other available claim or withdrawal.", "withdraw-fees");
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
@@ -615,7 +699,7 @@ export function WalletClaimPanel({
     deploymentError,
     auctionIdValid: Boolean(auctionIdBigInt),
     loading: isLoadingClaimData,
-    pending: pendingAction !== null || txStatus?.phase === "confirmation-unknown"
+    pending: pendingAction !== null || isVerifying || txStatus?.phase === "confirmation-unknown"
   };
 
   const claimNftDisabledReason = getClaimNftActionState({
@@ -623,21 +707,21 @@ export function WalletClaimPanel({
     account: address,
     claimant: expectedNftClaimant,
     claimantRoleLabel: expectedNftClaimantLabel,
-    nftClaimed: auction.nftClaimed,
+    nftClaimed: auction.nftClaimed || completedClaims.includes("claim-nft"),
     finalized: auction.finalized
   }).disabledReason;
 
   const claimRefundDisabledReason = getClaimRefundActionState({
     ...commonActionContext,
     refundableAmount,
-    refundClaimed,
+    refundClaimed: completedClaims.includes("claim-refund") ? true : refundClaimed,
     finalized: auction.finalized
   }).disabledReason;
 
   const rawClaimRewardDisabledReason = getClaimRewardActionState({
     ...commonActionContext,
     rewardEntitlement,
-    rewardClaimed,
+    rewardClaimed: completedClaims.includes("claim-reward") ? true : rewardClaimed,
     finalized: auction.finalized
   }).disabledReason;
   const claimRewardDisabledReason = rawClaimRewardDisabledReason === "No reward available."
@@ -645,8 +729,8 @@ export function WalletClaimPanel({
     : rawClaimRewardDisabledReason === "Reward already claimed."
       ? "Redistribution already claimed."
       : rawClaimRewardDisabledReason;
-  const availableRefundableAmount = refundClaimed === null ? null : refundClaimed ? 0n : refundableAmount;
-  const availableRewardEntitlement = rewardClaimed === null ? null : rewardClaimed ? 0n : rewardEntitlement;
+  const availableRefundableAmount = completedClaims.includes("claim-refund") ? 0n : refundClaimed === null ? null : refundClaimed ? 0n : refundableAmount;
+  const availableRewardEntitlement = completedClaims.includes("claim-reward") ? 0n : rewardClaimed === null ? null : rewardClaimed ? 0n : rewardEntitlement;
 
   const withdrawSellerDisabledReason = getWithdrawSellerActionState({
     ...commonActionContext,
@@ -774,7 +858,7 @@ export function WalletClaimPanel({
   }
 
   return (
-    <section aria-busy={isDeploymentLoading || isLoadingClaimData || pendingAction !== null} className="min-w-0 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isLoadingClaimData || pendingAction !== null || isVerifying} className="min-w-0 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-base font-semibold text-white">Claims and withdrawals</h3>
         <ModeBadge variant="wallet-signed" />
@@ -812,7 +896,7 @@ export function WalletClaimPanel({
         <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Unavailable" : formatEth(availableRewardEntitlement)} />
         <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Unavailable" : formatEth(sellerCredit)} />
         <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Unavailable" : formatEth(protocolFeeCredit)} />
-        <InfoItem label="NFT claimed" value={auction.nftClaimed ? "Yes" : "No"} />
+        <InfoItem label="NFT claimed" value={auction.nftClaimed || completedClaims.includes("claim-nft") ? "Yes" : "No"} />
         <InfoItem label="Auction finalized" value={auction.finalized ? "Yes" : "No"} />
       </div>
 
@@ -905,6 +989,19 @@ export function WalletClaimPanel({
 
       <div className="mt-4">
         <WalletTransactionStatus title="Wallet claim / withdrawal" status={txStatus} />
+        {txStatus?.refreshIncomplete ? <button type="button" onClick={refreshConfirmedData}
+          disabled={isLoadingClaimData || pendingAction !== null || isVerifying || wrongNetwork || !isConnected}
+          className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          {isLoadingClaimData ? "Refreshing..." : "Refresh auction and wallet claim data"}
+        </button> : null}
+        {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
+          <button type="button" onClick={verifyTransaction}
+            disabled={isVerifying || pendingAction !== null || recovery.current?.contextKey !== contextKey}
+            className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+            {isVerifying ? "Verifying..." : "Verify transaction"}
+          </button>
+          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet, network and auction if they changed.</p>
+        </div> : null}
       </div>
 
       {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}

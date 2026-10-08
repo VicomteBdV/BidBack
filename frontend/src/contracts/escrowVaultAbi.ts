@@ -1,6 +1,22 @@
 export const escrowVaultAbi = [
   {
     type: "event",
+    name: "SellerProceedsWithdrawn",
+    inputs: [
+      { name: "seller", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false }
+    ]
+  },
+  {
+    type: "event",
+    name: "ProtocolFeesWithdrawn",
+    inputs: [
+      { name: "recipient", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false }
+    ]
+  },
+  {
+    type: "event",
     name: "RefundClaimed",
     inputs: [
       { name: "auctionId", type: "uint256", indexed: true },
