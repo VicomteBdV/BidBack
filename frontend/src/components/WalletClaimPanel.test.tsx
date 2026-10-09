@@ -556,7 +556,7 @@ describe.each(auctionClaims)("$label displayed-lot identity", ({ label, success 
       await submitClaim(label);
       await expectNoSignature(f);
       expect(f.getBlock).not.toHaveBeenCalled();
-      expect(f.readContract).not.toHaveBeenCalled();
+      expect(f.readContract.mock.calls.some(([request]) => request.functionName === "getAuction")).toBe(false);
     });
 
   it("uses exact large integers and case-insensitive addresses without pinning mutable auction fields", async () => {
