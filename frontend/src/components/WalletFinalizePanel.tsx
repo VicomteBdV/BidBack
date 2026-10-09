@@ -7,6 +7,7 @@ import {
   type EIP1193Provider
 } from "viem";
 import { useAccount, useConfig } from "wagmi";
+import { assertAuctionReferenceBlock, displayedWalletAuctionIdentity, preflightWalletAuctionIdentity, walletAuctionIdentityKey, WalletAuctionIdentityError } from "@/lib/walletAuctionIdentity";
 import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { ModeBadge } from "@/components/ModeBadge";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
@@ -69,16 +70,25 @@ async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
     );
   }
 
-  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+  if (typeof walletChainId !== "string" || !/^0x[0-9a-f]+$/i.test(walletChainId) || BigInt(walletChainId) !== BigInt(targetChainId)) {
     throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
   }
+  return targetChainId;
+}
+
+function deploymentKey(value: Deployment | null) {
+  return value ? `${value.chainId}:${Object.values(value.contracts).map((contract) => contract.toLowerCase()).join(":")}` : "unloaded";
 }
 
 export function WalletFinalizePanel({
   auction,
+  expectedChainId,
+  expectedAuctionHouse,
   onFinalizeComplete
 }: {
   auction: SerializedAuction;
+  expectedChainId: number;
+  expectedAuctionHouse: Address;
   onFinalizeComplete: () => Promise<void>;
 }) {
   const { address, chainId, isConnected, connector } = useAccount();
@@ -92,10 +102,24 @@ export function WalletFinalizePanel({
   const [isReviewing, setIsReviewing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
-  const recovery = useRef<{ submission: WalletTransactionSubmission; contextKey: string } | null>(null);
-  const contextKey = `${address}:${chainId}:${connector?.uid}:${auction.auctionId}`;
-  const activeContext = useRef(contextKey);
-  activeContext.current = contextKey;
+  const recovery = useRef<{ submission: WalletTransactionSubmission; contextKey: string; walletKey: string; auctionId: string } | null>(null);
+  const identity = useMemo(() => {
+    try { return displayedWalletAuctionIdentity(expectedChainId, expectedAuctionHouse, auction); }
+    catch { return null; }
+  }, [expectedChainId, expectedAuctionHouse, auction.auctionId, auction.seller, auction.nft, auction.tokenId,
+    auction.startPrice, auction.startTime, auction.initialEndTime]);
+  const identityKey = identity ? walletAuctionIdentityKey(identity) : JSON.stringify([expectedChainId, expectedAuctionHouse,
+    auction.auctionId, auction.seller, auction.nft, auction.tokenId, auction.startPrice, auction.startTime, auction.initialEndTime]);
+  const walletKey = `${isConnected}:${address?.toLowerCase()}:${chainId}:${connector?.uid}`;
+  const contextKey = `${walletKey}:${identityKey}:${deploymentKey(deployment)}`;
+  const activeContext = useRef({ key: contextKey, walletKey, connector, deployment, revision: 0 });
+  if (activeContext.current.key !== contextKey || activeContext.current.connector !== connector || activeContext.current.deployment !== deployment) {
+    activeContext.current = { key: contextKey, walletKey, connector, deployment, revision: activeContext.current.revision + 1 };
+  }
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; activeContext.current.revision += 1; }; }, []);
+  const statusContext = useRef<{ key: string; auctionId: string } | null>(null);
+  const historicalTransaction = Boolean(txStatus && statusContext.current && statusContext.current.key !== contextKey);
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionChainTimestamp = parseChainTimestamp(auction.chainTimestamp);
@@ -135,10 +159,10 @@ export function WalletFinalizePanel({
   }, []);
 
   useEffect(() => {
-    if (!recovery.current) setTxStatus(null);
-    else setTxStatus(unknownConfirmationState(recovery.current.submission.effectiveHash));
+    if (recovery.current) setTxStatus(walletConfirmationState({ outcome: "unknown", submission: recovery.current.submission }));
     setIsReviewing(false);
-  }, [address, chainId, connector?.uid, auction.auctionId]);
+    setMessage(null);
+  }, [contextKey]);
 
   const finalizeState = getFinalizeActionState({
     isConnected,
@@ -148,15 +172,34 @@ export function WalletFinalizePanel({
     deploymentError,
     auctionIdValid: Boolean(auctionIdBigInt),
     loading: isDeploymentLoading,
-    pending: isFinalizing || txStatus?.phase === "confirmation-unknown" || txStatus?.phase === "confirmed",
+    pending: isFinalizing || txStatus?.phase === "confirmation-unknown" || (txStatus?.phase === "confirmed" && !historicalTransaction),
     finalized: auction.finalized,
     auctionState: auction.state,
     endTime: auction.endTime,
     nowSeconds: auctionChainTimestamp
   });
 
-  async function finishConfirmation(result: WalletConfirmationResult, submittedContext: string) {
-    if (activeContext.current !== submittedContext) return;
+  async function finishConfirmation(result: WalletConfirmationResult, submittedContext: string, historicalVerification = false) {
+    const stored = recovery.current;
+    if (activeContext.current.key !== submittedContext) {
+      if (!historicalVerification) {
+        setTxStatus(walletConfirmationState({ outcome: "unknown", submission: result.submission }));
+        return;
+      }
+      if (!stored || activeContext.current.walletKey !== stored.walletKey) return;
+      if (result.outcome === "confirmed") {
+        setTxStatus({ ...confirmedTransactionState(result.submission.effectiveHash,
+          `Previously submitted auction #${stored.auctionId} finalized.`,
+          "This result belongs to the previously reviewed lot. Review the current auction details separately."),
+          technicalDetail: result.submission.effectiveHash !== result.submission.originalHash
+            ? `Originally submitted as ${result.submission.originalHash}.` : undefined });
+        recovery.current = null;
+      } else {
+        if (result.outcome !== "unknown") recovery.current = null;
+        setTxStatus(walletConfirmationState(result));
+      }
+      return;
+    }
     if (result.outcome !== "confirmed") {
       if (result.outcome !== "unknown") recovery.current = null;
       setTxStatus(walletConfirmationState(result)); return;
@@ -165,7 +208,7 @@ export function WalletFinalizePanel({
     setTxStatus(refreshingTransactionState(hash, "Finalization confirmed on-chain. Refreshing lifecycle and claim data."));
     let refreshIncomplete = false;
     try { await onFinalizeComplete(); } catch { refreshIncomplete = true; }
-    if (activeContext.current !== submittedContext) return;
+    if (activeContext.current.key !== submittedContext) return;
     recovery.current = null;
     setIsReviewing(false);
     setTxStatus({ ...confirmedTransactionState(hash,
@@ -177,12 +220,12 @@ export function WalletFinalizePanel({
 
   async function verifyTransaction() {
     const stored = recovery.current;
-    if (!stored || stored.contextKey !== contextKey || isFinalizing) return;
+    if (!stored || stored.walletKey !== walletKey || isFinalizing) return;
     try {
       setIsFinalizing(true);
       const { publicClient } = await createConnectedWalletClients(config, connector, stored.submission.intent.account);
-      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored.contextKey);
-    } catch { setTxStatus(unknownConfirmationState(stored.submission.effectiveHash)); }
+      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored.contextKey, true);
+    } catch { setTxStatus(walletConfirmationState({ outcome: "unknown", submission: stored.submission })); }
     finally { setIsFinalizing(false); }
   }
 
@@ -192,7 +235,7 @@ export function WalletFinalizePanel({
     try {
       setIsRefreshingData(true);
       await onFinalizeComplete();
-      if (activeContext.current === submittedContext) setTxStatus((current) => current?.phase === "confirmed"
+      if (activeContext.current.key === submittedContext) setTxStatus((current) => current?.phase === "confirmed"
         ? { ...current, refreshIncomplete: false, message: "Auction finalized.", nextAction: "Review the refreshed lifecycle and claim data." }
         : current);
     } catch { /* Retain the verified result and refresh warning. */ }
@@ -215,23 +258,34 @@ export function WalletFinalizePanel({
       return;
     }
 
+    const revision = activeContext.current.revision;
+    const submittedContext = contextKey;
+    const submittedWallet = walletKey;
+    function assertCurrentContext() {
+      if (!mounted.current || activeContext.current.revision !== revision || activeContext.current.key !== submittedContext) throw new WalletAuctionIdentityError("context");
+    }
+    async function assertDeploymentCurrent() {
+      let fresh: Deployment;
+      try { fresh = await fetchDeployment(); } catch { throw new WalletAuctionIdentityError("unavailable"); }
+      if (deploymentKey(fresh) !== deploymentKey(deployment)) throw new WalletAuctionIdentityError("context");
+      assertCurrentContext();
+    }
     let submittedHash: `0x${string}` | null = null;
 
     try {
       setIsFinalizing(true);
       setMessage(null);
       setTxStatus(null);
+      statusContext.current = { key: submittedContext, auctionId: auction.auctionId };
 
       const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, address);
-      await verifyWalletChain(provider);
-      const latestBlock = await publicClient.getBlock({ blockTag: "latest" });
-      const liveAuction = await publicClient.readContract({
-        address: deployment.contracts.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "getAuction",
-        args: [auctionIdBigInt],
-        blockNumber: latestBlock.number
-      });
+      assertCurrentContext();
+      const selectedChainId = await verifyWalletChain(provider);
+      assertCurrentContext();
+      if (!identity) throw new WalletAuctionIdentityError("context");
+      const { liveAuction, referenceBlock: latestBlock } = await preflightWalletAuctionIdentity(publicClient, identity,
+        { targetChainId, selectedChainId, deploymentChainId: deployment.chainId, auctionHouse: deployment.contracts.auctionHouse });
+      assertCurrentContext();
       const liveAuctionState = liveAuction.state;
       if (liveAuctionState !== 0 && liveAuctionState !== 1 && liveAuctionState !== 2) {
         throw new Error("Auction state is unavailable.");
@@ -257,6 +311,10 @@ export function WalletFinalizePanel({
         return;
       }
 
+      await assertAuctionReferenceBlock(publicClient, latestBlock);
+      await assertDeploymentCurrent();
+      await verifyWalletChain(provider);
+      assertCurrentContext();
       setTxStatus(awaitingSignatureState("Confirm auction finalization in your wallet."));
 
       const request = {
@@ -269,22 +327,42 @@ export function WalletFinalizePanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: auctionHouseAbi, eventName: "AuctionFinalized", address: request.address,
         expected: Object.freeze({ auctionId: auctionIdBigInt }) };
+      assertCurrentContext();
+      statusContext.current = { key: submittedContext, auctionId: auction.auctionId };
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
       const submission = walletTransactionSubmission(hash, intent,
         (receipt) => matchingWalletActionEvents(receipt, proof).length === 1 ? {} : null);
-      recovery.current = { submission, contextKey };
-      if (activeContext.current === contextKey) setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
+      recovery.current = { submission, contextKey: submittedContext, walletKey: submittedWallet, auctionId: auction.auctionId };
+      if (activeContext.current.key === submittedContext) setTxStatus(pendingTransactionState(hash, "Finalization transaction submitted. Waiting for confirmation."));
       else setTxStatus(unknownConfirmationState(hash));
-      await finishConfirmation(await confirmWalletTransaction(publicClient, submission), contextKey);
+      await finishConfirmation(await confirmWalletTransaction(publicClient, submission), submittedContext);
     } catch (caught) {
       const failed = submittedHash
         ? unknownConfirmationState(submittedHash, caught)
         : failedTransactionState(caught, "Finalization failed before submission.");
       setTxStatus(failed);
+      if (!submittedHash) {
+        setIsReviewing(false);
+        if (caught instanceof WalletAuctionIdentityError) { setTxStatus(null); setMessage(caught.message); }
+      }
     } finally {
       setIsFinalizing(false);
     }
+  }
+
+  async function refreshAuctionContext() {
+    if (isRefreshingData || isFinalizing) return;
+    try {
+      setIsRefreshingData(true);
+      setIsReviewing(false);
+      const loaded = await fetchDeployment();
+      setDeployment(loaded);
+      setDeploymentError(null);
+      await onFinalizeComplete();
+      setMessage(null);
+    } catch { setMessage("Auction details could not be refreshed. No signature was requested. Try again."); }
+    finally { setIsRefreshingData(false); }
   }
 
   return (
@@ -370,22 +448,31 @@ export function WalletFinalizePanel({
       ) : null}
 
       <div className="mt-4">
-        <WalletTransactionStatus title="Auction finalization" status={txStatus} />
+        {historicalTransaction ? <p role="status" className="mb-3 text-sm text-amber-200">
+          Transaction for the previously reviewed auction #{statusContext.current?.auctionId}. Its result is separate from the displayed lot.
+        </p> : null}
+        <WalletTransactionStatus title={historicalTransaction ? "Previously submitted finalization" : "Auction finalization"} status={txStatus} />
         {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
           <button type="button" onClick={verifyTransaction}
-            disabled={isFinalizing || recovery.current?.contextKey !== contextKey}
+            disabled={isFinalizing || recovery.current?.walletKey !== walletKey}
             className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
             {isFinalizing ? "Verifying..." : "Verify transaction"}
           </button>
-          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet, network and auction if they changed.</p>
+          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet and network if they changed. A result for another displayed lot is kept separate.</p>
         </div> : null}
-        {txStatus?.refreshIncomplete ? <button type="button" onClick={refreshConfirmedData} disabled={isRefreshingData}
+        {txStatus?.refreshIncomplete && !historicalTransaction ? <button type="button" onClick={refreshConfirmedData} disabled={isRefreshingData}
           className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
           {isRefreshingData ? "Refreshing..." : "Refresh auction data"}
         </button> : null}
       </div>
 
-      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">
+        {message}
+        <button type="button" onClick={refreshAuctionContext} disabled={isRefreshingData || isFinalizing}
+          className="mt-3 block min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          {isRefreshingData ? "Refreshing..." : "Refresh auction details"}
+        </button>
+      </div> : null}
     </section>
   );
 }

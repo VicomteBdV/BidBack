@@ -9,6 +9,7 @@ import {
   type PublicClient
 } from "viem";
 import { useAccount, useConfig } from "wagmi";
+import { assertAuctionReferenceBlock, displayedWalletAuctionIdentity, preflightWalletAuctionIdentity, walletAuctionIdentityKey, WalletAuctionIdentityError, type AuctionReferenceBlock } from "@/lib/walletAuctionIdentity";
 import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { ModeBadge } from "@/components/ModeBadge";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
@@ -54,6 +55,24 @@ type ClaimAction =
   | "withdraw-seller"
   | "withdraw-fees";
 
+type AuctionClaimAction = Extract<ClaimAction, `claim-${string}`>;
+const claimActions: ClaimAction[] = ["claim-nft", "claim-refund", "claim-reward", "withdraw-seller", "withdraw-fees"];
+function isAuctionClaim(action: ClaimAction): action is AuctionClaimAction { return action.startsWith("claim-"); }
+type ActionContext = { key: string; revision: number };
+type ActionSnapshot = ActionContext & { action: ClaimAction; walletKey: string; auctionId: string; pageKey: string };
+type ClaimReadContext = { refund: ActionSnapshot; reward: ActionSnapshot; global: ActionSnapshot };
+
+function dispatchDeploymentKey(value: Deployment | null, action: ClaimAction) {
+  if (!value) return "unloaded";
+  const addresses = isAuctionClaim(action) ? [value.contracts.auctionHouse] : [];
+  if (action === "claim-refund" || !isAuctionClaim(action)) addresses.push(value.contracts.escrowVault);
+  if (action === "claim-reward") addresses.push(value.contracts.distributionVault);
+  return [value.chainId, ...addresses.map((address) => address.toLowerCase())].join(":");
+}
+
+function isAmount(value: unknown): value is bigint { return typeof value === "bigint" && value >= 0n && value < (1n << 256n); }
+function isFlag(value: unknown): value is boolean { return typeof value === "boolean"; }
+
 type WalletClaimData = {
   refundableAmount: bigint | null;
   refundClaimed: boolean | null;
@@ -87,16 +106,21 @@ async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
     );
   }
 
-  if (typeof walletChainId !== "string" || Number.parseInt(walletChainId, 16) !== targetChainId) {
+  if (typeof walletChainId !== "string" || !/^0x[0-9a-f]+$/i.test(walletChainId) || BigInt(walletChainId) !== BigInt(targetChainId)) {
     throw new Error(`Wallet connected, but not on the target chain (${targetChainLabel}).`);
   }
+  return targetChainId;
 }
 
 export function WalletClaimPanel({
   auction,
+  expectedChainId,
+  expectedAuctionHouse,
   onActionComplete
 }: {
   auction: SerializedAuction;
+  expectedChainId: number;
+  expectedAuctionHouse: Address;
   onActionComplete: () => Promise<void>;
 }) {
   const { address, chainId, isConnected, connector } = useAccount();
@@ -119,12 +143,41 @@ export function WalletClaimPanel({
   const [completedClaims, setCompletedClaims] = useState<ClaimAction[]>([]);
   const [selectedAction, setSelectedAction] = useState<ClaimAction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [claimDataMessage, setClaimDataMessage] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<WalletTransactionState | null>(null);
-  const recovery = useRef<{ submission: WalletTransactionSubmission; contextKey: string;
+  const recovery = useRef<{ submission: WalletTransactionSubmission; context: ActionSnapshot;
     successMessage: string; nextAction: string; refreshingMessage: string; action: ClaimAction } | null>(null);
-  const contextKey = `${address}:${chainId}:${connector?.uid}:${auction.auctionId}`;
-  const activeContext = useRef(contextKey);
-  activeContext.current = contextKey;
+  const identity = useMemo(() => {
+    try { return displayedWalletAuctionIdentity(expectedChainId, expectedAuctionHouse, auction); }
+    catch { return null; }
+  }, [expectedChainId, expectedAuctionHouse, auction.auctionId, auction.seller, auction.nft,
+    auction.tokenId, auction.startPrice, auction.startTime, auction.initialEndTime]);
+  const pageKey = identity ? walletAuctionIdentityKey(identity) : JSON.stringify([expectedChainId, expectedAuctionHouse,
+    auction.auctionId, auction.seller, auction.nft, auction.tokenId, auction.startPrice, auction.startTime, auction.initialEndTime]);
+  const walletKey = `${isConnected}:${address?.toLowerCase()}:${chainId}:${connector?.uid}`;
+  const contextKeys = Object.fromEntries(claimActions.map((action) => [action,
+    `${walletKey}:${isAuctionClaim(action) ? `${pageKey}:` : ""}${dispatchDeploymentKey(deployment, action)}`])) as Record<ClaimAction, string>;
+  const activeContext = useRef({ walletKey, pageKey, connector, actions: Object.fromEntries(claimActions.map((action) =>
+    [action, { key: contextKeys[action], revision: 0 }])) as Record<ClaimAction, ActionContext> });
+  for (const action of claimActions) {
+    const previous = activeContext.current.actions[action];
+    if (previous.key !== contextKeys[action] || activeContext.current.connector !== connector) {
+      activeContext.current.actions[action] = { key: contextKeys[action], revision: previous.revision + 1 };
+    }
+  }
+  activeContext.current.walletKey = walletKey;
+  activeContext.current.pageKey = pageKey;
+  activeContext.current.connector = connector;
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => {
+    mounted.current = false;
+    for (const action of claimActions) activeContext.current.actions[action].revision += 1;
+  }; }, []);
+  const claimLoadRevision = useRef(0);
+  const statusContext = useRef<ActionSnapshot | null>(null);
+  const historicalTransaction = Boolean(txStatus && statusContext.current && isAuctionClaim(statusContext.current.action) &&
+    statusContext.current.key !== contextKeys[statusContext.current.action]);
+  const globalTransaction = Boolean(txStatus && statusContext.current && !isAuctionClaim(statusContext.current.action));
 
   const wrongNetwork = isConnected && chainId !== targetChainId;
   const auctionIdBigInt = useMemo(() => (/^\d+$/.test(auction.auctionId) ? BigInt(auction.auctionId) : null), [
@@ -170,13 +223,23 @@ export function WalletClaimPanel({
     setRefundClaimed(null);
     setRewardEntitlement(null);
     setRewardClaimed(null);
+    setSelectedAction((current) => current && isAuctionClaim(current) ? null : current);
+    setCompletedClaims([]);
+  }, [contextKeys["claim-refund"], contextKeys["claim-reward"]]);
+
+  useEffect(() => {
     setSellerCredit(null);
     setProtocolFeeCredit(null);
-    if (!recovery.current) setTxStatus(null);
-    else setTxStatus(unknownConfirmationState(recovery.current.submission.effectiveHash));
     setSelectedAction(null);
-    setCompletedClaims([]);
-  }, [address, chainId, connector?.uid, auction.auctionId]);
+  }, [contextKeys["withdraw-seller"]]);
+
+  useEffect(() => {
+    if (recovery.current && recovery.current.context.key !== contextKeys[recovery.current.action]) {
+      setTxStatus(walletConfirmationState({ outcome: "unknown", submission: recovery.current.submission }));
+    }
+    setMessage(null);
+    setClaimDataMessage(null);
+  }, [pageKey, walletKey, deployment]);
 
   function requireWalletContext() {
     if (!address) throw new Error("Wallet not connected.");
@@ -191,14 +254,102 @@ export function WalletClaimPanel({
     };
   }
 
-  function applyClaimData(next: WalletClaimData) {
-    setRefundableAmount(next.refundableAmount);
-    setRefundClaimed(next.refundClaimed);
-    setRewardEntitlement(next.rewardEntitlement);
-    setRewardClaimed(next.rewardClaimed);
-    setSellerCredit(next.sellerCredit);
-    setProtocolFeeCredit(next.protocolFeeCredit);
-    setMessage(next.unavailable ? "Some wallet claim data is unavailable. Refresh to retry failed reads." : null);
+  function snapshotAction(action: ClaimAction): ActionSnapshot {
+    return { action, key: contextKeys[action], revision: activeContext.current.actions[action].revision,
+      walletKey, pageKey, auctionId: auction.auctionId };
+  }
+
+  function currentSnapshot(snapshot: ActionSnapshot, checkRevision = true) {
+    const current = activeContext.current.actions[snapshot.action];
+    return mounted.current && current.key === snapshot.key && (!checkRevision || current.revision === snapshot.revision);
+  }
+
+  function assertCurrentSnapshot(snapshot: ActionSnapshot) {
+    if (!currentSnapshot(snapshot)) throw new WalletAuctionIdentityError("context");
+  }
+
+  function snapshotClaimReads(): ClaimReadContext {
+    return { refund: snapshotAction("claim-refund"), reward: snapshotAction("claim-reward"), global: snapshotAction("withdraw-seller") };
+  }
+
+  async function prepareAuctionClaim(action: AuctionClaimAction) {
+    const context = requireWalletContext();
+    const snapshot = snapshotAction(action);
+    statusContext.current = snapshot;
+    assertCurrentSnapshot(snapshot);
+    const clients = await createConnectedWalletClients(config, connector, context.account);
+    assertCurrentSnapshot(snapshot);
+    const selectedChainId = await verifyWalletChain(clients.provider);
+    assertCurrentSnapshot(snapshot);
+    if (!identity) throw new WalletAuctionIdentityError("context");
+    const checked = await preflightWalletAuctionIdentity(clients.publicClient, identity, {
+      targetChainId, selectedChainId, deploymentChainId: context.deployment.chainId,
+      auctionHouse: context.deployment.contracts.auctionHouse
+    });
+    assertCurrentSnapshot(snapshot);
+    return { context, snapshot, ...clients, ...checked };
+  }
+
+  async function beforeSignature(snapshot: ActionSnapshot, context: ReturnType<typeof requireWalletContext>,
+    provider: Pick<EIP1193Provider, "request">, publicClient: PublicClient, referenceBlock?: AuctionReferenceBlock) {
+    if (referenceBlock) await assertAuctionReferenceBlock(publicClient, referenceBlock);
+    let fresh: Deployment;
+    try { fresh = await fetchDeployment(); } catch { throw new WalletAuctionIdentityError("unavailable"); }
+    if (dispatchDeploymentKey(fresh, snapshot.action) !== dispatchDeploymentKey(context.deployment, snapshot.action)) {
+      throw new WalletAuctionIdentityError("context");
+    }
+    await verifyWalletChain(provider);
+    assertCurrentSnapshot(snapshot);
+  }
+
+  async function readClaimEligibility(publicClient: PublicClient, context: ReturnType<typeof requireWalletContext>,
+    action: "claim-refund" | "claim-reward", referenceBlock: AuctionReferenceBlock) {
+    let values: readonly unknown[];
+    try {
+      values = action === "claim-refund" ? await Promise.all([
+        publicClient.readContract({ address: context.deployment.contracts.escrowVault, abi: escrowVaultAbi,
+          functionName: "refundableAmount", args: [context.auctionId, context.account], blockNumber: referenceBlock.number }),
+        publicClient.readContract({ address: context.deployment.contracts.escrowVault, abi: escrowVaultAbi,
+          functionName: "refundClaimed", args: [context.auctionId, context.account], blockNumber: referenceBlock.number })
+      ]) : await Promise.all([
+        publicClient.readContract({ address: context.deployment.contracts.distributionVault, abi: distributionVaultAbi,
+          functionName: "entitlementOf", args: [context.auctionId, context.account], blockNumber: referenceBlock.number }),
+        publicClient.readContract({ address: context.deployment.contracts.distributionVault, abi: distributionVaultAbi,
+          functionName: "claimed", args: [context.auctionId, context.account], blockNumber: referenceBlock.number })
+      ]);
+    } catch { throw new WalletAuctionIdentityError("unavailable"); }
+    if (!isAmount(values[0]) || !isFlag(values[1])) throw new WalletAuctionIdentityError("unavailable");
+    return { amount: values[0], wasClaimed: values[1] };
+  }
+
+  async function readWithdrawalCredit(publicClient: PublicClient, context: ReturnType<typeof requireWalletContext>,
+    action: "withdraw-seller" | "withdraw-fees") {
+    let credit: unknown;
+    try {
+      credit = await publicClient.readContract({ address: context.deployment.contracts.escrowVault, abi: escrowVaultAbi,
+        functionName: action === "withdraw-seller" ? "sellerCredits" : "protocolFeeCredits", args: [context.account] });
+    } catch { throw new WalletAuctionIdentityError("unavailable"); }
+    if (!isAmount(credit)) throw new WalletAuctionIdentityError("unavailable");
+    return credit;
+  }
+
+  function failAction(caught: unknown, submittedHash: `0x${string}` | null, fallback: string) {
+    if (!submittedHash && caught instanceof WalletAuctionIdentityError) {
+      setSelectedAction(null);
+      setTxStatus(null);
+      setMessage(caught.message);
+    } else {
+      setTxStatus(submittedHash ? unknownConfirmationState(submittedHash, caught) : failedTransactionState(caught, fallback));
+    }
+  }
+
+  function applyClaimData(next: WalletClaimData, reads: ClaimReadContext) {
+    if (currentSnapshot(reads.refund)) { setRefundableAmount(next.refundableAmount); setRefundClaimed(next.refundClaimed); }
+    if (currentSnapshot(reads.reward)) { setRewardEntitlement(next.rewardEntitlement); setRewardClaimed(next.rewardClaimed); }
+    if (currentSnapshot(reads.global)) { setSellerCredit(next.sellerCredit); setProtocolFeeCredit(next.protocolFeeCredit); }
+    if (currentSnapshot(reads.refund) && currentSnapshot(reads.reward) && currentSnapshot(reads.global)) {
+      setClaimDataMessage(next.unavailable ? "Some wallet claim data is unavailable. Refresh to retry failed reads." : null);
+    }
   }
 
   async function readWalletClaimData(): Promise<WalletClaimData> {
@@ -253,34 +404,40 @@ export function WalletClaimPanel({
       })
     ]);
 
-    return {
-      refundableAmount: nextRefundableAmount.status === "fulfilled" ? nextRefundableAmount.value : null,
-      refundClaimed: nextRefundClaimed.status === "fulfilled" ? nextRefundClaimed.value : null,
-      rewardEntitlement: nextRewardEntitlement.status === "fulfilled" ? nextRewardEntitlement.value : null,
-      rewardClaimed: nextRewardClaimed.status === "fulfilled" ? nextRewardClaimed.value : null,
-      sellerCredit: nextSellerCredit.status === "fulfilled" ? nextSellerCredit.value : null,
-      protocolFeeCredit: nextProtocolFeeCredit.status === "fulfilled" ? nextProtocolFeeCredit.value : null,
-      unavailable: [nextRefundableAmount, nextRefundClaimed, nextRewardEntitlement, nextRewardClaimed, nextSellerCredit, nextProtocolFeeCredit].some((read) => read.status === "rejected")
+    const values = {
+      refundableAmount: nextRefundableAmount.status === "fulfilled" && isAmount(nextRefundableAmount.value) ? nextRefundableAmount.value : null,
+      refundClaimed: nextRefundClaimed.status === "fulfilled" && isFlag(nextRefundClaimed.value) ? nextRefundClaimed.value : null,
+      rewardEntitlement: nextRewardEntitlement.status === "fulfilled" && isAmount(nextRewardEntitlement.value) ? nextRewardEntitlement.value : null,
+      rewardClaimed: nextRewardClaimed.status === "fulfilled" && isFlag(nextRewardClaimed.value) ? nextRewardClaimed.value : null,
+      sellerCredit: nextSellerCredit.status === "fulfilled" && isAmount(nextSellerCredit.value) ? nextSellerCredit.value : null,
+      protocolFeeCredit: nextProtocolFeeCredit.status === "fulfilled" && isAmount(nextProtocolFeeCredit.value) ? nextProtocolFeeCredit.value : null
     };
+    return { ...values, unavailable: Object.values(values).some((value) => value === null) };
   }
 
-  function clearClaimData() {
+  function clearClaimData(reads: ClaimReadContext) {
     applyClaimData({ refundableAmount: null, refundClaimed: null, rewardEntitlement: null, rewardClaimed: null,
-      sellerCredit: null, protocolFeeCredit: null, unavailable: true });
+      sellerCredit: null, protocolFeeCredit: null, unavailable: true }, reads);
   }
 
   async function loadWalletClaimData() {
+    const reads = snapshotClaimReads();
+    const loadRevision = ++claimLoadRevision.current;
     try {
       setIsLoadingClaimData(true);
-      setMessage(null);
+      setClaimDataMessage(null);
 
       const next = await readWalletClaimData();
-      applyClaimData(next);
+      if (loadRevision !== claimLoadRevision.current || !mounted.current) return;
+      applyClaimData(next, reads);
     } catch (caught) {
-      clearClaimData();
-      setMessage(`Wallet claim data is unavailable. ${walletErrorMessage(caught, "Unable to load wallet claim data.")}`);
+      if (loadRevision !== claimLoadRevision.current || !mounted.current) return;
+      clearClaimData(reads);
+      if (currentSnapshot(reads.refund) && currentSnapshot(reads.global)) {
+        setClaimDataMessage(`Wallet claim data is unavailable. ${walletErrorMessage(caught, "Unable to load wallet claim data.")}`);
+      }
     } finally {
-      setIsLoadingClaimData(false);
+      if (loadRevision === claimLoadRevision.current && mounted.current) setIsLoadingClaimData(false);
     }
   }
 
@@ -288,10 +445,10 @@ export function WalletClaimPanel({
     if (!deployment || !address || wrongNetwork) return;
 
     loadWalletClaimData().catch((caught) => {
-      setMessage(walletErrorMessage(caught, "Unable to load wallet claim data."));
+      setClaimDataMessage(walletErrorMessage(caught, "Unable to load wallet claim data."));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, connector?.uid, auction.auctionId, deployment, wrongNetwork]);
+  }, [walletKey, pageKey, deployment, wrongNetwork]);
 
   async function confirmSubmittedTransaction(
     publicClient: PublicClient,
@@ -301,17 +458,38 @@ export function WalletClaimPanel({
     proof: { abi: Abi; eventName: string; address: Address; expected: Readonly<Record<string, string | bigint>>; positiveAmount?: boolean },
     successMessage: string,
     nextAction: string,
-    action: ClaimAction
+    action: ClaimAction,
+    snapshot: ActionSnapshot
   ) {
     const submission = walletTransactionSubmission(hash, intent,
       (receipt) => matchingWalletActionEvents(receipt, proof).length === 1 ? {} : null);
-    recovery.current = { submission, contextKey, successMessage, nextAction, refreshingMessage, action };
-    if (activeContext.current !== contextKey) setTxStatus(unknownConfirmationState(hash));
-    await finishConfirmation(await confirmWalletTransaction(publicClient, submission), recovery.current);
+    const stored = { submission, context: snapshot, successMessage, nextAction, refreshingMessage, action };
+    recovery.current = stored;
+    if (!currentSnapshot(snapshot, false)) setTxStatus(walletConfirmationState({ outcome: "unknown", submission }));
+    await finishConfirmation(await confirmWalletTransaction(publicClient, submission), stored);
   }
 
-  async function finishConfirmation(result: WalletConfirmationResult, stored: NonNullable<typeof recovery.current>) {
-    if (activeContext.current !== stored.contextKey) return;
+  async function finishConfirmation(result: WalletConfirmationResult, stored: NonNullable<typeof recovery.current>, historicalVerification = false) {
+    if (!currentSnapshot(stored.context, false)) {
+      if (!historicalVerification) {
+        setTxStatus(walletConfirmationState({ outcome: "unknown", submission: result.submission }));
+        return;
+      }
+      if (!mounted.current || activeContext.current.walletKey !== stored.context.walletKey) return;
+      if (result.outcome === "confirmed") {
+        const hash = result.submission.effectiveHash;
+        setTxStatus({ ...confirmedTransactionState(hash,
+          isAuctionClaim(stored.action) ? `Previously reviewed auction #${stored.context.auctionId}: ${stored.successMessage}` : stored.successMessage,
+          isAuctionClaim(stored.action) ? "This result belongs to the previously reviewed lot. Review the current auction separately."
+            : "This withdrawal belongs to the submitting wallet's global credit, independently of the displayed auction."),
+          technicalDetail: hash !== result.submission.originalHash ? `Originally submitted as ${result.submission.originalHash}.` : undefined });
+        recovery.current = null;
+      } else {
+        if (result.outcome !== "unknown") recovery.current = null;
+        setTxStatus(walletConfirmationState(result));
+      }
+      return;
+    }
     if (result.outcome !== "confirmed") {
       if (result.outcome !== "unknown") recovery.current = null;
       setTxStatus(walletConfirmationState(result));
@@ -323,36 +501,38 @@ export function WalletClaimPanel({
 
   async function verifyTransaction() {
     const stored = recovery.current;
-    if (!stored || stored.contextKey !== contextKey || pendingAction || isVerifying) return;
+    if (!stored || stored.context.walletKey !== walletKey || pendingAction || isVerifying) return;
     try {
       setIsVerifying(true);
       const { publicClient } = await createConnectedWalletClients(config, connector, stored.submission.intent.account);
-      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored);
-    } catch { setTxStatus(unknownConfirmationState(stored.submission.effectiveHash)); }
+      await finishConfirmation(await confirmWalletTransaction(publicClient, stored.submission, { recheck: true }), stored, true);
+    } catch { setTxStatus(walletConfirmationState({ outcome: "unknown", submission: stored.submission })); }
     finally { setIsVerifying(false); }
   }
 
   async function afterSuccessfulAction(stored: NonNullable<typeof recovery.current>) {
     let refreshIncomplete = false;
+    if (!currentSnapshot(stored.context, false)) return;
 
     try {
-      await onActionComplete();
+      if (activeContext.current.pageKey === stored.context.pageKey) await onActionComplete();
     } catch {
       refreshIncomplete = true;
     }
 
+    const reads = snapshotClaimReads();
     try {
       const next = await readWalletClaimData();
-      if (activeContext.current !== stored.contextKey) return;
-      applyClaimData(next);
+      if (!currentSnapshot(stored.context, false)) return;
+      applyClaimData(next, reads);
       refreshIncomplete ||= next.unavailable;
     } catch {
-      if (activeContext.current !== stored.contextKey) return;
-      clearClaimData();
+      if (!currentSnapshot(stored.context, false)) return;
+      clearClaimData(reads);
       refreshIncomplete = true;
     }
 
-    if (activeContext.current !== stored.contextKey) return;
+    if (!currentSnapshot(stored.context, false)) return;
     recovery.current = null;
     if (stored.action.startsWith("claim-")) setCompletedClaims((current) => [...current, stored.action]);
     setSelectedAction(null);
@@ -372,19 +552,37 @@ export function WalletClaimPanel({
   }
 
   async function refreshConfirmedData() {
-    const submittedContext = contextKey;
+    const submittedContext = statusContext.current;
+    const reads = snapshotClaimReads();
     if (isLoadingClaimData || pendingAction || isVerifying) return;
     try {
       setIsLoadingClaimData(true);
       await onActionComplete();
       const next = await readWalletClaimData();
-      if (activeContext.current !== submittedContext) return;
-      applyClaimData(next);
+      if (!submittedContext || !currentSnapshot(submittedContext, false)) return;
+      applyClaimData(next, reads);
       if (!next.unavailable) setTxStatus((current) => current?.phase === "confirmed" ? { ...current,
         message: current.message.replace(" Displayed action data could not be fully refreshed.", ""),
         nextAction: "Review the refreshed auction and wallet claim data.", refreshIncomplete: false } : current);
     } catch { /* Keep the verified transaction and the refresh warning. */ }
     finally { setIsLoadingClaimData(false); }
+  }
+
+  async function refreshAuctionContext() {
+    if (isLoadingClaimData || pendingAction || isVerifying) return;
+    const submittedPage = pageKey;
+    const submittedWallet = walletKey;
+    try {
+      setIsLoadingClaimData(true);
+      setSelectedAction(null);
+      const loaded = await fetchDeployment();
+      if (!mounted.current || activeContext.current.pageKey !== submittedPage || activeContext.current.walletKey !== submittedWallet) return;
+      setDeployment(loaded);
+      setDeploymentError(null);
+      await onActionComplete();
+      setMessage(null);
+    } catch { setMessage("Auction details could not be refreshed. No signature was requested. Try again."); }
+    finally { if (mounted.current) setIsLoadingClaimData(false); }
   }
 
   async function claimNft() {
@@ -395,16 +593,7 @@ export function WalletClaimPanel({
       setMessage(null);
       setTxStatus(null);
 
-      const context = requireWalletContext();
-
-      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
-      await verifyWalletChain(provider);
-      const liveAuction = await publicClient.readContract({
-        address: context.deployment.contracts.auctionHouse,
-        abi: auctionHouseAbi,
-        functionName: "getAuction",
-        args: [context.auctionId]
-      });
+      const { context, snapshot, provider, publicClient, walletClient, liveAuction, referenceBlock } = await prepareAuctionClaim("claim-nft");
       const claimant = isZeroAddress(liveAuction.highestBidder) ? liveAuction.seller : liveAuction.highestBidder;
       const liveState = getClaimNftActionState({
         isConnected: true, wrongNetwork: false, targetChainLabel,
@@ -419,6 +608,7 @@ export function WalletClaimPanel({
         try { await onActionComplete(); } catch { /* Keep the preflight explanation available. */ }
         return;
       }
+      await beforeSignature(snapshot, context, provider, publicClient, referenceBlock);
       setTxStatus(awaitingSignatureState("Confirm NFT claim in your wallet."));
 
       const request = {
@@ -431,17 +621,15 @@ export function WalletClaimPanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: auctionHouseAbi, eventName: "NFTClaimed", address: request.address,
         expected: Object.freeze({ auctionId: context.auctionId, claimant: context.account }), positiveAmount: false };
+      assertCurrentSnapshot(snapshot);
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "NFT claim transaction submitted. Waiting for confirmation."));
       await confirmSubmittedTransaction(publicClient, hash, "NFT claim confirmed on-chain. Refreshing claimant state.", intent, proof,
-        "NFT claimed.", "Review any other available claim or withdrawal.", "claim-nft");
+        "NFT claimed.", "Review any other available claim or withdrawal.", "claim-nft", snapshot);
     } catch (caught) {
-      const failed = submittedHash
-        ? unknownConfirmationState(submittedHash, caught)
-        : failedTransactionState(caught, "NFT claim failed before submission.");
-      setTxStatus(failed);
+      failAction(caught, submittedHash, "NFT claim failed before submission.");
     } finally {
       setPendingAction(null);
     }
@@ -455,29 +643,13 @@ export function WalletClaimPanel({
       setMessage(null);
       setTxStatus(null);
 
-      const context = requireWalletContext();
-
       if (!auction.finalized) throw new Error("Auction is not finalized.");
-
-      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
+      const { context, snapshot, provider, publicClient, walletClient, liveAuction, referenceBlock } = await prepareAuctionClaim("claim-refund");
+      if (liveAuction.state !== 2) throw new Error("Auction is not finalized.");
       setRefundableAmount(null);
       setRefundClaimed(null);
-      await verifyWalletChain(provider);
-
-      const [amount, wasClaimed] = await Promise.all([
-        publicClient.readContract({
-          address: context.deployment.contracts.escrowVault,
-          abi: escrowVaultAbi,
-          functionName: "refundableAmount",
-          args: [context.auctionId, context.account]
-        }),
-        publicClient.readContract({
-          address: context.deployment.contracts.escrowVault,
-          abi: escrowVaultAbi,
-          functionName: "refundClaimed",
-          args: [context.auctionId, context.account]
-        })
-      ]);
+      const { amount, wasClaimed } = await readClaimEligibility(publicClient, context, "claim-refund", referenceBlock);
+      assertCurrentSnapshot(snapshot);
 
       setRefundableAmount(amount);
       setRefundClaimed(wasClaimed);
@@ -485,6 +657,7 @@ export function WalletClaimPanel({
       if (wasClaimed) throw new Error("Refund already claimed.");
       if (amount === 0n) throw new Error("No refund available.");
 
+      await beforeSignature(snapshot, context, provider, publicClient, referenceBlock);
       setTxStatus(awaitingSignatureState("Confirm refund claim in your wallet."));
 
       const request = {
@@ -497,17 +670,15 @@ export function WalletClaimPanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: escrowVaultAbi, eventName: "RefundClaimed", address: request.address,
         expected: Object.freeze({ auctionId: context.auctionId, bidder: context.account }), positiveAmount: true };
+      assertCurrentSnapshot(snapshot);
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Refund claim transaction submitted. Waiting for confirmation."));
       await confirmSubmittedTransaction(publicClient, hash, "Refund confirmed on-chain. Refreshing refundable balance.", intent, proof,
-        "Refund claimed.", "Review any separate redistribution or withdrawal still available.", "claim-refund");
+        "Refund claimed.", "Review any separate redistribution or withdrawal still available.", "claim-refund", snapshot);
     } catch (caught) {
-      const failed = submittedHash
-        ? unknownConfirmationState(submittedHash, caught)
-        : failedTransactionState(caught, "Refund claim failed before submission.");
-      setTxStatus(failed);
+      failAction(caught, submittedHash, "Refund claim failed before submission.");
     } finally {
       setPendingAction(null);
     }
@@ -521,29 +692,13 @@ export function WalletClaimPanel({
       setMessage(null);
       setTxStatus(null);
 
-      const context = requireWalletContext();
-
       if (!auction.finalized) throw new Error("Auction is not finalized.");
-
-      const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
+      const { context, snapshot, provider, publicClient, walletClient, liveAuction, referenceBlock } = await prepareAuctionClaim("claim-reward");
+      if (liveAuction.state !== 2) throw new Error("Auction is not finalized.");
       setRewardEntitlement(null);
       setRewardClaimed(null);
-      await verifyWalletChain(provider);
-
-      const [entitlement, wasClaimed] = await Promise.all([
-        publicClient.readContract({
-          address: context.deployment.contracts.distributionVault,
-          abi: distributionVaultAbi,
-          functionName: "entitlementOf",
-          args: [context.auctionId, context.account]
-        }),
-        publicClient.readContract({
-          address: context.deployment.contracts.distributionVault,
-          abi: distributionVaultAbi,
-          functionName: "claimed",
-          args: [context.auctionId, context.account]
-        })
-      ]);
+      const { amount: entitlement, wasClaimed } = await readClaimEligibility(publicClient, context, "claim-reward", referenceBlock);
+      assertCurrentSnapshot(snapshot);
 
       setRewardEntitlement(entitlement);
       setRewardClaimed(wasClaimed);
@@ -551,6 +706,7 @@ export function WalletClaimPanel({
       if (wasClaimed) throw new Error("Reward already claimed.");
       if (entitlement === 0n) throw new Error("No reward available.");
 
+      await beforeSignature(snapshot, context, provider, publicClient, referenceBlock);
       setTxStatus(awaitingSignatureState("Confirm redistribution claim in your wallet."));
 
       const request = {
@@ -563,17 +719,15 @@ export function WalletClaimPanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: distributionVaultAbi, eventName: "DistributionClaimed", address: request.address,
         expected: Object.freeze({ auctionId: context.auctionId, claimant: context.account }), positiveAmount: true };
+      assertCurrentSnapshot(snapshot);
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Redistribution claim submitted. Waiting for confirmation."));
       await confirmSubmittedTransaction(publicClient, hash, "Redistribution confirmed on-chain. Refreshing entitlement state.", intent, proof,
-        "Redistribution claimed.", "Review any separate refund or withdrawal still available.", "claim-reward");
+        "Redistribution claimed.", "Review any separate refund or withdrawal still available.", "claim-reward", snapshot);
     } catch (caught) {
-      const failed = submittedHash
-        ? unknownConfirmationState(submittedHash, caught)
-        : failedTransactionState(caught, "Redistribution claim failed before submission.");
-      setTxStatus(failed);
+      failAction(caught, submittedHash, "Redistribution claim failed before submission.");
     } finally {
       setPendingAction(null);
     }
@@ -588,25 +742,27 @@ export function WalletClaimPanel({
       setTxStatus(null);
 
       const context = requireWalletContext();
+      const snapshot = snapshotAction("withdraw-seller");
+      statusContext.current = snapshot;
+      assertCurrentSnapshot(snapshot);
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
       if (!sameAddress(context.account, auction.seller)) throw new Error("Connect the seller wallet.");
 
       const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setSellerCredit(null);
+      assertCurrentSnapshot(snapshot);
       await verifyWalletChain(provider);
+      assertCurrentSnapshot(snapshot);
 
-      const credit = await publicClient.readContract({
-        address: context.deployment.contracts.escrowVault,
-        abi: escrowVaultAbi,
-        functionName: "sellerCredits",
-        args: [context.account]
-      });
+      const credit = await readWithdrawalCredit(publicClient, context, "withdraw-seller");
+      assertCurrentSnapshot(snapshot);
 
       setSellerCredit(credit);
 
       if (credit === 0n) throw new Error("No seller proceeds.");
 
+      await beforeSignature(snapshot, context, provider, publicClient);
       setTxStatus(awaitingSignatureState("Confirm seller proceeds withdrawal in your wallet."));
 
       const request = {
@@ -618,17 +774,15 @@ export function WalletClaimPanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: escrowVaultAbi, eventName: "SellerProceedsWithdrawn", address: request.address,
         expected: Object.freeze({ seller: context.account }), positiveAmount: true };
+      assertCurrentSnapshot(snapshot);
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Seller proceeds withdrawal submitted. Waiting for confirmation."));
       await confirmSubmittedTransaction(publicClient, hash, "Proceeds withdrawal confirmed on-chain. Refreshing wallet-level credit.", intent, proof,
-        "Proceeds withdrawn.", "Review any other available claim or withdrawal.", "withdraw-seller");
+        "Proceeds withdrawn.", "Review any other available claim or withdrawal.", "withdraw-seller", snapshot);
     } catch (caught) {
-      const failed = submittedHash
-        ? unknownConfirmationState(submittedHash, caught)
-        : failedTransactionState(caught, "Proceeds withdrawal failed before submission.");
-      setTxStatus(failed);
+      failAction(caught, submittedHash, "Proceeds withdrawal failed before submission.");
     } finally {
       setPendingAction(null);
     }
@@ -643,6 +797,9 @@ export function WalletClaimPanel({
       setTxStatus(null);
 
       const context = requireWalletContext();
+      const snapshot = snapshotAction("withdraw-fees");
+      statusContext.current = snapshot;
+      assertCurrentSnapshot(snapshot);
 
       if (!auction.finalized) throw new Error("Auction is not finalized.");
       if (auction.auctionFeeRecipient && !sameAddress(context.account, auction.auctionFeeRecipient)) {
@@ -651,19 +808,18 @@ export function WalletClaimPanel({
 
       const { provider, publicClient, walletClient } = await createConnectedWalletClients(config, connector, context.account);
       setProtocolFeeCredit(null);
+      assertCurrentSnapshot(snapshot);
       await verifyWalletChain(provider);
+      assertCurrentSnapshot(snapshot);
 
-      const credit = await publicClient.readContract({
-        address: context.deployment.contracts.escrowVault,
-        abi: escrowVaultAbi,
-        functionName: "protocolFeeCredits",
-        args: [context.account]
-      });
+      const credit = await readWithdrawalCredit(publicClient, context, "withdraw-fees");
+      assertCurrentSnapshot(snapshot);
 
       setProtocolFeeCredit(credit);
 
       if (credit === 0n) throw new Error("No protocol fees.");
 
+      await beforeSignature(snapshot, context, provider, publicClient);
       setTxStatus(awaitingSignatureState("Confirm protocol fee withdrawal in your wallet."));
 
       const request = {
@@ -675,17 +831,15 @@ export function WalletClaimPanel({
         data: encodeFunctionData(request), value: 0n });
       const proof = { abi: escrowVaultAbi, eventName: "ProtocolFeesWithdrawn", address: request.address,
         expected: Object.freeze({ recipient: context.account }), positiveAmount: true };
+      assertCurrentSnapshot(snapshot);
       const hash = await walletClient.writeContract(request);
       submittedHash = hash;
 
       setTxStatus(pendingTransactionState(hash, "Protocol fee withdrawal submitted. Waiting for confirmation."));
       await confirmSubmittedTransaction(publicClient, hash, "Protocol fee withdrawal confirmed on-chain. Refreshing wallet-level credit.", intent, proof,
-        "Protocol fees withdrawn.", "Review any other available claim or withdrawal.", "withdraw-fees");
+        "Protocol fees withdrawn.", "Review any other available claim or withdrawal.", "withdraw-fees", snapshot);
     } catch (caught) {
-      const failed = submittedHash
-        ? unknownConfirmationState(submittedHash, caught)
-        : failedTransactionState(caught, "Protocol fee withdrawal failed before submission.");
-      setTxStatus(failed);
+      failAction(caught, submittedHash, "Protocol fee withdrawal failed before submission.");
     } finally {
       setPendingAction(null);
     }
@@ -764,6 +918,8 @@ export function WalletClaimPanel({
     { action: "withdraw-fees", disabledReason: withdrawFeesDisabledReason }
   ];
   const primaryAction = actionStates.find((item) => !item.disabledReason)?.action ?? null;
+  // A later balance read must not erase the reason a signature was refused.
+  const panelMessage = message ?? claimDataMessage;
 
   function selectedReview() {
     if (!selectedAction) return null;
@@ -927,7 +1083,7 @@ export function WalletClaimPanel({
         <button
           type="button"
           disabled={!isConnected || wrongNetwork || !deployment || isLoadingClaimData || pendingAction !== null}
-          onClick={() => loadWalletClaimData().catch((caught) => setMessage(walletErrorMessage(caught, "Unable to load wallet claim data.")))}
+          onClick={() => loadWalletClaimData().catch((caught) => setClaimDataMessage(walletErrorMessage(caught, "Unable to load wallet claim data.")))}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >
           {isLoadingClaimData ? "Loading..." : "Refresh wallet claim data"}
@@ -988,23 +1144,35 @@ export function WalletClaimPanel({
       {selectedAction ? <div className="mt-4">{selectedReview()}</div> : null}
 
       <div className="mt-4">
-        <WalletTransactionStatus title="Wallet claim / withdrawal" status={txStatus} />
-        {txStatus?.refreshIncomplete ? <button type="button" onClick={refreshConfirmedData}
+        {historicalTransaction ? <p role="status" className="mb-3 text-sm text-amber-200">
+          Transaction for the previously reviewed auction #{statusContext.current?.auctionId}. Its result is separate from the displayed lot.
+        </p> : null}
+        {globalTransaction ? <p role="status" className="mb-3 text-sm text-slate-300">
+          This withdrawal uses the submitting wallet's global credit and is not attributed to the displayed auction.
+        </p> : null}
+        <WalletTransactionStatus title={historicalTransaction ? "Previously submitted auction claim" : globalTransaction ? "Wallet-level withdrawal" : "Wallet claim / withdrawal"} status={txStatus} />
+        {txStatus?.refreshIncomplete && !historicalTransaction ? <button type="button" onClick={refreshConfirmedData}
           disabled={isLoadingClaimData || pendingAction !== null || isVerifying || wrongNetwork || !isConnected}
           className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
           {isLoadingClaimData ? "Refreshing..." : "Refresh auction and wallet claim data"}
         </button> : null}
         {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
           <button type="button" onClick={verifyTransaction}
-            disabled={isVerifying || pendingAction !== null || recovery.current?.contextKey !== contextKey}
+            disabled={isVerifying || pendingAction !== null || recovery.current?.context.walletKey !== walletKey}
             className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
             {isVerifying ? "Verifying..." : "Verify transaction"}
           </button>
-          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet, network and auction if they changed.</p>
+          <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet and network if they changed. Results for a previously reviewed lot remain separate.</p>
         </div> : null}
       </div>
 
-      {message ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
+      {panelMessage ? <div role="status" aria-live="polite" className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">
+        {panelMessage}
+        <button type="button" onClick={refreshAuctionContext} disabled={isLoadingClaimData || pendingAction !== null || isVerifying}
+          className="mt-3 block min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          {isLoadingClaimData ? "Refreshing..." : "Refresh auction details"}
+        </button>
+      </div> : null}
     </section>
   );
 }
