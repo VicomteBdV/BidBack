@@ -121,7 +121,8 @@ describe("auctionEventReader", () => {
     });
 
     expect(result.discovery.strategy).toBe("bounded-fallback");
-    expect(result.discovery.warning).toMatch(/RPC event failure/);
+    expect(result.discovery.warning).toBe("Wallet activity event scan failed; used bounded nextAuctionId fallback. Results are limited to 2 newest auction IDs out of 5 known auctions.");
+    expect(result.discovery.warning).not.toContain("RPC event failure");
     expect(result.ids.map((id) => id.toString())).toEqual(["5", "4"]);
   });
 
