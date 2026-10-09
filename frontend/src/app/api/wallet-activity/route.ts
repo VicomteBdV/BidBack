@@ -18,15 +18,6 @@ import { buildWalletActivity, type WalletActivityAuction, type WalletAuctionPosi
 
 export const dynamic = "force-dynamic";
 
-function errorMessage(error: unknown) {
-  if (error && typeof error === "object" && "shortMessage" in error) {
-    const shortMessage = (error as { shortMessage?: unknown }).shortMessage;
-    if (typeof shortMessage === "string") return shortMessage;
-  }
-
-  return error instanceof Error ? error.message : "Unable to read wallet activity";
-}
-
 function requestedLimit(value: string | null) {
   if (value === null || value === "") return normalizeWalletActivityEventLimit(value);
 
@@ -66,10 +57,10 @@ async function readGlobalCredit({
       args: [wallet]
     });
     return { value: toDecimalString(value) };
-  } catch (error) {
+  } catch {
     return {
       value: "0",
-      warning: `Unable to read ${label}: ${errorMessage(error)}`
+      warning: `Unable to read ${label}.`
     };
   }
 }
@@ -178,10 +169,10 @@ async function enrichAuctionForWallet({
       auctionFeeRecipient,
       walletPosition
     };
-  } catch (error) {
+  } catch {
     return {
       ...auction,
-      walletPositionError: errorMessage(error)
+      walletPositionError: "Unable to read wallet position for this auction."
     };
   }
 }
@@ -264,10 +255,10 @@ export async function GET(request: Request) {
         warnings: activityWarnings
       })
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
-        error: errorMessage(error)
+        error: "Unable to read wallet activity"
       },
       {
         status: 503

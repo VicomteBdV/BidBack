@@ -277,9 +277,8 @@ export async function discoverWalletActivityAuctionIds({
         )
       }
     };
-  } catch (error) {
+  } catch {
     const fallbackIds = fallbackAuctionIdsFromNextId(nextAuctionId, limit);
-    const message = error instanceof Error ? error.message : String(error);
 
     return {
       ids: fallbackIds,
@@ -291,7 +290,7 @@ export async function discoverWalletActivityAuctionIds({
         warning: boundedWarning(
           nextAuctionId,
           limit,
-          `Wallet activity event scan failed; used bounded nextAuctionId fallback: ${message}`
+          "Wallet activity event scan failed; used bounded nextAuctionId fallback."
         )
       }
     };
