@@ -2,8 +2,8 @@ import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AuctionDetail } from "@/components/AuctionDetail";
-import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture, settledReadinessFixture } from "@/test/fixtures";
+import type { AuctionDetailApiResponse, SerializedAuction } from "@/lib/auctionTypes";
+import { auctionDetailFixture, settledReadinessFixture, testAddresses } from "@/test/fixtures";
 
 vi.mock("@/components/AuctionDevActions", () => ({
   AuctionDevActions: () => (
@@ -41,23 +41,48 @@ vi.mock("@/components/WalletBidPanel", () => ({
   }
 }));
 
+const finalizePanel = vi.hoisted(() => ({
+  expectedChainId: null as number | null,
+  expectedAuctionHouse: null as `0x${string}` | null,
+  auction: null as SerializedAuction | null,
+  refresh: null as null | (() => Promise<void>)
+}));
 vi.mock("@/components/WalletFinalizePanel", () => ({
-  WalletFinalizePanel: () => (
+  WalletFinalizePanel: (props: { expectedChainId: number; expectedAuctionHouse: `0x${string}`; auction: SerializedAuction; onFinalizeComplete: () => Promise<void> }) => {
+    finalizePanel.expectedChainId = props.expectedChainId;
+    finalizePanel.expectedAuctionHouse = props.expectedAuctionHouse;
+    finalizePanel.auction = props.auction;
+    finalizePanel.refresh = props.onFinalizeComplete;
+    return (
     <section>
       <h3>Wallet-signed finalization</h3>
     </section>
-  )
+  );
+  }
 }));
 
+const claimPanel = vi.hoisted(() => ({
+  expectedChainId: null as number | null,
+  expectedAuctionHouse: null as `0x${string}` | null,
+  auction: null as SerializedAuction | null,
+  refresh: null as null | (() => Promise<void>)
+}));
 vi.mock("@/components/WalletClaimPanel", () => ({
-  WalletClaimPanel: () => (
+  WalletClaimPanel: (props: { expectedChainId: number; expectedAuctionHouse: `0x${string}`; auction: SerializedAuction; onActionComplete: () => Promise<void> }) => {
+    claimPanel.expectedChainId = props.expectedChainId;
+    claimPanel.expectedAuctionHouse = props.expectedAuctionHouse;
+    claimPanel.auction = props.auction;
+    claimPanel.refresh = props.onActionComplete;
+    return (
     <section>
       <h3>Wallet-signed claims / withdrawals</h3>
     </section>
-  )
+  );
+  }
 }));
 
-function mockAuctionDetailFetch(auction: SerializedAuction = auctionDetailFixture.auction) {
+function mockAuctionDetailFetch(auction: SerializedAuction = auctionDetailFixture.auction,
+  context: Pick<AuctionDetailApiResponse, "chainId" | "auctionHouse"> = auctionDetailFixture) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -66,8 +91,8 @@ function mockAuctionDetailFetch(auction: SerializedAuction = auctionDetailFixtur
       if (url.includes("/api/auctions/1/history")) {
         return new Response(
           JSON.stringify({
-            chainId: auctionDetailFixture.chainId,
-            auctionHouse: auctionDetailFixture.auctionHouse,
+            chainId: context.chainId,
+            auctionHouse: context.auctionHouse,
             auctionId: auctionDetailFixture.auction.auctionId,
             history: auctionDetailFixture.auction.history
           }),
@@ -81,7 +106,7 @@ function mockAuctionDetailFetch(auction: SerializedAuction = auctionDetailFixtur
       }
 
       if (url.includes("/api/auctions/1")) {
-        return new Response(JSON.stringify({ ...auctionDetailFixture, auction }), {
+        return new Response(JSON.stringify({ ...auctionDetailFixture, ...context, auction }), {
           status: 200,
           headers: {
             "content-type": "application/json"
@@ -128,6 +153,12 @@ describe("AuctionDetail", () => {
     expect(lifecycleTimeline).toHaveTextContent("Settlement");
     expect(screen.getByLabelText("Finalization: Current")).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("heading", { name: "Wallet-signed finalization" })).toBeInTheDocument();
+    expect(finalizePanel.expectedChainId).toBe(auctionDetailFixture.chainId);
+    expect(finalizePanel.expectedAuctionHouse).toBe(auctionDetailFixture.auctionHouse);
+    expect(finalizePanel.auction).toMatchObject({ auctionId: auctionDetailFixture.auction.auctionId,
+      seller: auctionDetailFixture.auction.seller, nft: auctionDetailFixture.auction.nft,
+      tokenId: auctionDetailFixture.auction.tokenId, startPrice: auctionDetailFixture.auction.startPrice,
+      startTime: auctionDetailFixture.auction.startTime, initialEndTime: auctionDetailFixture.auction.initialEndTime });
     expect(screen.queryByRole("heading", { name: "Wallet-signed bid" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wallet-signed claims / withdrawals" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Economic transparency / Settlement breakdown" })).toBeInTheDocument();
@@ -137,6 +168,19 @@ describe("AuctionDetail", () => {
     expect(screen.getByRole("heading", { name: "Technical details" })).toBeInTheDocument();
     expect(screen.getAllByText("BidBack Demo NFT #1").length).toBeGreaterThan(0);
     expect(screen.getByText("BidBack Demo Collection (BID)")).toBeInTheDocument();
+  });
+
+  it("passes refreshed displayed chain, house and same-ID lot fields to Finalize together", async () => {
+    mockAuctionDetailFetch();
+    render(<AuctionDetail auctionId="1" />);
+    await screen.findByRole("heading", { name: "Wallet-signed finalization" });
+    const refreshed = { ...auctionDetailFixture.auction, seller: testAddresses.secondBidder,
+      tokenId: "9007199254740993", startPrice: "9007199254740995" };
+    mockAuctionDetailFetch(refreshed, { chainId: 1, auctionHouse: testAddresses.localNft });
+    await act(async () => { await finalizePanel.refresh!(); });
+    expect(finalizePanel.expectedChainId).toBe(1);
+    expect(finalizePanel.expectedAuctionHouse).toBe(testAddresses.localNft);
+    expect(finalizePanel.auction).toMatchObject(refreshed);
   });
 
   it("selects the finalized action family without hiding its claims and withdrawals panel", async () => {
@@ -151,8 +195,29 @@ describe("AuctionDetail", () => {
     render(<AuctionDetail auctionId="1" />);
 
     expect(await screen.findByRole("heading", { name: "Wallet-signed claims / withdrawals" })).toBeInTheDocument();
+    expect(claimPanel.expectedChainId).toBe(auctionDetailFixture.chainId);
+    expect(claimPanel.expectedAuctionHouse).toBe(auctionDetailFixture.auctionHouse);
+    expect(claimPanel.auction).toMatchObject({ auctionId: auctionDetailFixture.auction.auctionId,
+      seller: auctionDetailFixture.auction.seller, nft: auctionDetailFixture.auction.nft,
+      tokenId: auctionDetailFixture.auction.tokenId, startPrice: auctionDetailFixture.auction.startPrice,
+      startTime: auctionDetailFixture.auction.startTime, initialEndTime: auctionDetailFixture.auction.initialEndTime });
     expect(screen.queryByRole("heading", { name: "Wallet-signed bid" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Wallet-signed finalization" })).not.toBeInTheDocument();
+  });
+
+  it("passes refreshed displayed chain, house and same-ID lot fields to Claim together", async () => {
+    const finalized = { ...auctionDetailFixture.auction, state: 2 as const, finalized: true, nftClaimed: false };
+    mockAuctionDetailFetch(finalized);
+    render(<AuctionDetail auctionId="1" />);
+    await screen.findByRole("heading", { name: "Wallet-signed claims / withdrawals" });
+    const refreshed = { ...finalized, seller: testAddresses.secondBidder, nft: testAddresses.secondBidder,
+      tokenId: "9007199254740993", startPrice: "9007199254740995",
+      startTime: "1800000000", initialEndTime: "1800000100" };
+    mockAuctionDetailFetch(refreshed, { chainId: 1, auctionHouse: testAddresses.localNft });
+    await act(async () => { await claimPanel.refresh!(); });
+    expect(claimPanel.expectedChainId).toBe(1);
+    expect(claimPanel.expectedAuctionHouse).toBe(testAddresses.localNft);
+    expect(claimPanel.auction).toMatchObject(refreshed);
   });
 
   it("selects bidding for an open auction", async () => {

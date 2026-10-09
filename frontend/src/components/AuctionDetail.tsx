@@ -125,9 +125,9 @@ export function AuctionDetail({
                 onBidComplete={() => loadAuction(true)}
               />
             ) : lifecycle.canFinalize ? (
-              <WalletFinalizePanel auction={auction} onFinalizeComplete={loadAuction} />
+              <WalletFinalizePanel auction={auction} expectedChainId={data.chainId} expectedAuctionHouse={data.auctionHouse} onFinalizeComplete={loadAuction} />
             ) : lifecycle.isFinalized ? (
-              <WalletClaimPanel auction={auction} onActionComplete={loadAuction} />
+              <WalletClaimPanel auction={auction} expectedChainId={data.chainId} expectedAuctionHouse={data.auctionHouse} onActionComplete={loadAuction} />
             ) : (
               <StateNotice tone="warning" title="Action state unavailable">
                 Refresh the auction before choosing a wallet-signed action.
