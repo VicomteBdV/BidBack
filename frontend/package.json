@@ -27,9 +27,10 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.23",
-    "next": "^15.3.4",
+    "next": "15.5.27",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sharp": "0.35.5",
     "viem": "^2.31.0",
     "wagmi": "^2.15.6"
   },
