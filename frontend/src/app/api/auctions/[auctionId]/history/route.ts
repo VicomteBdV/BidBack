@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { AuctionHistoryApiResponse } from "@/lib/auctionTypes";
-import { readAuctionHistory } from "@/lib/server/auctionHistoryReader";
+import { InvalidBidHistoryCursorError, parseBidHistoryCursor, readAuctionHistory } from "@/lib/server/auctionHistoryReader";
 import {
   AuctionNotFoundError,
   createTargetPublicClient,
@@ -11,7 +11,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, context: { params: Promise<{ auctionId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ auctionId: string }> }) {
   const { auctionId: auctionIdParam } = await context.params;
   const auctionId = parseAuctionId(auctionIdParam);
 
@@ -27,13 +27,17 @@ export async function GET(_request: Request, context: { params: Promise<{ auctio
   }
 
   try {
+    const cursors = new URL(request.url).searchParams.getAll("before");
+    if (cursors.length > 1) throw new InvalidBidHistoryCursorError();
+    const before = cursors.length === 1 ? parseBidHistoryCursor(cursors[0]) : undefined;
     const [deployment, auctionDetail] = await Promise.all([readTargetDeployment(), readAuctionById(auctionIdParam)]);
     const client = createTargetPublicClient();
     const history = await readAuctionHistory({
       client,
       deployment,
       auctionId,
-      auction: auctionDetail.auction
+      auction: auctionDetail.auction,
+      before
     });
     const payload: AuctionHistoryApiResponse = {
       chainId: deployment.chainId,
@@ -46,10 +50,11 @@ export async function GET(_request: Request, context: { params: Promise<{ auctio
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof AuctionNotFoundError ? "Auction not found" : "Unable to read auction history"
+        error: error instanceof AuctionNotFoundError ? "Auction not found" :
+          error instanceof InvalidBidHistoryCursorError ? "Invalid bid history cursor" : "Unable to read auction history"
       },
       {
-        status: error instanceof AuctionNotFoundError ? 404 : 503
+        status: error instanceof AuctionNotFoundError ? 404 : error instanceof InvalidBidHistoryCursorError ? 400 : 503
       }
     );
   }

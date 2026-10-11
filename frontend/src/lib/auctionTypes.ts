@@ -170,6 +170,12 @@ export type AuctionHistory = {
   source: AuctionHistorySource;
   partial: boolean;
   warnings: string[];
+  /** Optional for compatibility with previously loaded history responses. */
+  totalBidCount?: string | null;
+  bidsAvailable?: boolean;
+  hasMoreBids?: boolean;
+  nextBefore?: string | null;
+  returnedBidCount?: number;
   bids: AuctionBidHistoryEntry[];
   events: AuctionHistoryEvent[];
   transparency: AuctionTransparencySummary;
