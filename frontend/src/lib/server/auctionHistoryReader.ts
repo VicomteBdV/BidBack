@@ -11,11 +11,26 @@ import type {
   AuctionTransparencySummary,
   SerializedAuction
 } from "@/lib/auctionTypes";
-import { ZERO_ADDRESS } from "@/lib/format";
 import type { DeploymentFile } from "@/lib/server/auctionReader";
 
 const MAX_BID_HISTORY_RECORDS = 200;
 const MAX_HISTORY_EVENTS = 250;
+const MAX_BLOCK_READ_CONCURRENCY = 8;
+const MAX_UINT256 = (1n << 256n) - 1n;
+
+export class InvalidBidHistoryCursorError extends Error {
+  constructor() {
+    super("Invalid bid history cursor");
+    this.name = "InvalidBidHistoryCursorError";
+  }
+}
+
+export function parseBidHistoryCursor(value: string): bigint {
+  if (!/^(0|[1-9][0-9]*)$/.test(value) || value.length > 78) throw new InvalidBidHistoryCursorError();
+  const cursor = BigInt(value);
+  if (cursor > MAX_UINT256) throw new InvalidBidHistoryCursorError();
+  return cursor;
+}
 
 type EventReadableClient = {
   getContractEvents: (request: {
@@ -37,6 +52,7 @@ type RawHistoryLog = {
   transactionHash?: `0x${string}` | null;
   blockNumber?: bigint | null;
   logIndex?: number | bigint | null;
+  removed?: boolean;
 };
 
 type HistoryEventConfig = {
@@ -58,11 +74,17 @@ type BidRecordReadResult = {
   readSucceeded: boolean;
   bids: AuctionBidHistoryEntry[];
   warning?: string;
+  totalBidCount: string | null;
+  hasMoreBids: boolean;
+  nextBefore: string | null;
 };
 
 type EventReadResult = {
   logs: TaggedHistoryLog[];
   warning?: string;
+  totalLogCount?: number;
+  bidLogs?: TaggedHistoryLog[];
+  bidLogsRead?: boolean;
 };
 
 function getField<T>(raw: unknown, key: string, index: number): T {
@@ -149,12 +171,16 @@ function buildTransparencySummary(auction: SerializedAuction): AuctionTransparen
 async function readBidRecords({
   client,
   deployment,
-  auctionId
+  auctionId,
+  before
 }: {
   client: PublicClient;
   deployment: DeploymentFile;
   auctionId: bigint;
+  before?: bigint;
 }): Promise<BidRecordReadResult> {
+  let totalBidCount: string | null = null;
+  if (before !== undefined && (before < 0n || before > MAX_UINT256)) throw new InvalidBidHistoryCursorError();
   try {
     const bidCount = (await client.readContract({
       address: deployment.contracts.auctionHouse,
@@ -162,9 +188,12 @@ async function readBidRecords({
       functionName: "getBidCount",
       args: [auctionId]
     })) as bigint;
-
-    const recordsToRead = bidCount > BigInt(MAX_BID_HISTORY_RECORDS) ? MAX_BID_HISTORY_RECORDS : Number(bidCount);
-    const startIndex = bidCount > BigInt(MAX_BID_HISTORY_RECORDS) ? bidCount - BigInt(MAX_BID_HISTORY_RECORDS) : 0n;
+    if (typeof bidCount !== "bigint" || bidCount < 0n || bidCount > MAX_UINT256) throw new Error("Invalid bid count");
+    totalBidCount = bidCount.toString();
+    if (before !== undefined && before > bidCount) throw new InvalidBidHistoryCursorError();
+    const endIndex = before ?? bidCount;
+    const startIndex = endIndex > BigInt(MAX_BID_HISTORY_RECORDS) ? endIndex - BigInt(MAX_BID_HISTORY_RECORDS) : 0n;
+    const recordsToRead = Number(endIndex - startIndex);
 
     const bids: AuctionBidHistoryEntry[] = [];
 
@@ -177,9 +206,11 @@ async function readBidRecords({
         args: [auctionId, recordIndex]
       });
 
+      const bidder = toAddress(getField(rawBid, "bidder", 0));
+      if (!bidder) throw new Error("Invalid bid record");
       bids.push({
         index: recordIndex.toString(),
-        bidder: toAddress(getField(rawBid, "bidder", 0)) ?? ZERO_ADDRESS,
+        bidder,
         amount: toDecimalString(getField(rawBid, "amount", 1)),
         timestamp: toDecimalString(getField(rawBid, "timestamp", 2))
       });
@@ -188,15 +219,20 @@ async function readBidRecords({
     return {
       readSucceeded: true,
       bids,
-      warning:
-        bidCount > BigInt(MAX_BID_HISTORY_RECORDS)
-          ? `Bid history is limited to the latest ${MAX_BID_HISTORY_RECORDS} bid records.`
-          : undefined
+      totalBidCount,
+      hasMoreBids: startIndex > 0n,
+      nextBefore: startIndex > 0n ? startIndex.toString() : null
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof InvalidBidHistoryCursorError) throw error;
+    // A failed page is atomic: never skip an unread record and advance its cursor.
+    if (before !== undefined) throw new Error("Unable to read earlier bid records");
     return {
       readSucceeded: false,
       bids: [],
+      totalBidCount,
+      hasMoreBids: false,
+      nextBefore: null,
       warning: "Unable to read bid records from AuctionHouse.getBid."
     };
   }
@@ -222,14 +258,38 @@ async function readEventsForConfig({
       toBlock: "latest"
     });
 
-    return {
-      logs: logs.map((log, index) => ({
+    // Retain only the earliest bounded timeline window, even if the RPC returns
+    // more logs or returns them in reverse order. Bid verification uses its own
+    // complete sequence below, independently of the mixed timeline window.
+    const retained: TaggedHistoryLog[] = [];
+    const bidLogs: TaggedHistoryLog[] = [];
+    logs.forEach((log, index) => {
+      const tagged = {
         ...log,
         source: config.source,
         eventName: config.eventName,
         kind: config.kind,
         fallbackIndex: index
-      }))
+      };
+      if (config.kind === "bid-placed" && logs.length <= MAX_BID_HISTORY_RECORDS) bidLogs.push(tagged);
+      let low = 0;
+      let high = retained.length;
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+        if (sortChronologically(retained[middle], tagged) <= 0) low = middle + 1;
+        else high = middle;
+      }
+      if (low < MAX_HISTORY_EVENTS) {
+        retained.splice(low, 0, tagged);
+        if (retained.length > MAX_HISTORY_EVENTS) retained.pop();
+      }
+    });
+
+    return {
+      logs: retained,
+      totalLogCount: logs.length,
+      bidLogs: config.kind === "bid-placed" ? bidLogs : undefined,
+      bidLogsRead: config.kind === "bid-placed"
     };
   } catch {
     return {
@@ -326,15 +386,17 @@ async function readHistoryLogs({
 
   const logs = results.flatMap((result) => result.logs).sort(sortChronologically);
   const warnings = results.flatMap((result) => (result.warning ? [result.warning] : []));
+  const totalLogCount = results.reduce((count, result) => count + (result.totalLogCount ?? 0), 0);
+  const bidResult = results[1];
+  if (totalLogCount > MAX_HISTORY_EVENTS) {
+    warnings.push(`Auction timeline is limited to the first ${MAX_HISTORY_EVENTS} logs returned by the RPC.`);
+  }
 
   return {
     logs: logs.slice(0, MAX_HISTORY_EVENTS),
-    warning:
-      warnings.length > 0
-        ? warnings.join(" ")
-        : logs.length > MAX_HISTORY_EVENTS
-          ? `Auction timeline is limited to the first ${MAX_HISTORY_EVENTS} logs returned by the RPC.`
-          : undefined
+    bidLogs: bidResult.bidLogs,
+    bidLogsRead: bidResult.bidLogsRead,
+    warning: warnings.length > 0 ? warnings.join(" ") : undefined
   };
 }
 
@@ -346,13 +408,17 @@ async function readBlockTimestamps(client: PublicClient, logs: TaggedHistoryLog[
   const timestamps = new Map<string, string>();
   const warnings: string[] = [];
 
+  let nextBlock = 0;
   await Promise.all(
-    blockNumbers.map(async (blockNumber) => {
-      try {
-        const block = await blockClient.getBlock({ blockNumber });
-        timestamps.set(blockNumber.toString(), toDecimalString(block.timestamp));
-      } catch {
-        warnings.push(`Unable to read timestamp for block ${blockNumber.toString()}.`);
+    Array.from({ length: Math.min(MAX_BLOCK_READ_CONCURRENCY, blockNumbers.length) }, async () => {
+      while (nextBlock < blockNumbers.length) {
+        const blockNumber = blockNumbers[nextBlock++];
+        try {
+          const block = await blockClient.getBlock({ blockNumber });
+          timestamps.set(blockNumber.toString(), toDecimalString(block.timestamp));
+        } catch {
+          warnings.push(`Unable to read timestamp for block ${blockNumber.toString()}.`);
+        }
       }
     })
   );
@@ -436,42 +502,42 @@ function serializeHistoryEvent(
   };
 }
 
-function bidEntriesFromLogs(logs: TaggedHistoryLog[], timestampByBlock: Map<string, string>): AuctionBidHistoryEntry[] {
-  return logs
-    .filter((log) => log.kind === "bid-placed")
-    .map((log, index) => {
-      const blockNumber = log.blockNumber?.toString();
-      const logIndex = normalizeLogIndex(log.logIndex, log.fallbackIndex);
-
-      return {
-        index: index.toString(),
-        bidder: eventActor(log) ?? ZERO_ADDRESS,
-        amount: eventAmount(log) ?? "0",
-        timestamp: blockNumber ? (timestampByBlock.get(blockNumber) ?? "0") : "0",
-        transactionHash: typeof log.transactionHash === "string" ? log.transactionHash : undefined,
-        blockNumber,
-        logIndex
-      };
-    });
+function realLogIndex(log: TaggedHistoryLog): number | undefined {
+  if (typeof log.logIndex === "bigint" && log.logIndex >= 0n && log.logIndex <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    return Number(log.logIndex);
+  }
+  if (typeof log.logIndex === "number" && Number.isSafeInteger(log.logIndex) && log.logIndex >= 0) return log.logIndex;
+  return undefined;
 }
 
-function mergeBidRecordsWithLogs(records: AuctionBidHistoryEntry[], logs: TaggedHistoryLog[]) {
-  const bidLogs = logs.filter((log) => log.kind === "bid-placed");
+function mergeBidRecordsWithLogs(result: BidRecordReadResult, events: EventReadResult, auctionId: bigint) {
+  const records = result.bids;
+  if (records.length === 0) return { bids: records };
+  const bidLogs = [...(events.bidLogs ?? [])].sort(sortChronologically);
+  const orderKeys = new Set<string>();
+  const verified = events.bidLogsRead && result.totalBidCount === String(records.length) &&
+    bidLogs.length === records.length && bidLogs.every((log, index) => {
+      const record = records[index];
+      const logIndex = realLogIndex(log);
+      if (log.removed || typeof log.blockNumber !== "bigint" || log.blockNumber < 0n || logIndex === undefined ||
+        typeof log.transactionHash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(log.transactionHash)) return false;
+      const orderKey = `${log.blockNumber}:${logIndex}`;
+      if (orderKeys.has(orderKey)) return false;
+      orderKeys.add(orderKey);
+      return record.index === String(index) && log.args?.auctionId === auctionId &&
+        toAddress(log.args?.bidder)?.toLowerCase() === record.bidder.toLowerCase() &&
+        typeof log.args?.amount === "bigint" && log.args.amount.toString() === record.amount;
+    });
 
-  return records.map((record, index) => {
-    const log = bidLogs[index];
-
-    if (!log) return record;
-
-    const blockNumber = log.blockNumber?.toString();
-
-    return {
+  if (!verified) {
+    return { bids: records, warning: "Bid transaction metadata is unavailable because the complete event sequence could not be verified against canonical bid records." };
+  }
+  return { bids: records.map((record, index) => ({
       ...record,
-      transactionHash: typeof log.transactionHash === "string" ? log.transactionHash : undefined,
-      blockNumber,
-      logIndex: normalizeLogIndex(log.logIndex, log.fallbackIndex)
-    };
-  });
+      transactionHash: bidLogs[index].transactionHash ?? undefined,
+      blockNumber: bidLogs[index].blockNumber?.toString(),
+      logIndex: realLogIndex(bidLogs[index])
+    })) };
 }
 
 function historySource({
@@ -493,17 +559,19 @@ export async function readAuctionHistory({
   client,
   deployment,
   auctionId,
-  auction
+  auction,
+  before
 }: {
   client: PublicClient;
   deployment: DeploymentFile;
   auctionId: bigint;
   auction: SerializedAuction;
+  before?: bigint;
 }): Promise<AuctionHistory> {
   const warnings: string[] = [];
   const [bidRecordResult, eventResult] = await Promise.all([
-    readBidRecords({ client, deployment, auctionId }),
-    readHistoryLogs({ client, deployment, auctionId })
+    readBidRecords({ client, deployment, auctionId, before }),
+    before === undefined ? readHistoryLogs({ client, deployment, auctionId }) : Promise.resolve<EventReadResult>({ logs: [] })
   ]);
 
   if (bidRecordResult.warning) warnings.push(bidRecordResult.warning);
@@ -513,9 +581,15 @@ export async function readAuctionHistory({
   warnings.push(...timestampResult.warnings);
 
   const events = eventResult.logs.map((log, index) => serializeHistoryEvent(log, timestampResult.timestamps, index));
-  const bids = bidRecordResult.readSucceeded
-    ? mergeBidRecordsWithLogs(bidRecordResult.bids, eventResult.logs)
-    : bidEntriesFromLogs(eventResult.logs, timestampResult.timestamps);
+  // Event-only fallback belongs in the timeline: it cannot establish canonical
+  // getBid indices and must never fabricate rows in the canonical bid table.
+  const bidMerge = bidRecordResult.readSucceeded && before === undefined
+    ? mergeBidRecordsWithLogs(bidRecordResult, eventResult, auctionId)
+    : { bids: bidRecordResult.bids, warning: before !== undefined && bidRecordResult.bids.length > 0
+      ? "Earlier bid transaction metadata is unavailable; earlier pages read canonical records without rescanning event logs."
+      : undefined };
+  if (bidMerge.warning) warnings.push(bidMerge.warning);
+  const bids = bidMerge.bids;
 
   return {
     auctionId: auctionId.toString(),
@@ -526,6 +600,11 @@ export async function readAuctionHistory({
     }),
     partial: warnings.length > 0,
     warnings,
+    totalBidCount: bidRecordResult.totalBidCount,
+    bidsAvailable: bidRecordResult.readSucceeded,
+    hasMoreBids: bidRecordResult.hasMoreBids,
+    nextBefore: bidRecordResult.nextBefore,
+    returnedBidCount: bids.length,
     bids,
     events,
     transparency: buildTransparencySummary(auction)

@@ -352,18 +352,25 @@ describe("real history reader through partial HTTP 200 responses", () => {
     const { response, body } = await request("history");
     expect(response.status).toBe(200);
     expect(body.history.partial).toBe(true);
-    expect(body.history.warnings).toEqual(["Unable to read timestamp for block 40."]);
+    expect(body.history.warnings).toEqual([
+      "Unable to read timestamp for block 40.",
+      "Bid transaction metadata is unavailable because the complete event sequence could not be verified against canonical bid records."
+    ]);
     expect(body.history.bids).toHaveLength(1);
     expect(body.history.events).toHaveLength(1);
     expect(body.history.events[0].timestamp).toBeUndefined();
   });
 
-  it("preserves useful bounded-history business warnings", async () => {
+  it("preserves bounded canonical history with explicit pagination metadata and unavailable transaction attribution", async () => {
     readerClient({ overrides: { getBidCount: 201n } });
     const { response, body } = await request("history");
     expect(response.status).toBe(200);
     expect(body.history.bids).toHaveLength(200);
     expect(body.history.bids[0].index).toBe("1");
-    expect(body.history.warnings).toEqual(["Bid history is limited to the latest 200 bid records."]);
+    expect(body.history).toMatchObject({ totalBidCount: "201", returnedBidCount: 200, hasMoreBids: true, nextBefore: "1", bidsAvailable: true });
+    expect(body.history.bids.every((bid: { transactionHash?: string }) => !bid.transactionHash)).toBe(true);
+    expect(body.history.warnings).toEqual([
+      "Bid transaction metadata is unavailable because the complete event sequence could not be verified against canonical bid records."
+    ]);
   });
 });
