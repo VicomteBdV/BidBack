@@ -676,6 +676,12 @@ describe.each(auctionClaims)("$label displayed-lot identity", ({ label, success 
 
   it.each(["provider resolution", "initial chain"])("guards an away/back change during %s before reading auction identity", async (boundary) => {
     const f = setupClaims();
+    // NFT review can enable before the initial claim-data effect settles.
+    await waitFor(() => {
+      expect(screen.getByText("Refund available").nextElementSibling).toHaveTextContent("1 ETH");
+      expect(screen.getByRole("button", { name: `Review ${label}` }).closest("section"))
+        .toHaveAttribute("aria-busy", "false");
+    });
     await waitFor(() => expect(screen.getByRole("button", { name: `Review ${label}` })).toBeEnabled());
     const provider = deferred<typeof providerB>();
     const chain = deferred<string>();
