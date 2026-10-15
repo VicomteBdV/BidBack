@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { NftPreview } from "@/components/NftPreview";
+import { ResponsiveDisclosure } from "@/components/experience/ResponsiveDisclosure";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StateNotice } from "@/components/ui/StateNotice";
@@ -109,7 +110,7 @@ export function AuctionList() {
       <div className="catalog-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="premium-eyebrow">Marketplace</p>
-          <h2 className="editorial-title mt-1 text-3xl sm:text-4xl">Live auctions</h2>
+          <h2 className="editorial-title mt-2 text-4xl sm:text-5xl">The auction room.</h2>
           <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-400">
             Browse real auctions from the configured controlled-testnet catalogue.
           </p>
@@ -167,9 +168,9 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data ? (
-        <div className="catalog-toolbar mt-4 p-3">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(180px,0.8fr)_120px]">
-            <label className="grid gap-2 text-sm">
+        <div className="catalog-toolbar mt-6">
+          <div className="catalog-controls">
+            <label className="catalog-search grid gap-2 text-sm">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</span>
               <input
                 type="search"
@@ -180,54 +181,61 @@ export function AuctionList() {
               />
             </label>
 
-            <label className="grid gap-2 text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as AuctionStatusFilter)}
-                className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
-              >
-                {statusOptions.map((option) => (
-                  <option
-                    key={option}
-                    value={option}
-                    disabled={!isConnected && (option === "createdByWallet" || option === "involvingWallet")}
+            <ResponsiveDisclosure
+              className="catalog-filters"
+              summary={<><span className="catalog-filter-label">Filters</span><span className="catalog-filter-selection">{auctionStatusFilterLabels[statusFilter]} · {auctionSortLabels[sortOption]} · Limit {limit}</span></>}
+            >
+              <div className="catalog-filter-controls">
+                <label className="grid gap-2 text-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as AuctionStatusFilter)}
+                    className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
                   >
-                    {auctionStatusFilterLabels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
+                    {statusOptions.map((option) => (
+                      <option
+                        key={option}
+                        value={option}
+                        disabled={!isConnected && (option === "createdByWallet" || option === "involvingWallet")}
+                      >
+                        {auctionStatusFilterLabels[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="grid gap-2 text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
-              <select
-                value={sortOption}
-                onChange={(event) => setSortOption(event.target.value as AuctionSortOption)}
-                className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
-              >
-                {sortOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {auctionSortLabels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
+                  <select
+                    value={sortOption}
+                    onChange={(event) => setSortOption(event.target.value as AuctionSortOption)}
+                    className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {auctionSortLabels[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="grid gap-2 text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Limit</span>
-              <select
-                value={limit}
-                onChange={(event) => setLimit(Number(event.target.value))}
-                className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
-              >
-                {AUCTION_LIST_LIMIT_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <label className="grid gap-2 text-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Limit</span>
+                  <select
+                    value={limit}
+                    onChange={(event) => setLimit(Number(event.target.value))}
+                    className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400"
+                  >
+                    {AUCTION_LIST_LIMIT_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </ResponsiveDisclosure>
           </div>
 
           <div className="mt-4 flex flex-col gap-2 text-xs leading-5 text-slate-500 sm:flex-row sm:items-center sm:justify-between">
@@ -281,13 +289,13 @@ export function AuctionList() {
       ) : null}
 
       {!isLoading && data && data.auctions.length > 0 && filteredAuctions.length === 0 ? (
-        <EmptyState className="mt-5">
+        <EmptyState className="catalog-filter-empty mt-5">
           No auctions match the current search, status, and sort controls. Clear filters or increase the loaded limit.
         </EmptyState>
       ) : null}
 
       {!isLoading && data && filteredAuctions.length > 0 ? (
-        <div className="auction-catalog-grid mt-4">
+        <div className="auction-catalog-grid mt-6">
           {filteredAuctions.map((auction) => {
             const lifecycle = getAuctionLifecycle(auction);
             const hasBid = auction.highestBid !== "0";
@@ -308,18 +316,14 @@ export function AuctionList() {
                     marketplace
                     showLinks={false}
                   />
-                  <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`inline-flex min-h-7 items-center rounded-md border px-2.5 text-xs font-semibold ${lifecycleToneClasses[lifecycle.statusTone]}`}
-                    >
-                      {lifecycle.statusLabel}
-                    </span>
-                  </div>
                 </div>
 
-                <div className="flex flex-1 flex-col p-3.5 pt-3">
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                    Auction #{auction.auctionId}
+                <div className="auction-card-facts">
+                  <div className="auction-card-index">
+                    <span>Auction #{auction.auctionId}</span>
+                    <span className={`auction-card-status ${lifecycleToneClasses[lifecycle.statusTone]}`}>
+                      {lifecycle.statusLabel}
+                    </span>
                   </div>
                   <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-3">
                     <div>
@@ -335,11 +339,11 @@ export function AuctionList() {
                   </div>
 
                   <div className="auction-card-next mt-3 border-t border-slate-800 pt-2.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next action</div>
-                    <div className="mt-1 font-editorial text-base font-semibold text-cyan-100">{lifecycle.nextActionLabel}</div>
+                    <div className="text-xs font-semibold text-slate-500">Next action</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-100">{lifecycle.nextActionLabel}</div>
                   </div>
 
-                  <span className="brush-link mt-3 w-full">View lot →</span>
+                  <span className="auction-card-link-label">View lot <span aria-hidden="true">↗</span></span>
                 </div>
               </Link>
             );

@@ -14,15 +14,11 @@ export default function Home() {
     <AppShell>
       <BidBackIntro />
 
-      <div className="home-market-layout">
-        <div id="marketplace-auctions" className="min-w-0 scroll-mt-6">
-          <AuctionList />
-        </div>
-
-        <aside className="home-market-aside" aria-label="Participation safeguards">
-          <TrustDisclosure variant="sidebar" />
-        </aside>
+      <div id="marketplace-auctions" className="min-w-0 scroll-mt-6">
+        <AuctionList />
       </div>
+
+      <TrustDisclosure />
 
       <div id="wallet-activity" className="scroll-mt-6">
         <WalletActivityDashboard />

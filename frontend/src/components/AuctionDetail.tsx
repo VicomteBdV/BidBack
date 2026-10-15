@@ -108,7 +108,7 @@ export function AuctionDetail({
   const lifecycle = getAuctionLifecycle(auction);
 
   return (
-    <div aria-busy={isLoading} className="min-w-0 grid gap-5">
+    <div aria-busy={isLoading} className="auction-detail-content min-w-0 grid gap-8">
       <AuctionSummary
         auction={auction}
         participation={
@@ -182,7 +182,7 @@ export function AuctionDetail({
         </div>
 
         <aside className="auction-detail-aside" aria-label="Auction status and participation rules">
-          <TrustDisclosure variant="sidebar" />
+          <TrustDisclosure />
         </aside>
       </div>
 

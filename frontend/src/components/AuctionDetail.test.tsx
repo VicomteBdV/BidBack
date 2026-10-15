@@ -166,7 +166,7 @@ describe("AuctionDetail", () => {
     fireEvent.click(screen.getByText("Rules, contracts, and verification details"));
     expect(screen.getByRole("heading", { name: "Auction rules snapshot" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Technical details" })).toBeInTheDocument();
-    expect(screen.getAllByText("BidBack Demo NFT #1").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("heading", { name: "BidBack Demo NFT #1" })).toHaveLength(1);
     expect(screen.getByText("BidBack Demo Collection (BID)")).toBeInTheDocument();
   });
 
