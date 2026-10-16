@@ -11,6 +11,7 @@ type NftPreviewProps = {
   compact?: boolean;
   marketplace?: boolean;
   showLinks?: boolean;
+  hideIdentity?: boolean;
 };
 
 const statusLabels: Record<NftMetadata["status"], string> = {
@@ -31,7 +32,8 @@ export function NftPreview({
   tokenId,
   compact = false,
   marketplace = false,
-  showLinks = true
+  showLinks = true,
+  hideIdentity = false
 }: NftPreviewProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = metadata?.imageUrl;
@@ -67,9 +69,9 @@ export function NftPreview({
         }`}
       >
         <div
-          className={`flex items-center justify-center overflow-hidden border border-slate-800 bg-slate-900 ${
+          className={`nft-media ${compact ? "nft-media-compact" : ""} flex items-center justify-center overflow-hidden border border-slate-800 bg-slate-900 ${
             marketplace
-              ? "marketplace-media aspect-[4/3] w-full"
+              ? "marketplace-media aspect-square w-full"
               : compact
                 ? "aspect-square h-16 w-16 rounded-md sm:h-[72px] sm:w-[72px]"
                 : "aspect-square w-full rounded-md"
@@ -80,40 +82,47 @@ export function NftPreview({
             <img
               src={imageUrl}
               alt={`NFT preview: ${title}`}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="px-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              {imageFallbackLabel}
+            <div className="nft-media-fallback">
+              <span className="nft-fallback-frame" aria-hidden="true" />
+              {!compact ? <span className="nft-fallback-title">Artwork unavailable</span> : null}
+              <span>{imageFallbackLabel}</span>
             </div>
           )}
         </div>
 
         <div className={marketplace ? "marketplace-identity min-w-0" : "min-w-0"}>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className={`${compact ? "text-sm font-bold" : marketplace ? "font-editorial text-xl font-semibold" : "text-base font-bold"} break-words text-white`}>{title}</h3>
+            {!hideIdentity ? (
+              <h3 className={`${compact ? "text-sm font-bold" : marketplace ? "font-editorial text-xl font-semibold" : "text-base font-bold"} break-words text-white`}>{title}</h3>
+            ) : null}
             {metadata && showMetadataStatus ? (
-              <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-[11px] font-semibold text-slate-300">
+              <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-xs font-semibold text-slate-300">
                 {statusLabels[metadata.status]}
               </span>
             ) : !metadata ? (
-              <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-[11px] font-semibold text-slate-300">
+              <span className="inline-flex min-h-6 items-center rounded-md border border-slate-700 px-2 text-xs font-semibold text-slate-300">
                 Metadata not loaded
               </span>
             ) : null}
           </div>
 
-          <div className="mt-1 break-words text-sm text-slate-400">{collectionLabel}</div>
+          {!hideIdentity ? <div className="mt-1 break-words text-sm text-slate-400">{collectionLabel}</div> : null}
 
-          {!compact && metadata?.description ? (
+          {!compact && !marketplace && metadata?.description ? (
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{metadata.description}</p>
           ) : null}
 
           {marketplace ? (
-            <div className="mt-2 text-xs font-semibold text-slate-500">Token #{tokenId}</div>
+            <div className="marketplace-token-identity">
+              <span>Token #{tokenId}</span>
+              <span className="font-mono" title={contractAddress}>{shortenAddress(contractAddress)}</span>
+            </div>
           ) : (
             <div className={`grid gap-2 text-xs text-slate-500 ${compact ? "mt-2" : "mt-4 sm:grid-cols-2"}`}>
               <div>
@@ -128,7 +137,7 @@ export function NftPreview({
           )}
 
           {metadata?.errorMessage ? (
-            <div className="mt-3 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
+            <div className="nft-metadata-warning mt-3 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
               {metadata.errorMessage}
             </div>
           ) : null}

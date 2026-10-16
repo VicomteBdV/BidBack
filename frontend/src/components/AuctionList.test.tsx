@@ -72,6 +72,32 @@ function auctionLinks() {
 }
 
 describe("AuctionList", () => {
+  it("keeps mobile search and loaded-window context visible while one native filter set is collapsed", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    mockAccount({ isConnected: false });
+    mockAuctionListFetch(auctionsResponse([auctionFixture()]));
+    const { container } = render(<AuctionList />);
+    expect(await screen.findByText("Auction #1")).toBeInTheDocument();
+    const disclosure = container.querySelector(".catalog-filters")!;
+    const summary = disclosure.querySelector("summary")!;
+
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(screen.getByRole("searchbox", { name: "Search" })).toBeVisible();
+    expect(screen.getByText(/Showing 1 of 1 loaded auctions/)).toBeVisible();
+    expect(summary).toHaveTextContent("All auctions · Newest first · Limit 25");
+
+    fireEvent.click(summary);
+    await waitFor(() => expect(disclosure).toHaveAttribute("open"));
+    expect(screen.getAllByRole("combobox")).toHaveLength(3);
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "open" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort" }), { target: { value: "endingSoon" } });
+    expect(summary).toHaveTextContent("Open · Ending soon · Limit 25");
+    fireEvent.click(summary);
+    await waitFor(() => expect(disclosure).not.toHaveAttribute("open"));
+    expect(summary).toHaveTextContent("Open · Ending soon · Limit 25");
+    expect(screen.getByText(/currently loaded read-only window/)).toBeVisible();
+  });
+
   it("announces the loading state without an empty screen", () => {
     mockAccount({ isConnected: false });
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
@@ -280,6 +306,10 @@ describe("AuctionList", () => {
 
     expect(screen.getByText(/No auctions match the current search/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("Auction #1")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search" })).toHaveValue("");
   });
 
   it("allows wallet-scoped filters when a wallet is connected", async () => {

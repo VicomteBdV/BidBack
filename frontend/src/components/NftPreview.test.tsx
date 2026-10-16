@@ -22,7 +22,7 @@ describe("NftPreview", () => {
       />
     );
 
-    expect(screen.getByRole("img", { name: "NFT preview: Demo token" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "NFT preview: Demo token" })).toHaveClass("object-contain");
     expect(container.firstElementChild).toHaveClass("min-w-0");
     expect(screen.getByRole("link", { name: /Open token metadata for Demo token/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open the external NFT page for Demo token/ })).toBeInTheDocument();
@@ -34,7 +34,9 @@ describe("NftPreview", () => {
     );
 
     expect(screen.getByText("NFT preview")).toBeInTheDocument();
+    expect(screen.getByText("Artwork unavailable")).toBeInTheDocument();
     expect(screen.getByText("Metadata not loaded")).toBeInTheDocument();
+    expect(screen.queryByText(/Conceptual artwork/)).not.toBeInTheDocument();
 
     rendered.rerender(
       <NftPreview
@@ -53,6 +55,31 @@ describe("NftPreview", () => {
     fireEvent.error(screen.getByRole("img", { name: "NFT preview: Broken image token" }));
     expect(screen.getByText("Image unavailable")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("can omit a repeated detail title while retaining identity, metadata and safe links", () => {
+    render(
+      <NftPreview
+        hideIdentity
+        contractAddress={testAddresses.localNft}
+        tokenId="7"
+        metadata={{
+          contractAddress: testAddresses.localNft,
+          tokenId: "7",
+          metadataName: "Detailed token",
+          imageUrl: "https://images.example/7.png",
+          tokenUriGatewayUrl: "https://metadata.example/7",
+          status: "loaded"
+        }}
+      />
+    );
+
+    expect(screen.queryByRole("heading", { name: "Detailed token" })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "NFT preview: Detailed token" })).toBeInTheDocument();
+    expect(screen.getByText("Metadata loaded")).toBeInTheDocument();
+    expect(screen.getByText("Contract")).toBeInTheDocument();
+    expect(screen.getByText("#7")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open token metadata for Detailed token/ })).toHaveAttribute("href", "https://metadata.example/7");
   });
 
   it("does not render unsupported external schemes as links", () => {

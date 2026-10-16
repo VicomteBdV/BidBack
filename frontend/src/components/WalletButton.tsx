@@ -17,7 +17,7 @@ function walletName(connector: Connector) {
   return connector.id === "injected" ? "Browser wallet" : connector.name.trim() || "Browser wallet";
 }
 
-export function WalletButton() {
+export function WalletButton({ presentation = "default" }: { presentation?: "default" | "masthead" } = {}) {
   const instanceId = useId();
   const unavailableId = `${instanceId}-wallet-connect-unavailable`;
   const readOnlyId = `${instanceId}-wallet-connect-read-only-note`;
@@ -96,10 +96,10 @@ export function WalletButton() {
 
   if (!isConnected) {
     return (
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+      <div className={`wallet-connect-control flex w-full flex-col gap-2 sm:w-auto sm:items-end ${presentation === "masthead" ? "wallet-masthead-control" : ""}`}>
         {available.length > 1 ? (
-          <label className="flex w-full flex-col gap-1 text-xs text-slate-300 sm:w-auto">
-            Choose your wallet
+          <label className="wallet-choice flex w-full flex-col gap-1 text-xs text-slate-300 sm:w-auto">
+            <span className={presentation === "masthead" ? "sr-only" : undefined}>Choose your wallet</span>
             <select
               value={available.some((item) => item.uid === selectedUid) ? selectedUid : ""}
               disabled={isPending || discovering}
@@ -118,28 +118,61 @@ export function WalletButton() {
         <button
           type="button"
           disabled={!selected || isPending || discovering}
-          aria-describedby={connectUnavailableMessage ? unavailableId : readOnlyId}
+          aria-label={presentation === "masthead" && available.length > 1 && !isPending
+            ? selected ? `Connect ${walletName(selected)}` : "Connect wallet"
+            : undefined}
+          aria-describedby={[
+            connectUnavailableMessage && connectUnavailableMessage !== connectionError && connectUnavailableMessage !== "Waiting for the wallet connection request." ? unavailableId : null,
+            isPending ? `${instanceId}-wallet-pending` : null,
+            connectionError ? `${instanceId}-wallet-error` : null,
+            !connectUnavailableMessage && !isPending && !connectionError ? readOnlyId : null
+          ].filter(Boolean).join(" ")}
           onClick={() => selected && connect({ connector: selected })}
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          className="wallet-connect-action inline-flex min-h-10 w-full items-center justify-center rounded-md bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
-          {isPending ? "Connecting..." : selected ? `Connect ${walletName(selected)}` : "Connect wallet"}
+          {isPending ? "Connecting..." : presentation === "masthead" && available.length > 1 ? "Connect" : selected ? `Connect ${walletName(selected)}` : "Connect wallet"}
         </button>
-        {connectUnavailableMessage ? (
-          <p role="status" id={unavailableId} className="max-w-sm text-xs text-amber-100">
+        {connectUnavailableMessage && connectUnavailableMessage !== connectionError && connectUnavailableMessage !== "Waiting for the wallet connection request." && !(presentation === "masthead" && !discovering && available.length === 0 && !isPending && !connectionError) ? (
+          <p role="status" id={unavailableId} className="wallet-connect-status max-w-sm text-xs text-amber-100">
             {connectUnavailableMessage}
           </p>
         ) : null}
-        <p id={readOnlyId} className="max-w-sm text-xs text-slate-400">
-          Wallet connection is optional for the read-only deployment view.
-        </p>
+        {isPending ? (
+          <p role="status" id={`${instanceId}-wallet-pending`} className="wallet-connect-status max-w-sm text-xs text-amber-100">
+            Waiting for the wallet connection request.
+          </p>
+        ) : null}
+        {connectionError ? (
+          <p role="status" id={`${instanceId}-wallet-error`} className="wallet-connect-status max-w-sm text-xs text-amber-100">
+            {connectionError}
+          </p>
+        ) : null}
+        {presentation === "masthead" ? (
+          <details className="wallet-help">
+            <summary>
+              {!discovering && available.length === 0 && !isPending && !connectionError ? "Wallet unavailable" : "Wallet help"}
+              <span aria-hidden="true">+</span>
+            </summary>
+            {!discovering && available.length === 0 && !isPending && !connectionError ? (
+              <p role="status" id={unavailableId} className="mt-2 text-xs text-amber-100">{connectUnavailableMessage}</p>
+            ) : null}
+            <p id={readOnlyId} className="mt-2 text-xs text-slate-400">
+              Wallet connection is optional for the read-only deployment view.
+            </p>
+          </details>
+        ) : (
+          <p id={readOnlyId} className="max-w-sm text-xs text-slate-400">
+            Wallet connection is optional for the read-only deployment view.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:items-end">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+    <div className={`wallet-connected-control flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:items-end ${presentation === "masthead" ? "wallet-masthead-control" : ""}`}>
+      <div className="wallet-identity-actions flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="wallet-identity rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
           <span className="mr-2 text-slate-400">{connector ? walletName(connector) : "Connected wallet"}</span>
           <span className="break-all font-mono" title={address}>{shortenAddress(address)}</span>
         </div>
@@ -147,7 +180,7 @@ export function WalletButton() {
         <button
           type="button"
           onClick={() => disconnect()}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500"
+          className="wallet-disconnect inline-flex min-h-10 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500"
         >
           Disconnect
         </button>
@@ -172,7 +205,7 @@ export function WalletButton() {
           {networkMessage ? <p role="status" aria-live="polite" className="mt-2 text-amber-50">{networkMessage}</p> : null}
         </div>
       ) : walletChain.status === "target" ? (
-        <p className="max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+        <p className="wallet-network-verified max-w-sm rounded-md border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
           Wallet connected on {targetChainLabel}.
         </p>
       ) : (

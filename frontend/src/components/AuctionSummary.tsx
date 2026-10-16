@@ -11,44 +11,56 @@ export function AuctionSummary({ auction, participation }: { auction: Serialized
   const headlinePrice = hasBid ? auction.highestBid : auction.startPrice;
   const nftIdentity = auction.nftMetadata?.metadataName ?? `Token #${auction.tokenId}`;
 
+  const metadata = auction.nftMetadata;
+  const collectionLabel = metadata?.collectionName && metadata.collectionSymbol
+    ? `${metadata.collectionName} (${metadata.collectionSymbol})`
+    : metadata?.collectionName ?? metadata?.collectionSymbol ?? "Unknown collection";
+
   return (
-    <section className="premium-surface overflow-hidden p-3 sm:p-5 lg:p-6" aria-labelledby="auction-overview-title">
+    <section className="auction-overview" aria-labelledby="auction-overview-title">
       <div className="auction-participation-layout">
+        <header className="auction-participation-overview">
+          <div className="auction-overview-kicker">
+            <p className="premium-eyebrow">Auction #{auction.auctionId}</p>
+            <span className="auction-summary-status">{lifecycle.statusLabel}</span>
+          </div>
+          <h1 id="auction-overview-title" className="editorial-title auction-overview-title">
+            {nftIdentity}
+          </h1>
+          <p className="auction-overview-collection">{collectionLabel}</p>
+        </header>
+
         <div className="auction-participation-art">
           <NftPreview
             metadata={auction.nftMetadata}
             contractAddress={auction.nft}
             tokenId={auction.tokenId}
             marketplace
-            showLinks={false}
+            hideIdentity
           />
         </div>
 
-        <div className="auction-participation-overview flex min-w-0 flex-col">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="auction-summary-status">{lifecycle.statusLabel}</span>
-          </div>
-
-          <p className="premium-eyebrow mt-5">Lot {auction.auctionId}</p>
-          <h1 id="auction-overview-title" className="editorial-title mt-2 text-4xl leading-none sm:text-5xl">
-            {nftIdentity}
-          </h1>
-          <p className="mt-2 text-sm text-slate-400">Auction #{auction.auctionId}</p>
-
-          <div className="mt-7 grid gap-5 border-y border-slate-800 py-5 sm:grid-cols-2">
+        <div className="auction-participation-market">
+          <dl className="auction-headline-facts">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{headlinePriceLabel}</div>
-              <div className="auction-price mt-2">{formatEth(headlinePrice)}</div>
-              <div className="mt-2 text-xs text-slate-500">Start price {formatEth(auction.startPrice)}</div>
+              <dt>{headlinePriceLabel}</dt>
+              <dd className="auction-headline-price">{formatEth(headlinePrice)}</dd>
+              <dd className="auction-headline-support">Start price {formatEth(auction.startPrice)}</dd>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Time status</div>
-              <div className="mt-2 text-lg font-bold text-white">{lifecycle.timeStatusLabel}</div>
-              <div className="mt-2 text-xs text-slate-500">Ends {formatTimestamp(auction.endTime)}</div>
+              <dt>Time status</dt>
+              <dd className="auction-headline-time">{lifecycle.timeStatusLabel}</dd>
+              <dd className="auction-headline-support">Ends {formatTimestamp(auction.endTime)}</dd>
             </div>
+          </dl>
+
+          <div className="auction-summary-next">
+            <p className="premium-eyebrow">Next action</p>
+            <p className="auction-summary-next-label">{lifecycle.nextActionLabel}</p>
+            <p className="auction-summary-next-reason">{lifecycle.nextActionReason}</p>
           </div>
 
-          <div className="auction-summary-parties mt-5 grid gap-3 text-sm sm:grid-cols-2">
+          <div className="auction-summary-parties grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <div className="text-xs text-slate-500">Seller</div>
               <div className="mt-1 break-all font-mono text-slate-300" title={auction.seller}>{shortenAddress(auction.seller)}</div>
@@ -61,7 +73,15 @@ export function AuctionSummary({ auction, participation }: { auction: Serialized
             </div>
           </div>
         </div>
+
         {participation ? <div className="auction-participation-action">{participation}</div> : null}
+
+        {metadata?.description ? (
+          <section className="auction-summary-about" aria-labelledby="auction-artwork-description">
+            <h2 id="auction-artwork-description" className="premium-eyebrow">About the artwork</h2>
+            <p>{metadata.description}</p>
+          </section>
+        ) : null}
       </div>
     </section>
   );
