@@ -26,8 +26,9 @@ describe("AppShell navigation disclosure", () => {
 
     fireEvent.click(summary);
     await waitFor(() => expect(disclosure).toHaveAttribute("open"));
-    expect(within(disclosure).getAllByRole("link")).toHaveLength(4);
+    expect(within(disclosure).getAllByRole("link")).toHaveLength(5);
     expect(screen.getByRole("link", { name: "Create auction" })).toHaveAttribute("href", "/create");
+    expect(screen.getByRole("link", { name: "Participation rules" })).toHaveAttribute("href", "/#trust-rules-title");
 
     fireEvent.click(summary);
     await waitFor(() => expect(disclosure).not.toHaveAttribute("open"));

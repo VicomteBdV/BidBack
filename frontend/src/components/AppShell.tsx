@@ -8,7 +8,8 @@ const navigation = [
   { href: "/", label: "Marketplace", marker: "01" },
   { href: "/#how-it-works", label: "How it works", marker: "02" },
   { href: "/#wallet-activity", label: "My activity", marker: "03" },
-  { href: "/create", label: "Create auction", marker: "04" }
+  { href: "/create", label: "Create auction", marker: "04" },
+  { href: "/#trust-rules-title", label: "Participation rules", marker: "05" }
 ];
 
 function Brand() {
@@ -49,14 +50,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="app-environment" aria-label="Current environment">
               <span className="environment-badge" title={`Configured for ${targetChainLabel}`}>
-                Controlled testnet preview
+                Controlled testnet
               </span>
-              <p>Controlled environment on {targetChainLabel}. Test assets only. No real value.</p>
-              <Link href="/#trust-rules-title">Participation rules <span aria-hidden="true">↗</span></Link>
+              <span className="app-environment-chain">{targetChainLabel}</span>
+              <p>Test assets only. No real value.</p>
             </div>
 
             <div className="app-wallet">
-              <WalletButton />
+              <WalletButton presentation="masthead" />
             </div>
           </div>
         </header>

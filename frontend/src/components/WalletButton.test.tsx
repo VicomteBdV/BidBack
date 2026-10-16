@@ -12,8 +12,8 @@ function wallet(id: string, name: string, provider: unknown = { request: vi.fn()
 }
 
 const connect = vi.fn();
-function setup(connectors: Connector[], { connected, error, pending = false, wagmiChainId = 1 }: {
-  connected?: Connector; error?: unknown; pending?: boolean; wagmiChainId?: number;
+function setup(connectors: Connector[], { connected, error, pending = false, wagmiChainId = 1, presentation = "default" }: {
+  connected?: Connector; error?: unknown; pending?: boolean; wagmiChainId?: number; presentation?: "default" | "masthead";
 } = {}) {
   vi.mocked(useAccount).mockReturnValue({ connector: connected, isConnected: Boolean(connected),
     address: connected ? "0x1111111111111111111111111111111111111111" : undefined,
@@ -21,12 +21,66 @@ function setup(connectors: Connector[], { connected, error, pending = false, wag
   vi.mocked(useConnect).mockReturnValue({ connectors, connect, isPending: pending, error, reset: vi.fn() } as unknown as ReturnType<typeof useConnect>);
   vi.mocked(useConfig).mockReturnValue({} as ReturnType<typeof useConfig>);
   vi.mocked(useDisconnect).mockReturnValue({ disconnect: vi.fn() } as unknown as ReturnType<typeof useDisconnect>);
-  return render(<><p>Read-only auctions</p><WalletButton /></>);
+  return render(<><p>Read-only auctions</p><WalletButton presentation={presentation} /></>);
 }
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("wallet choice and connector-aware network switching", () => {
+  it("collapses only ordinary masthead help and keeps a visible unavailable reason and unique descriptions", async () => {
+    const view = setup([], { presentation: "masthead" });
+    const summary = await screen.findByText("Wallet unavailable");
+    const help = summary.closest("details")!;
+    expect(help).not.toHaveAttribute("open");
+    expect(summary).toBeVisible();
+    expect(screen.getByRole("button", { name: "Connect wallet" })).toBeDisabled();
+    expect(screen.getByText(/No compatible browser wallet was detected/)).not.toBeVisible();
+    fireEvent.click(summary);
+    await waitFor(() => expect(help).toHaveAttribute("open"));
+    expect(screen.getByText(/No compatible browser wallet was detected/)).toBeVisible();
+    expect(screen.getByText(/Wallet connection is optional/)).toBeVisible();
+
+    view.rerender(<><WalletButton presentation="masthead" /><WalletButton /></>);
+    await waitFor(() => expect(screen.getAllByText(/No compatible browser wallet was detected/)).toHaveLength(2));
+    const buttons = screen.getAllByRole("button", { name: "Connect wallet" });
+    const ids = buttons.map((button) => button.getAttribute("aria-describedby"));
+    expect(new Set(ids).size).toBe(2);
+    ids.forEach((id) => expect(document.getElementById(id!)).toHaveTextContent("No compatible browser wallet"));
+  });
+
+  it.each(["default", "masthead"] as const)("keeps pending feedback expanded with no providers in %s presentation", async (presentation) => {
+    setup([], { pending: true, presentation });
+    const pending = await screen.findByText("Waiting for the wallet connection request.");
+    expect(pending).toBeVisible();
+    expect(pending.closest("details")).toBeNull();
+    expect(pending).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Connecting..." })).toHaveAttribute("aria-describedby", expect.stringContaining(pending.id));
+    expect(screen.getByRole("button", { name: "Connecting..." })).toBeDisabled();
+  });
+
+  it.each(["default", "masthead"] as const)("keeps sanitized rejection expanded during rediscovery/provider loss in %s presentation", async (presentation) => {
+    setup([], { error: { cause: { code: 4001 }, message: "SECRET" }, presentation });
+    const rejection = await screen.findByText("Wallet connection was rejected. Try again when you are ready.");
+    expect(rejection).toBeVisible();
+    expect(rejection.closest("details")).toBeNull();
+    expect(rejection).toHaveAttribute("role", "status");
+    expect(screen.getByRole("button", { name: "Connect wallet" })).toHaveAttribute("aria-describedby", expect.stringContaining(rejection.id));
+    expect(screen.queryByText(/SECRET/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["wrong chain", async (): Promise<string> => "0x1", /Wrong network/],
+    ["unverifiable chain", async (): Promise<string> => { throw new Error("RPC unavailable"); }, /Unable to verify the connected wallet network/]
+  ] as const)("keeps %s warnings outside help in the masthead", async (_label, request, message) => {
+    setup([wallet("b", "Wallet B", { request: vi.fn(request) })], {
+      connected: wallet("connected", "Wallet B", { request: vi.fn(request) }), presentation: "masthead", wagmiChainId: 31337
+    });
+    const warning = await screen.findByText(message);
+    expect(warning).toBeVisible();
+    expect(warning.closest("details")).toBeNull();
+    expect(screen.queryByText("Wallet connected on Anvil 31337.")).not.toBeInTheDocument();
+  });
+
   it("uses unique accessible descriptions when header and participation controls coexist", async () => {
     const view = setup([]);
     view.rerender(<><WalletButton /><WalletButton /></>);
@@ -66,6 +120,37 @@ describe("wallet choice and connector-aware network switching", () => {
     fireEvent.change(selector, { target: { value: "b" } });
     fireEvent.click(screen.getByRole("button", { name: "Connect Wallet B" }));
     expect(connect).toHaveBeenCalledExactlyOnceWith({ connector: b });
+  });
+
+  it("keeps the compact masthead choice accessible and connects only the explicitly selected provider", async () => {
+    const a = wallet("a", "Wallet A");
+    const b = wallet("b", "Wallet B");
+    setup([wallet("injected", "Injected"), a, b], { presentation: "masthead" });
+    const selector = await screen.findByRole("combobox", { name: "Choose your wallet" });
+    const button = screen.getByRole("button", { name: "Connect wallet" });
+
+    expect(screen.getByText("Choose your wallet")).toHaveClass("sr-only");
+    expect(selector).toHaveValue("");
+    expect(screen.getAllByRole("combobox")).toHaveLength(1);
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(screen.queryByRole("option", { name: "Browser wallet" })).not.toBeInTheDocument();
+    expect(button).toHaveTextContent(/^Connect$/);
+    expect(button).toBeDisabled();
+    expect(connect).not.toHaveBeenCalled();
+
+    fireEvent.change(selector, { target: { value: "b" } });
+    const selectedAction = screen.getByRole("button", { name: "Connect Wallet B" });
+    expect(selector).toHaveValue("b");
+    expect(selectedAction).toHaveTextContent(/^Connect$/);
+    expect(selectedAction).toBeEnabled();
+    fireEvent.click(selectedAction);
+    expect(connect).toHaveBeenCalledExactlyOnceWith({ connector: b });
+
+    const help = screen.getByText("Wallet help").closest("details")!;
+    expect(help).not.toHaveAttribute("open");
+    fireEvent.click(screen.getByText("Wallet help"));
+    await waitFor(() => expect(help).toHaveAttribute("open"));
+    expect(screen.getByText(/Wallet connection is optional/)).toBeVisible();
   });
 
   it("switches only through connected B even when global A exists", async () => {
