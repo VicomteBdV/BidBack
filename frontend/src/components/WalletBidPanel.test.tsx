@@ -392,6 +392,26 @@ beforeEach(() => {
 });
 
 describe("WalletBidPanel", () => {
+  it("keeps the additional payment, deposited cap and new cap distinct and returns focus after review", async () => {
+    const { writeContract } = setupBid({ currentCap: 1_000_000_000_000_000_000n });
+    const reviewButton = await screen.findByRole("button", { name: "Review increase" });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    const commitment = within(screen.getByRole("group", { name: "Your bid commitment" }));
+    expect(commitment.getByText("Additional amount").nextElementSibling).toHaveTextContent("0.2 ETH");
+    expect(commitment.getByText("Current wallet cap").nextElementSibling).toHaveTextContent("1 ETH");
+    expect(commitment.getByText("New total cap").nextElementSibling).toHaveTextContent("1.2 ETH");
+    expect(screen.getByText("Signing wallet").closest("details")).toBeNull();
+    expect(screen.getByText(/A forwarded local Anvil RPC may be unavailable/).closest("details")).toBeNull();
+
+    fireEvent.click(reviewButton);
+    const review = await screen.findByLabelText("Review your bid");
+    expect(within(review).getByText("Signing wallet").closest("details")).toBeNull();
+    fireEvent.click(within(review).getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.getByLabelText("Additional amount in ETH")).toHaveFocus());
+    expect(screen.getByLabelText("Additional amount in ETH")).toHaveValue("0.2");
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
   it("blocks bid preparation when wagmi says Anvil but the selected provider is on Ethereum", async () => {
     const { getBlock, readContract, writeContract } = setupBid({ providerChainId: "0x1" });
     expect(await screen.findByText(/Switch your wallet to Anvil 31337 to continue/)).toBeInTheDocument();

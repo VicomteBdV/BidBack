@@ -146,10 +146,10 @@ export function CreateAuctionForm() {
   }
 
   return (
-    <section className="seller-form-surface">
+    <section className="seller-form-surface transaction-studio-local">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="premium-eyebrow">Controlled local route</p>
+          <p className="premium-eyebrow">Developer workspace / Local only</p>
           <h2 className="editorial-title mt-1 text-2xl">Local development creation</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
             This form uses the local Anvil seller key on the Next.js server. It approves NFTVault and calls

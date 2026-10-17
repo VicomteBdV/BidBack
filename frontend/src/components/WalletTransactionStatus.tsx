@@ -50,18 +50,23 @@ export function WalletTransactionStatus({
   return (
     <div
       data-testid="wallet-transaction-status"
+      data-phase={status.phase}
       role={isError ? "alert" : "status"}
       aria-live={isError ? "assertive" : "polite"}
       aria-atomic="true"
-      className={`rounded-md border px-4 py-3 text-sm leading-6 ${toneClasses(status.phase)}`}
+      className={`transaction-studio-status rounded-md border px-4 py-3 text-sm leading-6 ${toneClasses(status.phase)}`}
     >
-      <div>
+      <div className="transaction-studio-status-heading">
+        <span className="transaction-studio-status-indicator" aria-hidden="true" />
+        <div>
         <div className="text-xs font-semibold uppercase tracking-wide opacity-80">{title}</div>
-        <div className="font-semibold">{phaseLabels[status.phase]}</div>
+        <div className="transaction-studio-status-label font-semibold">{phaseLabels[status.phase]}</div>
+        </div>
       </div>
 
       <p className="mt-2 opacity-90">{status.message}</p>
       {status.nextAction ? <p className="mt-2 font-medium">Next: {status.nextAction}</p> : null}
+      {status.refreshIncomplete ? <p className="transaction-studio-refresh-note">Displayed data needs a refresh. Review the available recovery action before relying on the displayed action state.</p> : null}
 
       {status.txHash || status.technicalDetail ? (
         <details className="transaction-evidence mt-3">

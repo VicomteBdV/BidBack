@@ -185,6 +185,26 @@ async function waitForContext() {
 }
 
 describe("WalletCreateAuctionForm", () => {
+  it("groups the existing asset and auction terms accessibly without opening the wallet during review", async () => {
+    const { writeContract } = setupWalletCreateForm();
+    await waitForContext();
+
+    const asset = screen.getByRole("group", { name: "The asset" });
+    expect(within(asset).getByLabelText("NFT contract")).toBeEnabled();
+    expect(within(asset).getByLabelText("Token ID")).toBeEnabled();
+    const terms = screen.getByRole("group", { name: "Auction terms" });
+    expect(within(terms).getByLabelText("Start price in ETH")).toBeEnabled();
+    expect(within(terms).getByRole("group", { name: "Duration" })).toBeInTheDocument();
+    expect(screen.getByText("Target network").closest("details")).toBeNull();
+    expect(screen.getByText(/Approval alone does not create a listing/).closest("details")).toBeNull();
+    expect(screen.getByRole("list", { name: "Create auction transaction sequence" }).querySelector('[aria-current="step"]')).toHaveTextContent("Auction details");
+
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    const review = await screen.findByRole("region", { name: "Create auction" });
+    expect(within(review).getByText("Currently expected: 2 wallet confirmations")).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+
   it("associates a field validation error with its labelled input", async () => {
     setupWalletCreateForm();
     await waitForContext();

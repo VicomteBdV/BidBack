@@ -10,29 +10,28 @@ export default function CreateAuctionPage() {
 
   return (
     <AppShell>
-      <header className="seller-masthead">
+      <header className="seller-masthead transaction-studio-masthead">
         <div>
           <Link href="/" className="text-xs font-bold text-cyan-300 transition hover:text-cyan-200">
             ← Back to marketplace
           </Link>
-          <p className="premium-eyebrow mt-4">Seller workspace</p>
+          <p className="premium-eyebrow mt-4">Seller workspace / Transaction studio</p>
           <h1 className="editorial-title mt-1 text-4xl sm:text-5xl">Bring an NFT to auction</h1>
         </div>
         <p className="seller-masthead-note self-end text-sm leading-6 text-slate-400">
-          Set the lot terms for an existing ERC-721, then approve and list it with the owner wallet. BidBack does not mint
-          the asset.
+          List an existing NFT. Review the terms, approve custody if needed, then sign with the owner wallet.
         </p>
       </header>
 
-      <div className="seller-workspace-grid">
+      <div className="seller-workspace-grid transaction-studio-create">
+        <div className="seller-workspace-main">
+          <WalletCreateAuctionForm />
+          {localDevActionsEnabled ? <CreateAuctionForm /> : null}
+        </div>
+
         <aside className="seller-workspace-aside" aria-label="Seller safeguards">
           <TrustDisclosure variant="sidebar" />
         </aside>
-
-        <div className="seller-workspace-main">
-          {localDevActionsEnabled ? <CreateAuctionForm /> : null}
-          <WalletCreateAuctionForm />
-        </div>
       </div>
     </AppShell>
   );

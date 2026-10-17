@@ -48,8 +48,9 @@ export function WalletActionQueueSection({
       title={title}
       description={description}
       headingLevel={3}
+      className={`transaction-studio-queue-section ${title === "Action required" ? "transaction-studio-queue-priority" : ""}`}
       badges={
-        <span className="rounded-full border border-slate-700 px-2 py-1 text-xs text-slate-300">
+        <span className="transaction-studio-queue-count rounded-full border border-slate-700 px-2 py-1 text-xs text-slate-300">
           {itemCount} item{itemCount === 1 ? "" : "s"}
         </span>
       }
@@ -61,7 +62,7 @@ export function WalletActionQueueSection({
           {globalActions.map((action) => (
             <article
               key={action.kind}
-              className="activity-queue-row activity-queue-credit min-w-0"
+              className="activity-queue-row activity-queue-credit transaction-studio-queue-row min-w-0"
             >
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -76,14 +77,14 @@ export function WalletActionQueueSection({
                     </p>
                   ) : null}
                 </div>
-                <div className="shrink-0 break-all font-mono text-sm text-violet-100">
+                <div className="transaction-studio-queue-credit-amount shrink-0 break-all text-violet-100">
                   {formatEth(action.amount)}
                 </div>
               </div>
               {action.href ? (
                 <Link
                   href={action.href}
-                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-violet-300/40 px-4 text-sm font-semibold text-violet-50 transition hover:border-violet-200 sm:w-auto"
+                  className="transaction-studio-queue-link mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-violet-300/40 px-4 text-sm font-semibold text-violet-50 transition hover:border-violet-200 sm:w-auto"
                 >
                   Open withdrawal panel
                 </Link>
@@ -94,11 +95,11 @@ export function WalletActionQueueSection({
           ))}
 
           {visibleItems.map((item) => (
-            <article key={item.auctionId} className="activity-queue-row min-w-0">
+            <article key={item.auctionId} className="activity-queue-row transaction-studio-queue-row min-w-0">
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <h4 className="break-words font-semibold text-white">Auction #{item.auctionId}</h4>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  <div className="transaction-studio-queue-meta mt-2 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-cyan-100">
                       {item.lifecycleLabel}
                     </span>
@@ -117,7 +118,7 @@ export function WalletActionQueueSection({
                 {item.actions.length === 0 ? (
                   <Link
                     href={item.href}
-                    className="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-500/60 sm:w-auto"
+                    className="transaction-studio-queue-link inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-500/60 sm:w-auto"
                   >
                     View auction
                   </Link>
@@ -141,12 +142,12 @@ export function WalletActionQueueSection({
                         <div className="font-semibold text-cyan-100">{action.label}</div>
                         <div className="mt-1 break-words text-sm leading-6 text-slate-400">{action.description}</div>
                         {action.amount ? (
-                          <div className="mt-1 break-all font-mono text-xs text-slate-200">{formatEth(action.amount)}</div>
+                          <div className="transaction-studio-queue-action-amount mt-1 break-all text-slate-200">{formatEth(action.amount)}</div>
                         ) : null}
                       </div>
                       <Link
                         href={item.href}
-                        className="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-md border border-cyan-400/40 px-4 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300 sm:w-auto"
+                        className="transaction-studio-queue-link inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-md border border-cyan-400/40 px-4 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300 sm:w-auto"
                       >
                         {action.label}
                       </Link>
@@ -161,7 +162,8 @@ export function WalletActionQueueSection({
             <button
               type="button"
               onClick={() => setExpanded((current) => !current)}
-              className="min-h-10 w-full rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500"
+              aria-expanded={expanded}
+              className="transaction-studio-queue-link min-h-11 w-full rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500"
             >
               {expanded ? "Show less" : `Show ${items.length - visibleItems.length} more`}
             </button>

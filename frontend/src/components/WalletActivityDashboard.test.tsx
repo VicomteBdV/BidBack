@@ -88,6 +88,25 @@ function mockActivityFetch(payload: WalletActivityApiResponse) {
 }
 
 describe("WalletActivityDashboard", () => {
+  it("puts read limitations before actions and positions before settled history in reading order", async () => {
+    mockAccount({ address: testAddresses.primaryBidder, chainId: 31337, isConnected: true });
+    const payload = activityResponse([baseAuction({ walletPosition: walletPosition({ cap: "1000000000000000000" }) })], testAddresses.primaryBidder);
+    payload.activity.actionQueue.warnings.push("Some wallet position reads were unavailable.");
+    mockActivityFetch(payload);
+    render(<WalletActivityDashboard />);
+
+    const actionHeading = await screen.findByRole("heading", { name: "Action required" });
+    const warning = screen.getByText("Some wallet position reads were unavailable.");
+    expect(warning.closest("details")).toBeNull();
+    expect(warning.compareDocumentPosition(actionHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const order = [actionHeading, screen.getByRole("heading", { name: "Watching" }),
+      screen.getByRole("heading", { name: "Position summary" }), screen.getByRole("heading", { name: "History" })];
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getByText("Viewing wallet").closest("details")).toBeNull();
+  });
+
   it("shows a wallet connection warning without blocking read-only mode", () => {
     mockAccount({ isConnected: false });
     const fetchMock = vi.fn();
