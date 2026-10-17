@@ -1889,8 +1889,9 @@ export function WalletBidPanel({
   );
 
   return (
-    <section aria-label="Bid participation" aria-busy={isDeploymentLoading || isLoadingBidData || isPlacingBid} className="bid-participation">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section aria-label="Bid participation" aria-busy={isDeploymentLoading || isLoadingBidData || isPlacingBid} className="bid-participation transaction-studio-bid">
+      <p className="premium-eyebrow mb-3">Your commitment / Transaction studio</p>
+      <div className="transaction-studio-intent flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-editorial text-2xl font-semibold text-white">{isStepUp ? "Increase bid" : "Place bid"}</h3>
         <span className="premium-eyebrow">{isReviewingBid ? "02 / Review" : "01 / Amount"}</span>
       </div>
@@ -1901,32 +1902,46 @@ export function WalletBidPanel({
 
       {!isReviewingBid ? <div className="mt-5 grid min-w-0 gap-4">
         {isConnected && !wrongNetwork ? <>
-          <div className="bid-context">
-            <InfoItem label="Minimum required total cap" value={minimumNextBid === null ? (isLoadingBidData || isDeploymentLoading ? "Loading…" : "Unavailable") : formatEth(minimumNextBid)} />
-            <InfoItem label="Current wallet cap" value={currentCap === null ? (isLoadingBidData || isDeploymentLoading ? "Loading…" : "Unavailable") : formatEth(currentCap)} />
+          <div className="transaction-studio-market-context">
+            <InfoItem label="Starting price" value={formatEth(auction.startPrice)} />
+            <InfoItem label="Recorded highest bid" value={formatEth(auction.highestBid)} />
           </div>
-          <label className="grid min-w-0 gap-2" htmlFor="wallet-bid-cap">
-            <span className="text-sm font-semibold text-slate-200">{isStepUp ? "Additional amount in ETH" : "Bid cap in ETH"}</span>
+          <div className="transaction-studio-amount-entry grid min-w-0 gap-2">
+            <label className="text-sm font-semibold text-slate-200" htmlFor="wallet-bid-cap">{isStepUp ? "Additional amount in ETH" : "Bid cap in ETH"}</label>
+            <span className="transaction-studio-input-wrap">
+              {isStepUp ? <span className="transaction-studio-plus" aria-hidden="true">+</span> : null}
             <input ref={inputRef} id="wallet-bid-cap" value={bidAmountEth}
               disabled={isDeploymentLoading || isLoadingBidData || isPlacingBid || bidResolutionLocked}
               aria-describedby="wallet-bid-help wallet-bid-disabled-reason"
               onChange={(event) => setBidAmountEth(event.target.value)}
               className="bid-amount-input" placeholder="0.00" inputMode="decimal" />
-          </label>
+            </span>
+          </div>
+          <div className="transaction-studio-minimum">
+            <InfoItem label="Minimum required total cap" value={minimumNextBid === null ? (isLoadingBidData || isDeploymentLoading ? "Loading…" : "Unavailable") : formatEth(minimumNextBid)} />
+          </div>
           <p id="wallet-bid-help" className="text-xs leading-5 text-slate-400">
             {isStepUp ? "Enter only the amount to add. Your existing cap stays deposited." : "Your first bid sends the full cap. Network gas is separate."}
           </p>
-          <div className="bid-amount-ledger" aria-live="polite">
+          <div className="bid-amount-ledger transaction-studio-bid-ledger" role="group" aria-label="Your bid commitment" aria-live="polite">
             <InfoItem
               label={isStepUp ? "Additional amount" : "ETH to send"}
               value={enteredValueToSend === null ? "—" : formatEth(enteredValueToSend)}
             />
+            <InfoItem label="Current wallet cap" value={currentCap === null ? (isLoadingBidData || isDeploymentLoading ? "Loading…" : "Unavailable") : formatEth(currentCap)} />
             <InfoItem label="New total cap" value={displayedNewCap === null ? "—" : formatEth(displayedNewCap)} />
           </div>
         </> : null}
         <div id="wallet-bid-disabled-reason">
           {isDeploymentLoading || isLoadingBidData ? <StateNotice tone="loading" title="Preparing your bid">Checking the minimum and your deposited cap.</StateNotice>
             : unavailable ? <p className="text-sm leading-6 text-slate-400">{unavailable}</p> : null}
+        </div>
+        <div className="transaction-studio-bid-identity">
+          <InfoItem label="Signing wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
+          <InfoItem label="Target network" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet network" value={!isConnected ? "Not connected"
+            : walletChain.status === "checking" ? "Checking..."
+            : walletChain.status === "unavailable" || walletChain.chainId === null ? "Not verified" : String(walletChain.chainId)} />
         </div>
         {!isConnected || wrongNetwork ? <WalletButton /> :
           <button type="button" disabled={Boolean(bidActionState.disabledReason) || bidResolutionLocked || isPlacingBid}
@@ -1937,6 +1952,13 @@ export function WalletBidPanel({
       </div> : null}
 
       {isReviewingBid ? <div ref={reviewRef} tabIndex={-1} aria-label="Review your bid" className="bid-review-focus mt-4">
+        <div className="transaction-studio-bid-identity mb-4">
+          <InfoItem label="Signing wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
+          <InfoItem label="Target network" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet network" value={!isConnected ? "Not connected"
+            : walletChain.status === "checking" ? "Checking..."
+            : walletChain.status === "unavailable" || walletChain.chainId === null ? "Not verified" : String(walletChain.chainId)} />
+        </div>
         <TransactionReview
           title={isStepUp ? "Review increase bid" : "Review place bid"}
           description="Check the amounts below. Live values are checked again before your wallet opens."
@@ -1957,9 +1979,10 @@ export function WalletBidPanel({
           onConfirm={placeWalletBid} />
       </div> : null}
 
-      <p className="bid-economic-note">
+      <p className="bid-economic-note transaction-studio-economic-note">
         If you lose, 100% of your deposited cap is refundable after finalization. If you win, any surplus above the final price is refundable. Network gas is separate and is not refunded. Redistribution is conditional, funded only from net premium, and may be zero.
       </p>
+      <p className="transaction-studio-rpc-note">Your wallet must reach the configured RPC. A forwarded local Anvil RPC may be unavailable to browser wallets.</p>
       <WalletTransactionStatus title="Wallet bid" status={txStatus} />
       {storageRecoveryError ? <StateNotice tone="error" title="Recovery storage unavailable" className="mt-4">
         {storageRecoveryError}
@@ -2002,7 +2025,6 @@ export function WalletBidPanel({
             : walletChain.status === "unavailable" || walletChain.chainId === null ? "Not verified" : String(walletChain.chainId)} />
           <InfoItem label="AuctionHouse" value={deployment ? deployment.contracts.auctionHouse : "Not loaded"} mono />
         </div>
-        <p className="mt-3 text-xs leading-5 text-slate-400">Your wallet must reach the configured RPC. A forwarded local Anvil RPC may be unavailable to browser wallets.</p>
       </TechnicalDisclosure>
     </section>
   );

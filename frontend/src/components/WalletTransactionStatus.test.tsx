@@ -6,6 +6,23 @@ import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 const txHash = "0x1111111111111111111111111111111111111111111111111111111111111111" as const;
 
 describe("WalletTransactionStatus", () => {
+  it("renders only the supplied phase and keeps unknown and incomplete-refresh guidance expanded", () => {
+    const { rerender } = render(<WalletTransactionStatus status={{ phase: "pending", message: "Waiting for the receipt." }} />);
+    expect(screen.getByText("Pending confirmation")).toBeInTheDocument();
+    expect(screen.queryByText("Transaction confirmed")).not.toBeInTheDocument();
+
+    rerender(<WalletTransactionStatus status={{ phase: "confirmation-unknown", message: "Receipt not verified.",
+      nextAction: "Verify the retained transaction before preparing another action.", txHash }} />);
+    expect(screen.getByText("Receipt not verified.").closest("details")).toBeNull();
+    expect(screen.getByText(/Verify the retained transaction before preparing another action/).closest("details")).toBeNull();
+    expect(screen.queryByText("Transaction confirmed")).not.toBeInTheDocument();
+
+    rerender(<WalletTransactionStatus status={{ phase: "confirmed", message: "Confirmed on-chain; the balance read failed.", refreshIncomplete: true, txHash }} />);
+    expect(screen.getByText("Transaction confirmed")).toBeInTheDocument();
+    expect(screen.getByText(/Displayed data needs a refresh/).closest("details")).toBeNull();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+  });
+
   it("renders pending feedback with an explorer link when configured", () => {
     render(
       <WalletTransactionStatus

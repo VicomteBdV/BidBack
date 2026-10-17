@@ -141,8 +141,9 @@ describe("WalletActionQueueSection", () => {
     renderSection(items, [], 5);
 
     expect(screen.queryByText("Auction #6")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 2 more" })).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
     expect(screen.getByText("Auction #6")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute("aria-expanded", "true");
   });
 });

@@ -366,14 +366,19 @@ export function WalletFinalizePanel({
   }
 
   return (
-    <section aria-busy={isDeploymentLoading || isFinalizing || isRefreshingData} className="min-w-0 rounded-lg border border-sky-400/30 bg-sky-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isFinalizing || isRefreshingData} className="transaction-studio-finalize min-w-0">
+      <p className="premium-eyebrow mb-3">Resolve the auction / Transaction studio</p>
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-base font-semibold text-white">Finalize auction</h3>
+        <h3 className="editorial-title text-2xl text-white">Finalize auction</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/80">
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
         Complete the expired auction on-chain so eligible wallets can use the separate pull-based actions that follow.
       </p>
+      <div className="transaction-studio-effect">
+        <p className="font-semibold">Record the result. Unlock separate claims.</p>
+        <p>Finalization does not transfer the NFT or pay out balances. It does not compensate the caller. Network gas is separate.</p>
+      </div>
 
       {isDeploymentLoading ? (
         <StateNotice tone="loading" title="Loading deployment data" className="mt-4">
@@ -387,23 +392,14 @@ export function WalletFinalizePanel({
         </StateNotice>
       ) : null}
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+      <div className="transaction-studio-finalize-context mt-4">
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
+        <InfoItem label="Target network" value={`${targetChainLabel} (${targetChainId})`} />
+        <InfoItem label="Wallet network" value={chainId ? String(chainId) : "Not connected"} />
         <InfoItem label="Auction end time" value={formatTimestamp(auction.endTime)} />
         <InfoItem label="Finalized" value={auction.finalized ? "Yes" : "No"} />
       </div>
 
-      <TechnicalDisclosure
-        summary="Finalization network and contract details"
-        description="Technical connection details for diagnosing permissionless finalization."
-        className="mt-4"
-      >
-        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
-          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
-          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
-        </div>
-      </TechnicalDisclosure>
 
       {finalizeState.disabledReason ? (
         <StateNotice id="wallet-finalize-disabled-reason" tone="warning" title="Finalization unavailable" className="mt-4">
@@ -417,7 +413,7 @@ export function WalletFinalizePanel({
           disabled={Boolean(finalizeState.disabledReason)}
           aria-describedby={finalizeState.disabledReason ? "wallet-finalize-disabled-reason" : undefined}
           onClick={() => setIsReviewing(true)}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          className="transaction-primary-action w-full"
         >
           {isFinalizing ? "Finalizing..." : "Review finalization"}
         </button>
@@ -447,7 +443,7 @@ export function WalletFinalizePanel({
         </div>
       ) : null}
 
-      <div className="mt-4">
+      <div className="transaction-studio-resolution mt-4">
         {historicalTransaction ? <p role="status" className="mb-3 text-sm text-amber-200">
           Transaction for the previously reviewed auction #{statusContext.current?.auctionId}. Its result is separate from the displayed lot.
         </p> : null}
@@ -455,13 +451,13 @@ export function WalletFinalizePanel({
         {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
           <button type="button" onClick={verifyTransaction}
             disabled={isFinalizing || recovery.current?.walletKey !== walletKey}
-            className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+            className="transaction-secondary-action mt-3 w-full">
             {isFinalizing ? "Verifying..." : "Verify transaction"}
           </button>
           <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet and network if they changed. A result for another displayed lot is kept separate.</p>
         </div> : null}
         {txStatus?.refreshIncomplete && !historicalTransaction ? <button type="button" onClick={refreshConfirmedData} disabled={isRefreshingData}
-          className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          className="transaction-secondary-action mt-3 w-full">
           {isRefreshingData ? "Refreshing..." : "Refresh auction data"}
         </button> : null}
       </div>
@@ -473,13 +469,25 @@ export function WalletFinalizePanel({
           {isRefreshingData ? "Refreshing..." : "Refresh auction details"}
         </button>
       </div> : null}
+      <TechnicalDisclosure
+        summary="Finalization network and contract details"
+        description="Technical connection details for diagnosing permissionless finalization."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+        </div>
+      </TechnicalDisclosure>
+
     </section>
   );
 }
 
 function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="transaction-studio-info-item">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

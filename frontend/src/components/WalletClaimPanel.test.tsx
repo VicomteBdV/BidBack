@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics, encodeFunctionData, type Abi, type Address, type Hex } from "viem";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
@@ -166,6 +166,20 @@ describe("WalletClaimPanel", () => {
     expect(screen.getByRole("button", { name: "Review claim refund" })).toHaveClass("transaction-secondary-action");
     expect(screen.queryByText("Wallet claim data loaded.")).not.toBeInTheDocument();
     expect(screen.getAllByText(/global credit/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("separates auction-specific claims from aggregate wallet credits without hiding their scope", async () => {
+    setupClaims();
+    const auctionClaims = await screen.findByRole("region", { name: "Auction-specific claims" });
+    const globalCredits = screen.getByRole("region", { name: "Global wallet credits" });
+    expect(within(auctionClaims).getByRole("button", { name: "Review claim refund" })).toBeInTheDocument();
+    expect(within(auctionClaims).getByRole("button", { name: "Review claim redistribution" })).toBeInTheDocument();
+    expect(within(auctionClaims).queryByRole("button", { name: "Review withdraw proceeds" })).not.toBeInTheDocument();
+    expect(within(globalCredits).getByRole("button", { name: "Review withdraw proceeds" })).toBeInTheDocument();
+    expect(within(globalCredits).getByRole("button", { name: "Review withdraw protocol fees" })).toBeInTheDocument();
+    expect(within(globalCredits).getByText(/This lot is a navigation context, not exact credit attribution/).closest("details")).toBeNull();
+    expect(screen.getByText("Target network").closest("details")).toBeNull();
+    expect(screen.getByText(/A forwarded local Anvil RPC may be unavailable/).closest("details")).toBeNull();
   });
 
   it("shows zero available and offers no new signature after refund and redistribution claims", async () => {

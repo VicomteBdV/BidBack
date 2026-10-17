@@ -34,8 +34,8 @@ export function TransactionReview({
   const titleId = `transaction-review-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   return (
-    <section className="transaction-review" aria-labelledby={titleId}>
-      <div>
+    <section className="transaction-review transaction-studio-review" aria-labelledby={titleId}>
+      <div className="transaction-studio-review-header">
         <p className="premium-eyebrow">Review before signing</p>
         <h4 id={titleId} className="mt-1 text-lg font-semibold text-white">{title}</h4>
         <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
@@ -43,13 +43,14 @@ export function TransactionReview({
 
       <dl className="transaction-review-list">
         {items.map((item) => (
-          <div key={item.label} className="transaction-review-row">
+          <div key={item.label} className="transaction-review-row" data-review-label={item.label}>
             <dt>{item.label}</dt>
             <dd className={item.mono ? "font-mono" : undefined}>{item.value}</dd>
           </div>
         ))}
       </dl>
 
+      <div className="transaction-studio-review-decision">
       <div className="transaction-review-confirmations">{confirmations}</div>
       {note ? <p className="transaction-review-note">{note}</p> : null}
 
@@ -65,6 +66,7 @@ export function TransactionReview({
         >
           {busy ? "Working..." : primaryLabel}
         </button>
+      </div>
       </div>
     </section>
   );

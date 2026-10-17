@@ -10,6 +10,7 @@ export function CreateAuctionFields({
   disabled = false,
   errors = {},
   idPrefix = "create-auction",
+  durationHint,
   onNftContractChange,
   onTokenIdChange,
   onStartPriceEthChange,
@@ -22,6 +23,7 @@ export function CreateAuctionFields({
   disabled?: boolean;
   errors?: Partial<Record<CreateAuctionFieldName, string>>;
   idPrefix?: string;
+  durationHint?: string;
   onNftContractChange: (value: string) => void;
   onTokenIdChange: (value: string) => void;
   onStartPriceEthChange: (value: string) => void;
@@ -51,7 +53,11 @@ export function CreateAuctionFields({
 
   return (
     <>
-      <label className="grid gap-2" htmlFor={fieldIds.nftContract}>
+      <fieldset className="transaction-studio-fieldgroup">
+        <legend className="transaction-studio-group-title">The asset</legend>
+        <p className="transaction-studio-group-help">Identify an existing ERC-721 owned by the seller. BidBack does not mint the asset.</p>
+        <div className="transaction-studio-asset-fields">
+      <label className="grid min-w-0 gap-2" htmlFor={fieldIds.nftContract}>
         <span className="text-sm font-medium text-slate-200">NFT contract</span>
         <input
           id={fieldIds.nftContract}
@@ -60,14 +66,13 @@ export function CreateAuctionFields({
           aria-invalid={Boolean(errors.nftContract)}
           aria-describedby={errors.nftContract ? `${fieldIds.nftContract}-error` : undefined}
           onChange={(event) => onNftContractChange(event.target.value)}
-          className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="transaction-studio-field min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
           placeholder="0x..."
         />
         {errors.nftContract ? <span id={`${fieldIds.nftContract}-error`} className="text-xs text-rose-200">{errors.nftContract}</span> : null}
       </label>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <label className="grid gap-2" htmlFor={fieldIds.tokenId}>
+        <label className="grid min-w-0 gap-2" htmlFor={fieldIds.tokenId}>
           <span className="text-sm font-medium text-slate-200">Token ID</span>
           <input
             id={fieldIds.tokenId}
@@ -76,14 +81,20 @@ export function CreateAuctionFields({
             aria-invalid={Boolean(errors.tokenId)}
             aria-describedby={errors.tokenId ? `${fieldIds.tokenId}-error` : undefined}
             onChange={(event) => onTokenIdChange(event.target.value)}
-            className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="transaction-studio-field min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
             placeholder="0"
             inputMode="numeric"
           />
           {errors.tokenId ? <span id={`${fieldIds.tokenId}-error`} className="text-xs text-rose-200">{errors.tokenId}</span> : null}
         </label>
+        </div>
+      </fieldset>
 
-        <label className="grid gap-2" htmlFor={fieldIds.startPriceEth}>
+      <fieldset className="transaction-studio-fieldgroup">
+        <legend className="transaction-studio-group-title">Auction terms</legend>
+        <p className="transaction-studio-group-help">Set the starting price and how long bidding remains open.</p>
+        <div className="transaction-studio-term-fields">
+        <label className="grid min-w-0 gap-2" htmlFor={fieldIds.startPriceEth}>
           <span className="text-sm font-medium text-slate-200">Start price in ETH</span>
           <input
             id={fieldIds.startPriceEth}
@@ -92,7 +103,7 @@ export function CreateAuctionFields({
             aria-invalid={Boolean(errors.startPriceEth)}
             aria-describedby={errors.startPriceEth ? `${fieldIds.startPriceEth}-error` : undefined}
             onChange={(event) => onStartPriceEthChange(event.target.value)}
-            className="min-h-11 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="transaction-studio-field transaction-studio-price min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
             placeholder="1"
             inputMode="decimal"
           />
@@ -118,7 +129,7 @@ export function CreateAuctionFields({
                 aria-invalid={Boolean(errors.durationSeconds)}
                 aria-describedby={durationDescriptionId}
                 onChange={(event) => updateDuration(event.target.value, hours, event.target.value)}
-                className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="transaction-studio-field min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
                 placeholder="0"
                 inputMode="numeric"
               />
@@ -132,7 +143,7 @@ export function CreateAuctionFields({
                 aria-invalid={Boolean(errors.durationSeconds)}
                 aria-describedby={durationDescriptionId}
                 onChange={(event) => updateDuration(days, event.target.value, durationSeconds)}
-                className="min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="transaction-studio-field min-h-11 w-full min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-slate-100 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {Array.from({ length: 24 }, (_, hour) => (
                   <option key={hour} value={hour}>{hour}</option>
@@ -140,9 +151,11 @@ export function CreateAuctionFields({
               </select>
             </label>
           </div>
+          {durationHint ? <p className="transaction-studio-duration-hint">Minimum duration: {durationHint}</p> : null}
           {errors.durationSeconds ? <span id={`${fieldIds.durationSeconds}-error`} className="text-xs text-rose-200">{errors.durationSeconds}</span> : null}
         </fieldset>
-      </div>
+        </div>
+      </fieldset>
     </>
   );
 }

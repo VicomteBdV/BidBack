@@ -115,16 +115,20 @@ export function WalletActivityDashboard() {
   );
 
   return (
-    <section aria-busy={isLoading} className="activity-ledger min-w-0">
+    <section aria-busy={isLoading} className="activity-ledger transaction-studio-activity min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="premium-eyebrow">Collector record</p>
+          <p className="premium-eyebrow">Your next move / Transaction studio</p>
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="editorial-title mt-1 text-3xl">My activity</h2>
             <ModeBadge variant="read-only" />
           </div>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
-            Auctions, statuses, and available actions linked to the connected wallet.
+            Start with available actions, then follow the auctions linked to your wallet. This view covers a bounded set of auction reads.
+          </p>
+          <p className="transaction-studio-activity-wallet">
+            <span>Viewing wallet</span> <strong>{address ? shortenAddress(address) : "Not connected"}</strong>
+            <span>Target</span> <strong>{targetChainLabel}</strong>
           </p>
           {data ? (
             <dl className="activity-headline-stats mt-3">
@@ -144,7 +148,7 @@ export function WalletActivityDashboard() {
           type="button"
           onClick={loadActivity}
           disabled={!isConnected || isLoading}
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          className="transaction-studio-activity-refresh inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
           {isLoading ? "Loading..." : "Refresh activity"}
         </button>
@@ -182,6 +186,15 @@ export function WalletActivityDashboard() {
 
       {data ? (
         <>
+          {activityWarnings.length > 0 ? (
+            <StateNotice tone="warning" title="Activity warnings" className="mt-5">
+              <ul className="list-disc space-y-1 pl-5">
+                {activityWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </StateNotice>
+          ) : null}
           {!data.activity.hasActivity ? (
             <EmptyState className="mt-5">
               No activity found for this wallet in the currently scanned auctions. Create an auction with a test ERC-721 NFT or place a bid, then refresh this panel.
@@ -203,14 +216,6 @@ export function WalletActivityDashboard() {
                 emptyTitle="Nothing to watch"
                 emptyMessage="No related active or partial auction is currently waiting for a state change."
               />
-              <WalletActionQueueSection
-                title="History"
-                description="Finalized wallet-related auctions with no remaining auction-specific action currently known."
-                items={data.activity.actionQueue.history}
-                emptyTitle="No settled history"
-                emptyMessage="No completed wallet-related auction is present in the bounded read model."
-                initialLimit={5}
-              />
             </div>
           )}
 
@@ -229,6 +234,15 @@ export function WalletActivityDashboard() {
               ))}
             </dl>
           </section>
+
+          {data.activity.hasActivity ? <WalletActionQueueSection
+            title="History"
+            description="Finalized wallet-related auctions with no remaining auction-specific action currently known."
+            items={data.activity.actionQueue.history}
+            emptyTitle="No settled history"
+            emptyMessage="No completed wallet-related auction is present in the bounded read model."
+            initialLimit={5}
+          /> : null}
 
           <TechnicalDisclosure
             summary="Wallet and discovery details"
@@ -260,15 +274,7 @@ export function WalletActivityDashboard() {
             </p>
           </TechnicalDisclosure>
 
-          {activityWarnings.length > 0 ? (
-            <StateNotice tone="warning" title="Activity warnings" className="mt-5">
-              <ul className="list-disc space-y-1 pl-5">
-                {activityWarnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
-            </StateNotice>
-          ) : null}
+
         </>
       ) : null}
     </section>

@@ -546,23 +546,23 @@ export function WalletCreateAuctionForm() {
           : 1;
 
   return (
-    <section aria-busy={isContextLoading || isBusy} className="seller-form-surface min-w-0">
-      <div>
-        <p className="premium-eyebrow">Primary listing route</p>
+    <section aria-busy={isContextLoading || isBusy} className="seller-form-surface transaction-studio-seller min-w-0">
+      <div className="transaction-studio-intent">
+        <p className="premium-eyebrow">01 / Prepare your listing</p>
         <h2 className="editorial-title mt-1 text-2xl">Wallet-signed creation</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          The owner wallet approves the NFT for custody, then signs the auction creation transaction.
+          Set the terms. Review before signing in your wallet.
         </p>
       </div>
 
-      <div className="seller-mode-note mt-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
-        <p className="mt-1 text-sm leading-6 text-cyan-100/80">
-          Your wallet must be connected to the configured target network. Ownership and approval are verified before listing.
-        </p>
+
+      <div className="transaction-studio-context transaction-studio-wallet-strip mt-5">
+        <InfoItem label="Connected wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
+        <InfoItem label="Target network" value={`${targetChainLabel} (${targetChainId})`} />
+        <InfoItem label="Wallet network" value={chainId ? String(chainId) : "Not connected"} />
       </div>
 
-      <ol className="transaction-journey-steps mt-5" aria-label="Create auction transaction sequence">
+      <ol className="transaction-journey-steps transaction-studio-seller-rail mt-5" aria-label="Create auction transaction sequence">
         {["Auction details", "Review", "Approve NFT custody if required", "Create auction", "Confirmation / View lot"].map((label, index) => {
           const step = index + 1;
           const state = step < journeyStep ? "completed" : step === journeyStep ? "current" : "upcoming";
@@ -588,35 +588,6 @@ export function WalletCreateAuctionForm() {
         </StateNotice>
       ) : null}
 
-      <div className="mt-5 grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-        <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="Approval status" value={approvalStatus} />
-        <InfoItem
-          label="Minimum duration"
-          value={context?.minAuctionDuration ? formatDurationSeconds(context.minAuctionDuration) : "Loaded during review"}
-        />
-      </div>
-
-      <TechnicalDisclosure
-        summary="Create network and contract details"
-        description="Technical deployment, approval, and argument details for diagnosing wallet-signed creation."
-        className="mt-5"
-      >
-        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
-          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
-          <InfoItem label="Deployment chain" value={context ? String(context.chainId) : "Not loaded"} />
-          <InfoItem label="AuctionHouse" value={context ? shortenAddress(context.auctionHouse) : "Not loaded"} mono />
-          <InfoItem label="NFTVault approval target" value={context ? shortenAddress(context.nftVault) : "Not loaded"} mono />
-          {owner ? <InfoItem label="ownerOf(tokenId)" value={shortenAddress(owner)} mono /> : null}
-          {owner ? <InfoItem label="getApproved(tokenId)" value={approvedAddress ? shortenAddress(approvedAddress) : "Not checked"} mono /> : null}
-          {owner ? <InfoItem label="isApprovedForAll" value={approvedForAll === null ? "Not checked" : approvedForAll ? "Yes" : "No"} /> : null}
-        </div>
-        <p className="mt-3 text-xs leading-5 text-slate-400">
-          The frontend converts the ETH start price to wei, keeps duration in seconds, and calls AuctionHouse.createAuction
-          with the reviewed NFT contract, token ID, start price, and duration.
-        </p>
-      </TechnicalDisclosure>
 
       {modeMessage ? (
         <StateNotice tone="warning" title="Wallet action unavailable" className="mt-5">
@@ -624,7 +595,7 @@ export function WalletCreateAuctionForm() {
         </StateNotice>
       ) : null}
 
-      <form className="mt-6 grid gap-5" onSubmit={(event) => event.preventDefault()}>
+      <form className="transaction-studio-seller-fields mt-6 grid gap-5" onSubmit={(event) => event.preventDefault()}>
         <CreateAuctionFields
           nftContract={nftContract}
           tokenId={tokenId}
@@ -633,6 +604,7 @@ export function WalletCreateAuctionForm() {
           disabled={isBusy || confirmationUnknown}
           errors={fieldErrors}
           idPrefix="wallet-create"
+          durationHint={context?.minAuctionDuration ? formatDurationSeconds(context.minAuctionDuration) : "Loaded during review"}
           onNftContractChange={(value) => { setNftContract(value); setIsReviewing(false); }}
           onTokenIdChange={(value) => { setTokenId(value); setIsReviewing(false); }}
           onStartPriceEthChange={(value) => { setStartPriceEth(value); setIsReviewing(false); }}
@@ -645,12 +617,20 @@ export function WalletCreateAuctionForm() {
           </StateNotice>
         ) : null}
 
-        {owner ? (
-          <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+      <div className="seller-mode-note transaction-studio-custody mt-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Wallet-signed mode</h3>
+        <p className="mt-1 text-sm leading-6 text-cyan-100/80">
+          Approval lets NFTVault hold this NFT. Approval alone does not create a listing.
+        </p>
+        <div className="transaction-studio-custody-evidence">
+          <InfoItem label="Approval status" value={approvalStatus} />
+          <InfoItem label="NFTVault approval target" value={context ? shortenAddress(context.nftVault) : "Not loaded"} mono />
+          {owner ? <div>
             <InfoItem label="NFT owner" value={shortenAddress(owner)} mono />
             <InfoItem label="Custody approval" value={hasApproval ? "Approved" : "Required"} />
-          </div>
-        ) : null}
+          </div> : null}
+        </div>
+      </div>
 
         <div>
           <div>
@@ -659,17 +639,18 @@ export function WalletCreateAuctionForm() {
               disabled={Boolean(validationError) || !isConnected || wrongNetwork || isBusy || confirmationUnknown || createTxStatus?.phase === "confirmed" || createTxStatus?.phase === "confirmation-unknown"}
               aria-describedby={checkDisabledReason ? "check-ownership-disabled-reason" : undefined}
               onClick={openCreateReview}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="transaction-primary-action w-full"
             >
               {isChecking ? "Checking..." : "Review auction"}
             </button>
             {checkDisabledReason ? <p id="check-ownership-disabled-reason" className="mt-1 text-xs text-slate-400">{checkDisabledReason}</p> : null}
+            <p className="transaction-studio-signing-note">Review first. Your wallet only opens when you choose to continue.</p>
           </div>
         </div>
       </form>
 
       {isReviewing ? (
-        <div className="mt-5">
+        <div className="transaction-studio-seller-review mt-5">
           <TransactionReview
             title="Create auction"
             description="Review the listing terms currently checked against the connected owner wallet before continuing."
@@ -698,7 +679,8 @@ export function WalletCreateAuctionForm() {
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-3">
+      <div className="transaction-studio-resolution mt-5 grid gap-3">
+        {approvalTxStatus || createTxStatus ? <p className="premium-eyebrow">On-chain updates</p> : null}
         <WalletTransactionStatus title="NFT approval" status={approvalTxStatus} />
         <WalletTransactionStatus title="Auction creation" status={createTxStatus} />
         {confirmationUnknown ? <div>
@@ -720,7 +702,7 @@ export function WalletCreateAuctionForm() {
       {message ? <div role="status" aria-live="polite" className="mt-5 rounded-md bg-slate-950 px-4 py-3 text-sm text-slate-200">{message}</div> : null}
 
       {createdAuctionId ? (
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <div className="transaction-studio-next mt-5 flex flex-col gap-3 sm:flex-row">
           <Link
             href={`/auctions/${createdAuctionId}`}
             className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-300 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200"
@@ -735,6 +717,27 @@ export function WalletCreateAuctionForm() {
           </Link>
         </div>
       ) : null}
+
+      <TechnicalDisclosure
+        summary="Create network and contract details"
+        description="Technical deployment, approval, and argument details for diagnosing wallet-signed creation."
+        className="mt-5"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="Deployment chain" value={context ? String(context.chainId) : "Not loaded"} />
+          <InfoItem label="AuctionHouse" value={context ? shortenAddress(context.auctionHouse) : "Not loaded"} mono />
+          <InfoItem label="NFTVault approval target" value={context ? shortenAddress(context.nftVault) : "Not loaded"} mono />
+          {owner ? <InfoItem label="ownerOf(tokenId)" value={shortenAddress(owner)} mono /> : null}
+          {owner ? <InfoItem label="getApproved(tokenId)" value={approvedAddress ? shortenAddress(approvedAddress) : "Not checked"} mono /> : null}
+          {owner ? <InfoItem label="isApprovedForAll" value={approvedForAll === null ? "Not checked" : approvedForAll ? "Yes" : "No"} /> : null}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-400">
+          The frontend converts the ETH start price to wei, keeps duration in seconds, and calls AuctionHouse.createAuction
+          with the reviewed NFT contract, token ID, start price, and duration.
+        </p>
+      </TechnicalDisclosure>
 
     </section>
   );

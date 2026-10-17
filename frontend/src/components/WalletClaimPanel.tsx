@@ -1014,14 +1014,14 @@ export function WalletClaimPanel({
   }
 
   return (
-    <section aria-busy={isDeploymentLoading || isLoadingClaimData || pendingAction !== null || isVerifying} className="min-w-0 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4">
+    <section aria-busy={isDeploymentLoading || isLoadingClaimData || pendingAction !== null || isVerifying} className="transaction-studio-claims min-w-0">
+      <p className="premium-eyebrow mb-3">Your available actions / Transaction studio</p>
       <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-base font-semibold text-white">Claims and withdrawals</h3>
+        <h3 className="editorial-title text-2xl text-white">Claims and withdrawals</h3>
         <ModeBadge variant="wallet-signed" />
       </div>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-100/80">
-        Pull-based post-finalization actions signed in your wallet. No server private key is used and no /api/dev route is
-        called.
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+        Review each available claim separately, then continue in your wallet. Refundable cap and conditional redistribution are distinct.
       </p>
 
       {isDeploymentLoading ? (
@@ -1042,55 +1042,28 @@ export function WalletClaimPanel({
         </StateNotice>
       ) : null}
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+      <div className="transaction-studio-claim-context transaction-studio-wallet-strip mt-4">
         <InfoItem label="Wallet" value={address ? shortenAddress(address) : "Not connected"} mono />
-        <InfoItem label="NFT claimant" value={shortenAddress(expectedNftClaimant)} mono />
-        <InfoItem label="NFT claimant role" value={expectedNftClaimantLabel} />
-        <InfoItem label="Seller wallet" value={shortenAddress(auction.seller)} mono />
-        <InfoItem label="Fee recipient" value={auction.auctionFeeRecipient ? shortenAddress(auction.auctionFeeRecipient) : "Not loaded"} mono />
-        <InfoItem label="Refund available" value={availableRefundableAmount === null ? "Unavailable" : formatEth(availableRefundableAmount)} />
-        <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Unavailable" : formatEth(availableRewardEntitlement)} />
-        <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Unavailable" : formatEth(sellerCredit)} />
-        <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Unavailable" : formatEth(protocolFeeCredit)} />
-        <InfoItem label="NFT claimed" value={auction.nftClaimed || completedClaims.includes("claim-nft") ? "Yes" : "No"} />
-        <InfoItem label="Auction finalized" value={auction.finalized ? "Yes" : "No"} />
+        <InfoItem label="Target network" value={`${targetChainLabel} (${targetChainId})`} />
+        <InfoItem label="Wallet network" value={chainId ? String(chainId) : "Not connected"} />
       </div>
 
-      <TechnicalDisclosure
-        summary="Claim network, contract, and recorded amount details"
-        description="Technical values retained for diagnosing wallet-signed claims and historical on-chain records."
-        className="mt-4"
-      >
-        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
-          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
-          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
-          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
-          <InfoItem label="EscrowVault" value={deployment ? shortenAddress(deployment.contracts.escrowVault) : "Not loaded"} mono />
-          <InfoItem label="DistributionVault" value={deployment ? shortenAddress(deployment.contracts.distributionVault) : "Not loaded"} mono />
-          <InfoItem label="Recorded refundable amount" value={refundableAmount === null ? "Unavailable" : formatEth(refundableAmount)} />
-          <InfoItem label="Refund claimed" value={refundClaimed === null ? "Unavailable" : refundClaimed ? "Yes" : "No"} />
-          <InfoItem label="Recorded redistribution entitlement" value={rewardEntitlement === null ? "Unavailable" : formatEth(rewardEntitlement)} />
-          <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Unavailable" : rewardClaimed ? "Yes" : "No"} />
+
+
+      <div role="region" className="transaction-studio-claim-scope" aria-label="Auction-specific claims">
+        <div className="transaction-studio-scope-heading">
+          <p className="premium-eyebrow">This auction</p>
+          <h4>Recover your asset or refundable cap</h4>
+          <p>Redistribution is funded only from net premium and may be zero. Network gas is separate and is not refundable.</p>
         </div>
-        <p className="mt-3 text-xs leading-5 text-slate-400">
-          Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. In Codespaces with local
-          Anvil, a browser wallet may not reach the forwarded RPC reliably; use local-dev actions there or expose Anvil through a
-          reliable localhost/testnet RPC.
-        </p>
-      </TechnicalDisclosure>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          disabled={!isConnected || wrongNetwork || !deployment || isLoadingClaimData || pendingAction !== null}
-          onClick={() => loadWalletClaimData().catch((caught) => setClaimDataMessage(walletErrorMessage(caught, "Unable to load wallet claim data.")))}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-        >
-          {isLoadingClaimData ? "Loading..." : "Refresh wallet claim data"}
-        </button>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="transaction-studio-wallet-strip transaction-studio-auction-state">
+          <InfoItem label="Auction finalized" value={auction.finalized ? "Yes" : "No"} />
+        </div>
+        <div className="transaction-studio-claim-amounts">
+          <InfoItem label="Refund available" value={availableRefundableAmount === null ? "Unavailable" : formatEth(availableRefundableAmount)} />
+          <InfoItem label="Redistribution available" value={availableRewardEntitlement === null ? "Unavailable" : formatEth(availableRewardEntitlement)} />
+        </div>
+      <div className="transaction-studio-claim-actions">
         <ActionButton
           label="Claim NFT"
           description="Release the NFT to the authorized claimant wallet."
@@ -1098,6 +1071,11 @@ export function WalletClaimPanel({
           disabledReason={claimNftDisabledReason}
           primary={primaryAction === "claim-nft"}
           onClick={() => setSelectedAction("claim-nft")}
+          details={<div className="transaction-studio-wallet-strip transaction-studio-claimant">
+            <InfoItem label="NFT claimant" value={shortenAddress(expectedNftClaimant)} mono />
+            <InfoItem label="NFT claimant role" value={expectedNftClaimantLabel} />
+            <InfoItem label="NFT claimed" value={auction.nftClaimed || completedClaims.includes("claim-nft") ? "Yes" : "No"} />
+          </div>}
         />
 
         <ActionButton
@@ -1119,7 +1097,24 @@ export function WalletClaimPanel({
           primary={primaryAction === "claim-reward"}
           onClick={() => setSelectedAction("claim-reward")}
         />
+      </div>
+      </div>
 
+      <div role="region" className="transaction-studio-claim-scope transaction-studio-global-scope" aria-label="Global wallet credits">
+        <div className="transaction-studio-scope-heading">
+          <p className="premium-eyebrow">Wallet-level / Global credits</p>
+          <h4>Withdraw available wallet credit</h4>
+          <p>These balances may combine more than one auction. This lot is a navigation context, not exact credit attribution.</p>
+        </div>
+        <div className="transaction-studio-claim-amounts">
+          <InfoItem label="Global seller proceeds credit" value={sellerCredit === null ? "Unavailable" : formatEth(sellerCredit)} />
+          <InfoItem label="Global protocol fee credit" value={protocolFeeCredit === null ? "Unavailable" : formatEth(protocolFeeCredit)} />
+        </div>
+        <div className="transaction-studio-credit-context">
+          <InfoItem label="Seller wallet" value={shortenAddress(auction.seller)} mono />
+          <InfoItem label="Fee recipient" value={auction.auctionFeeRecipient ? shortenAddress(auction.auctionFeeRecipient) : "Not loaded"} mono />
+        </div>
+      <div className="transaction-studio-claim-actions">
         <ActionButton
           label="Withdraw proceeds"
           description="Withdraw the seller wallet's global credit."
@@ -1140,10 +1135,22 @@ export function WalletClaimPanel({
           onClick={() => setSelectedAction("withdraw-fees")}
         />
       </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          disabled={!isConnected || wrongNetwork || !deployment || isLoadingClaimData || pendingAction !== null}
+          onClick={() => loadWalletClaimData().catch((caught) => setClaimDataMessage(walletErrorMessage(caught, "Unable to load wallet claim data.")))}
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          {isLoadingClaimData ? "Loading..." : "Refresh wallet claim data"}
+        </button>
+      </div>
 
       {selectedAction ? <div className="mt-4">{selectedReview()}</div> : null}
 
-      <div className="mt-4">
+      <div className="transaction-studio-resolution mt-4">
         {historicalTransaction ? <p role="status" className="mb-3 text-sm text-amber-200">
           Transaction for the previously reviewed auction #{statusContext.current?.auctionId}. Its result is separate from the displayed lot.
         </p> : null}
@@ -1153,13 +1160,13 @@ export function WalletClaimPanel({
         <WalletTransactionStatus title={historicalTransaction ? "Previously submitted auction claim" : globalTransaction ? "Wallet-level withdrawal" : "Wallet claim / withdrawal"} status={txStatus} />
         {txStatus?.refreshIncomplete && !historicalTransaction ? <button type="button" onClick={refreshConfirmedData}
           disabled={isLoadingClaimData || pendingAction !== null || isVerifying || wrongNetwork || !isConnected}
-          className="mt-3 min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+          className="transaction-secondary-action mt-3 w-full">
           {isLoadingClaimData ? "Refreshing..." : "Refresh auction and wallet claim data"}
         </button> : null}
         {txStatus?.phase === "confirmation-unknown" ? <div className="mt-3">
           <button type="button" onClick={verifyTransaction}
             disabled={isVerifying || pendingAction !== null || recovery.current?.context.walletKey !== walletKey}
-            className="min-h-11 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-100 disabled:opacity-50">
+            className="transaction-secondary-action w-full">
             {isVerifying ? "Verifying..." : "Verify transaction"}
           </button>
           <p className="mt-2 text-xs text-slate-300">Verification only reads on-chain evidence. Return to the submitting wallet and network if they changed. Results for a previously reviewed lot remain separate.</p>
@@ -1173,6 +1180,27 @@ export function WalletClaimPanel({
           {isLoadingClaimData ? "Refreshing..." : "Refresh auction details"}
         </button>
       </div> : null}
+      <p className="transaction-studio-rpc-note">
+        Wallet-signed claims require your wallet to access the target RPC for {targetChainLabel}. A forwarded local Anvil RPC may be unavailable to browser wallets.
+      </p>
+      <TechnicalDisclosure
+        summary="Claim network, contract, and recorded amount details"
+        description="Technical values retained for diagnosing wallet-signed claims and historical on-chain records."
+        className="mt-4"
+      >
+        <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2 lg:grid-cols-4">
+          <InfoItem label="Target chain" value={`${targetChainLabel} (${targetChainId})`} />
+          <InfoItem label="Wallet chain" value={chainId ? String(chainId) : "Not connected"} />
+          <InfoItem label="AuctionHouse" value={deployment ? shortenAddress(deployment.contracts.auctionHouse) : "Not loaded"} mono />
+          <InfoItem label="EscrowVault" value={deployment ? shortenAddress(deployment.contracts.escrowVault) : "Not loaded"} mono />
+          <InfoItem label="DistributionVault" value={deployment ? shortenAddress(deployment.contracts.distributionVault) : "Not loaded"} mono />
+          <InfoItem label="Recorded refundable amount" value={refundableAmount === null ? "Unavailable" : formatEth(refundableAmount)} />
+          <InfoItem label="Refund claimed" value={refundClaimed === null ? "Unavailable" : refundClaimed ? "Yes" : "No"} />
+          <InfoItem label="Recorded redistribution entitlement" value={rewardEntitlement === null ? "Unavailable" : formatEth(rewardEntitlement)} />
+          <InfoItem label="Redistribution claimed" value={rewardClaimed === null ? "Unavailable" : rewardClaimed ? "Yes" : "No"} />
+        </div>
+      </TechnicalDisclosure>
+
     </section>
   );
 }
@@ -1184,6 +1212,7 @@ function ActionButton({
   pending,
   disabledReason,
   primary = false,
+  details,
   onClick
 }: {
   label: string;
@@ -1192,16 +1221,18 @@ function ActionButton({
   pending: boolean;
   disabledReason: string | null;
   primary?: boolean;
+  details?: React.ReactNode;
   onClick: () => void;
 }) {
   const reasonId = `wallet-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-disabled-reason`;
 
   return (
-    <div className={`transaction-action-card ${primary ? "transaction-action-primary" : ""} ${disabledReason ? "transaction-action-disabled" : ""}`}>
+    <div className={`transaction-action-card transaction-studio-action ${primary ? "transaction-action-primary" : ""} ${disabledReason ? "transaction-action-disabled" : ""}`}>
       <div>
-        <h4 className="font-semibold text-white">{label}</h4>
+        <h5 className="font-semibold text-white">{label}</h5>
         <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
-        {amount ? <p className="mt-2 font-mono text-sm text-slate-200">{amount}</p> : null}
+        {amount ? <p className="transaction-studio-action-amount">{amount}</p> : null}
+        {details}
       </div>
       <button
         type="button"
@@ -1219,7 +1250,7 @@ function ActionButton({
 
 function InfoItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-md border border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="transaction-studio-info-item">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 break-all text-sm text-slate-200 ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

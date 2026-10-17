@@ -1561,3 +1561,203 @@ a { color: inherit; }
 @media (min-width: 1440px) {
   .auction-participation-layout { gap: 1.5rem 3rem; }
 }
+
+/* Transaction Studio: the OPEN FRAME materials applied to reviewed commitments. */
+.transaction-studio-masthead {
+  background: transparent;
+  border-top: 0;
+  padding-inline: 0;
+  padding-bottom: 1.75rem;
+}
+.transaction-studio-create { gap: 2rem; }
+.transaction-studio-seller {
+  padding: 1.25rem;
+  border-top: 2px solid var(--accent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--paper-bright) 42%, transparent), transparent 24rem), var(--paper);
+}
+.transaction-studio-intent { max-width: 42rem; }
+.transaction-studio-custody { margin-top: 1.5rem; background: transparent; }
+.transaction-studio-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem 1.25rem; }
+.transaction-studio-context .seller-info-item { padding-block: 0.75rem; }
+.transaction-studio-context .seller-info-item > :last-child { overflow-wrap: anywhere; word-break: normal; }
+.transaction-studio-seller-rail { gap: 0; margin-block: 1.75rem; }
+.transaction-studio-seller-rail li { gap: 0.65rem; padding-block: 0.65rem; }
+.transaction-studio-seller-rail strong { font-size: 0.8125rem; line-height: 1.5; font-weight: 600; }
+.transaction-studio-seller-rail small { font-size: 0.8125rem; text-transform: none; }
+.transaction-studio-seller-rail li > span { width: 1.6rem; height: 1.6rem; font-size: 0.8125rem; border-radius: 50%; }
+.transaction-studio-fieldgroup { min-width: 0; margin: 0; padding: 0 0 1.5rem; border: 0; border-bottom: 1px solid var(--border); }
+.transaction-studio-group-title { padding: 0; color: var(--ink-strong); font-size: 1.1rem; font-weight: 650; letter-spacing: -0.02em; }
+.transaction-studio-group-help { margin: 0.4rem 0 1.25rem; color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.65; }
+.transaction-studio-asset-fields, .transaction-studio-term-fields { display: grid; min-width: 0; gap: 1.25rem; align-items: start; }
+.transaction-studio-field { min-height: 3.25rem; background: var(--surface-recessed); border-radius: 0.25rem; transition: border-color 160ms ease, background 160ms ease; }
+.transaction-studio-field:not(:disabled):hover { border-color: var(--ink-muted); }
+.transaction-studio-price { font-size: 1.5rem; font-variant-numeric: tabular-nums; color: var(--accent-foreground); }
+.transaction-studio-seller-fields { gap: 1.75rem; }
+.transaction-studio-signing-note { margin-top: 0.75rem; color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.6; text-align: center; }
+.transaction-studio-resolution:has(> .premium-eyebrow) { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.transaction-studio-next { padding-top: 1rem; border-top: 1px solid var(--border); }
+.transaction-studio-next > a { min-height: 2.75rem; }
+.transaction-studio-local { background: transparent; border: 1px dashed var(--border-strong); margin-top: 1.5rem; }
+.transaction-studio-local .transaction-studio-price { color: var(--ink); }
+
+@media (min-width: 640px) {
+  .transaction-studio-seller { padding: 1.75rem; }
+  .transaction-studio-asset-fields { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); }
+  .transaction-studio-term-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .transaction-studio-seller-rail { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.65rem; }
+  .transaction-studio-seller-rail li { grid-template-columns: minmax(0, 1fr); align-content: start; gap: 0.5rem; border-top-width: 2px; }
+  .transaction-studio-seller-rail li.transaction-journey-current { border-top-color: var(--accent); }
+  .transaction-studio-seller-rail li.transaction-journey-completed { border-top-color: var(--ink-muted); }
+  .transaction-studio-seller-rail small { color: var(--ink-muted); }
+}
+@media (min-width: 1024px) {
+  .seller-workspace-grid.transaction-studio-create { grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.32fr); }
+  .transaction-studio-masthead { grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.4fr); align-items: end; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transaction-studio-field { transition: none; }
+}
+
+.transaction-studio-custody-evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 0 1rem; margin-top: 0.75rem; }
+.transaction-studio-custody-evidence .seller-info-item { padding-block: 0.5rem; }
+.transaction-studio-bid { border-top: 2px solid var(--accent); padding-top: 1.25rem; }
+.transaction-studio-bid > .transaction-studio-intent h3 { font-size: clamp(1.5rem, 2.3vw, 2rem); letter-spacing: -0.035em; }
+.transaction-studio-market-context, .transaction-studio-bid-identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.transaction-studio-market-context { border-block: 1px solid var(--border); padding-block: 0.9rem; }
+.transaction-studio-market-context .bid-info-item > :last-child { font-size: 1rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.transaction-studio-amount-entry { margin-top: 0.25rem; }
+.transaction-studio-input-wrap { display: flex; min-width: 0; align-items: center; border: 1px solid var(--border-strong); border-radius: 0.25rem; background: var(--surface-recessed); transition: border-color 160ms ease, background 160ms ease; }
+.transaction-studio-input-wrap:focus-within { border-color: var(--focus); background: var(--paper-bright); }
+.transaction-studio-plus { padding-left: 1rem; color: var(--accent-foreground); font-size: 2rem; font-variant-numeric: tabular-nums; }
+.transaction-studio-input-wrap .bid-amount-input { border: 0; border-radius: 0.25rem; background: transparent; color: var(--accent-foreground); padding-block: 1rem; font-size: 2rem; line-height: 1.3; font-weight: 650; font-variant-numeric: tabular-nums; }
+.transaction-studio-input-wrap:has(> .transaction-studio-plus) .bid-amount-input { padding-left: 0.4rem; }
+.transaction-studio-minimum .bid-info-item { display: flex; min-width: 0; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.2rem 0.75rem; }
+.transaction-studio-minimum .bid-info-item > :last-child { margin: 0; color: var(--ink); font-weight: 600; }
+.transaction-studio-bid-ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; border-block: 1px solid var(--border); border-radius: 0; background: transparent; padding: 1.15rem 0; }
+.transaction-studio-bid-ledger .bid-info-item:first-child { grid-column: 1 / -1; border-left: 2px solid var(--accent); padding-left: 0.9rem; }
+.transaction-studio-bid-ledger .bid-info-item:first-child > :last-child { color: var(--accent-foreground); font-size: 1.75rem; line-height: 1.25; font-weight: 650; font-variant-numeric: tabular-nums; }
+.transaction-studio-bid-ledger .bid-info-item:not(:first-child) > :last-child { color: var(--ink-strong); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.transaction-studio-bid-ledger .bid-info-item:last-child { border-left: 1px solid var(--border-strong); padding-left: 0.85rem; }
+.transaction-studio-bid-identity { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border); padding-top: 0.85rem; }
+.transaction-studio-bid-identity > :first-child { grid-column: 1 / -1; }
+.transaction-studio-bid-identity .bid-info-item > :last-child { font-size: 0.8125rem; overflow-wrap: anywhere; word-break: normal; }
+.transaction-studio-economic-note { border-left: 2px solid var(--border-strong); padding-left: 0.9rem; color: var(--ink); }
+.transaction-studio-rpc-note { margin: 0.85rem 0 1.25rem; color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.65; }
+@media (min-width: 640px) {
+  .transaction-studio-input-wrap .bid-amount-input { font-size: 2.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transaction-studio-input-wrap { transition: none; }
+}
+
+.transaction-studio-review { border: 0; border-top: 2px solid var(--accent); background: var(--surface-elevated); padding: 1.25rem; animation: transaction-studio-reveal 180ms ease-out both; }
+.transaction-studio-review-header h4 { font-size: 1.5rem; letter-spacing: -0.025em; }
+.transaction-studio-review .transaction-review-list { margin-top: 1.4rem; }
+.transaction-studio-review .transaction-review-row { padding-block: 0.85rem; }
+.transaction-studio-review :is([data-review-label="ETH sent in this transaction"], [data-review-label="Start price"], [data-review-label="Refund available"], [data-review-label="Redistribution available"], [data-review-label="Amount"]) dd { color: var(--accent-foreground); font-size: 1.6rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.transaction-studio-review [data-review-label="Your new total cap"] dd { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.transaction-studio-review [data-review-label="Network gas"] { border-bottom: 1px solid var(--border); }
+.transaction-studio-review [data-review-label="Effect"] dd { color: var(--ink-strong); font-size: 1rem; }
+.transaction-studio-review-decision { padding-top: 0.5rem; }
+.transaction-studio-review .transaction-review-confirmations { margin-top: 0.75rem; background: transparent; padding-block: 0.25rem; font-weight: 600; }
+.transaction-studio-review .transaction-review-note { color: var(--ink); }
+.transaction-studio-review .transaction-review-actions { flex-direction: column; margin-top: 1.25rem; }
+.transaction-studio-review .transaction-review-actions > button { min-height: 2.75rem; padding: 0.7rem 1rem; }
+@media (min-width: 640px) {
+  .transaction-studio-review .transaction-review-actions { flex-direction: row; }
+}
+.transaction-studio-status { --status-ink: var(--accent-foreground); border: 1px solid var(--border); border-left: 3px solid var(--status-ink); border-radius: 0; background: var(--surface-elevated); color: var(--ink); padding: 1.15rem; }
+.transaction-studio-status[data-phase="confirmed"] { --status-ink: var(--success-foreground); }
+.transaction-studio-status[data-phase="confirmation-unknown"] { --status-ink: var(--warning-foreground); }
+.transaction-studio-status:is([data-phase="failed"], [data-phase="rejected"]) { --status-ink: var(--danger-foreground); }
+.transaction-studio-status-heading { display: flex; align-items: center; min-width: 0; gap: 0.85rem; }
+.transaction-studio-status-heading > div { min-width: 0; }
+.transaction-studio-status-indicator { display: inline-flex; width: 1.25rem; height: 1.25rem; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--status-ink); border-radius: 50%; color: var(--status-ink); }
+.transaction-studio-status[data-phase="confirmed"] .transaction-studio-status-indicator::after { content: "✓"; font-size: 0.8125rem; }
+.transaction-studio-status:is([data-phase="failed"], [data-phase="rejected"], [data-phase="confirmation-unknown"]) .transaction-studio-status-indicator::after { content: "!"; font-size: 0.8125rem; font-weight: 700; }
+.transaction-studio-status[data-phase="pending"] .transaction-studio-status-indicator { animation: transaction-studio-pending 1.6s ease-in-out infinite; }
+.transaction-studio-status-label { margin-top: 0.2rem; color: var(--status-ink); font-size: 1.05rem; }
+.transaction-studio-refresh-note { margin-top: 0.85rem; border-top: 1px solid var(--border); padding-top: 0.75rem; color: var(--warning-foreground); font-size: 0.8125rem; }
+.transaction-studio-status .transaction-evidence { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.transaction-studio-status .transaction-evidence summary { min-height: 2.75rem; align-content: center; font-size: 0.8125rem; }
+.transaction-studio-claims, .transaction-studio-finalize { border-top: 2px solid var(--accent); padding-top: 1.25rem; }
+.transaction-studio-effect { margin-top: 1.25rem; border-left: 2px solid var(--accent); padding: 0.35rem 0 0.35rem 1rem; }
+.transaction-studio-effect p:first-child { color: var(--ink-strong); font-size: 1.05rem; }
+.transaction-studio-effect p + p { margin-top: 0.5rem; color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.65; }
+.transaction-studio-finalize-context, .transaction-studio-claim-context, .transaction-studio-credit-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem 1rem; }
+.transaction-studio-finalize-context > :first-child, .transaction-studio-claim-context > :first-child { grid-column: 1 / -1; }
+.transaction-studio-info-item { min-width: 0; border-top: 1px solid var(--border); padding-block: 0.6rem; }
+.transaction-studio-info-item > :last-child { overflow-wrap: anywhere; word-break: normal; font-variant-numeric: tabular-nums; }
+.transaction-studio-claim-scope { margin-top: 1.75rem; }
+.transaction-studio-scope-heading { margin-bottom: 1rem; }
+.transaction-studio-scope-heading h4 { margin-top: 0.35rem; color: var(--ink-strong); font-size: 1.2rem; font-weight: 600; letter-spacing: -0.025em; }
+.transaction-studio-scope-heading > p:last-child { margin-top: 0.5rem; color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.65; }
+.transaction-studio-claim-amounts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.transaction-studio-claim-amounts .transaction-studio-info-item > :last-child { font-size: 1.35rem; line-height: 1.35; color: var(--accent-foreground); font-weight: 650; }
+.transaction-studio-claim-actions { display: grid; min-width: 0; gap: 0; margin-top: 0.65rem; }
+.transaction-studio-action { border: 0; border-top: 1px solid var(--border); background: transparent; padding: 1.15rem 0; }
+.transaction-studio-action.transaction-action-primary { border-top-color: var(--accent); padding-left: 1rem; box-shadow: inset 2px 0 var(--accent); }
+.transaction-studio-action.transaction-action-disabled { border-top-color: var(--border); background: transparent; }
+.transaction-studio-action-amount { margin-top: 0.6rem; color: var(--ink-strong); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.transaction-studio-action > p:last-child { margin-top: 0.65rem; color: var(--ink-muted); }
+.transaction-studio-global-scope { border-top: 1px solid var(--border-strong); padding-top: 1.5rem; }
+.transaction-studio-global-scope .premium-eyebrow { color: var(--violet-foreground); }
+.transaction-studio-global-scope .transaction-studio-claim-amounts .transaction-studio-info-item > :last-child { color: var(--ink-strong); }
+.transaction-studio-resolution > .transaction-secondary-action { margin-top: 0.75rem; }
+@keyframes transaction-studio-reveal { from { opacity: 0.65; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes transaction-studio-pending { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (max-width: 359px) {
+  .transaction-studio-claim-amounts { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transaction-studio-review, .transaction-studio-status-indicator { animation: none !important; transform: none !important; }
+}
+
+.transaction-studio-wallet-strip { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-block: 1px solid var(--border); padding-block: 0.35rem; }
+.transaction-studio-wallet-strip > .seller-info-item,
+.transaction-studio-wallet-strip > .transaction-studio-info-item { display: flex; grid-column: auto; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.15rem 0.75rem; border: 0; padding-block: 0.3rem; }
+.transaction-studio-wallet-strip > :is(.seller-info-item, .transaction-studio-info-item) > :last-child { margin: 0; font-size: 0.8125rem; }
+.transaction-studio-claimant { margin-top: 0.75rem; border-bottom: 0; }
+.transaction-studio-auction-state { border: 0; padding: 0; margin-top: -0.5rem; }
+.transaction-studio-duration-hint { color: var(--ink-muted); font-size: 0.8125rem; line-height: 1.6; }
+.transaction-studio-seller .transaction-studio-custody { margin-top: 0; }
+@media (max-width: 639px) {
+  .transaction-studio-seller-rail { margin-block: 1rem; }
+  .transaction-studio-seller-rail li { padding-block: 0.35rem; grid-template-columns: 1.4rem minmax(0, 1fr) auto; gap: 0.45rem; }
+  .transaction-studio-seller-rail li > span { width: 1.35rem; height: 1.35rem; }
+  .transaction-studio-seller-rail strong { line-height: 1.35; }
+  .transaction-studio-seller-fields { margin-top: 1rem; }
+}
+
+.transaction-studio-activity { border: 0; border-top: 2px solid var(--accent); background: transparent; padding: 1.25rem 0; }
+.transaction-studio-activity-wallet { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.65rem; margin-top: 0.85rem; font-size: 0.8125rem; line-height: 1.6; color: var(--ink-muted); }
+.transaction-studio-activity-wallet strong { color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+.transaction-studio-activity-wallet > span:not(:first-child) { margin-left: 0.35rem; }
+.transaction-studio-activity .activity-headline-stats { margin-block: 1.5rem 0.5rem; gap: 1.25rem 2rem; }
+.transaction-studio-activity .activity-headline-stats > div { display: flex; flex-direction: column; align-items: start; gap: 0.25rem; }
+.transaction-studio-activity .activity-headline-stats dt { font-size: 0.8125rem; }
+.transaction-studio-activity .activity-headline-stats dd { font-size: 2rem; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -0.035em; }
+.transaction-studio-activity .activity-headline-stats > div:first-child dd { color: var(--accent-foreground); font-size: 2.5rem; }
+.transaction-studio-queue-section { container-type: inline-size; container-name: activityqueue; margin-top: 1.5rem; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding: 1.25rem 0 0; }
+.transaction-studio-queue-section h3 { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.025em; }
+.transaction-studio-queue-priority { border-top: 2px solid var(--accent); }
+.transaction-studio-queue-priority h3 { font-size: 1.5rem; }
+.transaction-studio-queue-count { border: 0; border-radius: 0; padding-inline: 0; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.transaction-studio-queue-section .activity-queue { border-top: 0; }
+.transaction-studio-queue-row { background: transparent; padding: 1.25rem 0; }
+.transaction-studio-queue-row.activity-queue-credit { border-left: 2px solid var(--violet-foreground); padding-left: 1rem; background: transparent; }
+.transaction-studio-queue-credit-amount { font-size: 1.6rem; line-height: 1.35; font-weight: 600; font-variant-numeric: tabular-nums; }
+.transaction-studio-queue-action-amount { font-size: 1.25rem; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; }
+.transaction-studio-queue-meta > span { border-radius: 0.2rem; font-size: 0.8125rem; }
+.transaction-studio-queue-row .activity-action-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.85rem; border-top-style: solid; padding-block: 1rem; }
+.transaction-studio-queue-link { min-height: 2.75rem; overflow-wrap: anywhere; text-align: center; }
+.transaction-studio-activity .activity-record { margin-block: 1.75rem; padding-top: 1.4rem; }
+.transaction-studio-activity .activity-record-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); border: 0; gap: 0 1.5rem; }
+.transaction-studio-activity .activity-record-grid > div { border: 0; border-top: 1px solid var(--border); padding: 0.9rem 0; }
+.transaction-studio-activity .activity-record-grid dt { font-size: 0.8125rem; }
+.transaction-studio-activity .activity-record-grid dd { margin-top: 0.35rem; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.transaction-studio-activity .activity-record-grid span { font-family: var(--font-sans); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+@container activityqueue (min-width: 34rem) {
+  .transaction-studio-queue-row .activity-action-row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 1.5rem; }
+  .transaction-studio-queue-row .activity-action-row > .transaction-studio-queue-link { width: auto; min-width: 10rem; }
+}
