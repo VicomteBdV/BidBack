@@ -521,12 +521,16 @@ const immutableMismatches = [
 describe.each(auctionClaims)("$label displayed-lot identity", ({ label, success }) => {
   it.each(immutableMismatches)("refuses a reused ID with different $field before reading eligibility", async ({ field, value }) => {
     const f = setupClaims();
+    // NFT readiness can precede the initial six-read bootstrap. Refund readiness
+    // requires its values to be applied after the whole bootstrap has settled.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review claim refund" })).toBeEnabled());
     await waitFor(() => expect(screen.getByRole("button", { name: `Review ${label}` })).toBeEnabled());
     f.readContract.mockClear();
     Object.assign(f.liveAuction, { [field]: value });
     await submitClaim(label);
     await expectNoSignature(f);
     expect(f.readContract).toHaveBeenCalledTimes(1);
+    expect(f.readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "getAuction" }));
     expect(screen.queryByRole("button", { name: "Continue in wallet" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh auction details" })).toBeEnabled();
     expect(screen.getByText(/The displayed auction details no longer match/)).toHaveAttribute("role", "status");
