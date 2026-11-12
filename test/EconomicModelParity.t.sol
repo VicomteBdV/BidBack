@@ -19,11 +19,14 @@ interface VmEconomicModel {
     function warp(uint256 newTimestamp) external;
 }
 
+// Historical fixture files remain untouched. Stateful vectors below now assert
+// approved amount-rank behavior; pure EF/ET/II vectors cover inactive legacy helpers.
 contract EconomicModelParityTest {
     VmEconomicModel private constant vm = VmEconomicModel(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     uint256 private constant BPS = 10_000;
     uint256 private constant SCALE = 1e18;
+    uint256 private constant Q = 1 << 136;
     address private constant SELLER = address(0xA11CE);
     address private constant BIDDER_A = address(0xB01);
     address private constant BIDDER_B = address(0xB02);
@@ -164,10 +167,10 @@ contract EconomicModelParityTest {
 
         (,,,, uint256 sellerProceeds, uint256 feeAmount, uint256 reserve) = escrowVault.settlements(auctionId);
         assertEq(feeAmount, 0.05 ether, "Anvil fee");
-        assertEq(reserve, 0.19 ether, "Anvil assigned distribution");
-        assertEq(sellerProceeds, 1.76 ether, "Anvil seller proceeds");
+        assertEq(reserve, 0.475 ether, "Anvil assigned distribution");
+        assertEq(sellerProceeds, 1.475 ether, "Anvil seller proceeds");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_B), 1.5 ether, "Anvil full refund");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 0.19 ether, "Anvil reward");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 0.475 ether, "Anvil reward");
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 0, "winner excluded");
         _assertLiabilities(auctionId, 3.5 ether, 1.5 ether);
     }
@@ -185,60 +188,60 @@ contract EconomicModelParityTest {
 
         (,,,, uint256 sellerProceeds, uint256 feeAmount, uint256 reserve) = escrowVault.settlements(auctionId);
         assertEq(feeAmount, 0.001 ether, "Base fee");
-        assertEq(reserve, 0.0038 ether, "Base assigned distribution");
-        assertEq(sellerProceeds, 0.0252 ether, "Base seller proceeds");
+        assertEq(reserve, 0.0095 ether, "Base assigned distribution");
+        assertEq(sellerProceeds, 0.0195 ether, "Base seller proceeds");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_B), 0.015 ether, "Base full refund");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 0.0038 ether, "Base reward");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 0.0095 ether, "Base reward");
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 0, "Base winner excluded");
         _assertLiabilities(auctionId, 0.045 ether, 0.015 ether);
     }
 
-    function testVectorMultipleLosersNonSaturatedNormalizationAndDust() external {
+    function testVectorMultipleLosersHamiltonAllocatesDust() external {
         uint256 auctionId = _createPureEfTrace(8, 10_000, 10_000, 10_000);
 
-        _assertPureEfComponents(auctionId, BIDDER_A, 62_500_000_000_000_000, 0, 0, 62_493_750_000_000_000);
+        _assertPureEfComponents(auctionId, BIDDER_A, 62_500_000_000_000_000, 0, 0, 2_500 * Q);
         _assertPureEfComponents(
-            auctionId, BIDDER_B, 250_000_000_000_000_000, 0, 200_000_000_000_000_000, 249_975_000_000_000_000
+            auctionId, BIDDER_B, 250_000_000_000_000_000, 0, 200_000_000_000_000_000, 4_000 * Q
         );
         _assertPureEfComponents(
-            auctionId, BIDDER_C, 562_500_000_000_000_000, 0, 200_000_000_000_000_000, 562_443_750_000_000_000
+            auctionId, BIDDER_C, 562_500_000_000_000_000, 0, 200_000_000_000_000_000, 5_000 * Q
         );
 
         _finalizeAfter(auctionId, 2 hours);
 
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 714, "reward A");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 2_857, "reward B");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 6_428, "reward C");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 2_174, "reward A");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 3_478, "reward B");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 4_348, "reward C");
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_D), 0, "winner excluded");
 
         (, uint256 assigned,) = distributionVault.distributions(auctionId);
         (,,,, uint256 sellerProceeds,, uint256 reserve) = escrowVault.settlements(auctionId);
-        assertEq(assigned, 9_999, "one wei allocation dust");
-        assertEq(reserve, 9_999, "only assigned amount reserved");
-        assertEq(sellerProceeds, 1, "dust remains seller proceeds");
+        assertEq(assigned, 10_000, "Hamilton allocates all dust");
+        assertEq(reserve, 10_000, "full pool reserved");
+        assertEq(sellerProceeds, 0, "no dust left for seller");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_A), 2_500, "refund A independent");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_B), 5_000, "refund B independent");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_C), 7_500, "refund C independent");
         _assertLiabilities(auctionId, 25_000, 15_000);
     }
 
-    function testVectorMultipleLosersPerUserCapAndSellerRemainder() external {
+    function testVectorLegacyPerUserCapIsInactive() external {
         uint256 auctionId = _createPureEfTrace(9, 4_000, 10_000, 10_000);
         _finalizeAfter(auctionId, 2 hours);
 
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 714, "uncapped small reward");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 2_857, "uncapped middle reward");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 4_000, "largest reward capped");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 2_174, "amount-rank small reward");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 3_478, "amount-rank middle reward");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 4_348, "legacy per-user cap is inactive");
 
         (, uint256 assigned,) = distributionVault.distributions(auctionId);
         (,,,, uint256 sellerProceeds,, uint256 reserve) = escrowVault.settlements(auctionId);
-        assertEq(assigned, 7_571, "capped assigned total");
-        assertEq(reserve, 7_571, "reserve equals assigned total");
-        assertEq(sellerProceeds, 2_429, "unassigned candidate pool remains seller proceeds");
+        assertEq(assigned, 10_000, "full assigned total");
+        assertEq(reserve, 10_000, "reserve equals assigned total");
+        assertEq(sellerProceeds, 0, "full pool has no seller remainder");
         _assertLiabilities(auctionId, 25_000, 15_000);
     }
 
-    function testVectorAllocationRoundsToZero() external {
+    function testVectorTinyPoolAwardsLargestRemainder() external {
         uint256 auctionId = _createPureEfTrace(10, 10_000, 1, 10_000);
         assertEq(auctionHouse.exposedCandidateDistributionPool(auctionId, 10_000), 1, "one wei pool");
         _finalizeAfter(auctionId, 2 hours);
@@ -247,13 +250,13 @@ contract EconomicModelParityTest {
         (,,,, uint256 sellerProceeds,, uint256 reserve) = escrowVault.settlements(auctionId);
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 0, "A rounds to zero");
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 0, "B rounds to zero");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 0, "C rounds to zero");
-        assertEq(assigned, 0, "nothing assigned");
-        assertEq(reserve, 0, "nothing reserved");
-        assertEq(sellerProceeds, 10_000, "entire final price remains seller proceeds");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 1, "C receives largest remainder wei");
+        assertEq(assigned, 1, "tiny pool fully assigned");
+        assertEq(reserve, 1, "tiny pool reserved");
+        assertEq(sellerProceeds, 9_999, "seller receives price less assigned wei");
     }
 
-    function testVectorZeroScore() external {
+    function testVectorTinyCapRetainsPositiveScore() external {
         ParamsController.Params memory p = _pureEfParams(10_000, 10_000);
         params.setParams(p);
 
@@ -262,14 +265,14 @@ contract EconomicModelParityTest {
         _bid(BIDDER_A, auctionId, 1);
         _bid(BIDDER_B, auctionId, 2 ether);
 
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 0, "tiny ratio rounds to zero score");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), Q, "one wei retains one Q score at first rank");
         _finalizeAfter(auctionId, 2 hours);
 
         (, uint256 assigned,) = distributionVault.distributions(auctionId);
         (,,,, uint256 sellerProceeds,, uint256 reserve) = escrowVault.settlements(auctionId);
-        assertEq(assigned, 0, "zero total score assigns nothing");
-        assertEq(reserve, 0, "zero reserve");
-        assertEq(sellerProceeds, 2 ether, "seller receives final price");
+        assertEq(assigned, 2 ether, "sole loser receives full pool");
+        assertEq(reserve, 2 ether, "full pool reserve");
+        assertEq(sellerProceeds, 0, "full funded pool is assigned");
         assertEq(escrowVault.refundableAmount(auctionId, BIDDER_A), 1, "full refund remains independent");
     }
 
@@ -309,6 +312,7 @@ contract EconomicModelParityTest {
             0,
             "first bid after initial end has zero ET"
         );
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_B), 1.1 ether * Q * 4 / 5, "late bid still earns rank score");
     }
 
     function testVectorInteractionIntensityBoundaries() external view {
@@ -319,7 +323,7 @@ contract EconomicModelParityTest {
         assertEq(auctionHouse.exposedInteractionIntensity(6, p), SCALE, "II above max");
     }
 
-    function testVectorReputationBoundsAndLiveRead() external {
+    function testVectorReputationBoundsDoNotChangeScore() external {
         ParamsController.Params memory p = _pureEfParams(10_000, 10_000);
         params.setParams(p);
 
@@ -328,19 +332,19 @@ contract EconomicModelParityTest {
         _bid(BIDDER_A, auctionId, 5_000);
         _bid(BIDDER_B, auctionId, 10_000);
 
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 250_000_000_000_000_000, "default rep");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 5_000 * Q, "default rep is inactive");
 
         reputation.setReputationBps(BIDDER_A, 5_000);
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 125_000_000_000_000_000, "minimum rep");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 5_000 * Q, "minimum rep is inactive");
 
         reputation.setReputationBps(BIDDER_A, 10_000);
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 250_000_000_000_000_000, "explicit default rep");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 5_000 * Q, "explicit default rep is inactive");
 
         reputation.setReputationBps(BIDDER_A, 15_000);
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 375_000_000_000_000_000, "maximum rep");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 5_000 * Q, "maximum rep is inactive");
     }
 
-    function testVectorReputationChangeBeforeFinalizationChangesNormalization() external {
+    function testVectorReputationChangeBeforeFinalizationDoesNotChangeNormalization() external {
         ParamsController.Params memory p = _pureEfParams(10_000, 10_000);
         params.setParams(p);
 
@@ -353,19 +357,19 @@ contract EconomicModelParityTest {
 
         reputation.setReputationBps(BIDDER_A, 15_000);
 
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 93_750_000_000_000_000, "changed score A");
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_B), 250_000_000_000_000_000, "score B");
-        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_C), 562_500_000_000_000_000, "score C");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_A), 7_250 * Q, "reputation leaves score A unchanged");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_B), 11_600 * Q, "score B");
+        assertEq(auctionHouse.exposedScore(auctionId, BIDDER_C), 14_500 * Q, "score C");
         _finalizeAfter(auctionId, 2 hours);
 
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 3_000, "live reputation reward A");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 8_000, "reward B");
-        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 18_000, "reward C");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_A), 6_304, "amount-rank reward A");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_B), 10_087, "reward B");
+        assertEq(distributionVault.entitlementOf(auctionId, BIDDER_C), 12_609, "reward C");
         assertEq(distributionVault.entitlementOf(auctionId, BIDDER_D), 0, "winner excluded");
 
         (, uint256 assigned,) = distributionVault.distributions(auctionId);
         (,,,, uint256 sellerProceeds,,) = escrowVault.settlements(auctionId);
-        assertEq(assigned, 29_000, "full pool assigned after live reputation change");
+        assertEq(assigned, 29_000, "full pool unaffected by reputation change");
         assertEq(sellerProceeds, 0, "no unassigned remainder");
     }
 

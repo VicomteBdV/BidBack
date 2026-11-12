@@ -1,11 +1,12 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics, encodeFunctionData, type Abi, type Address, type Hex } from "viem";
+import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics, encodeFunctionData, formatEther, type Abi, type Address, type Hex } from "viem";
 import { useAccount } from "wagmi";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
 import { erc721Abi } from "@/contracts/erc721Abi";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
+import { AMOUNT_RANK_MAX_AMOUNT, AMOUNT_RANK_SCORE_SCALE } from "@/lib/auctionFormula";
 import { WalletCreateAuctionForm } from "@/components/WalletCreateAuctionForm";
 import { localDeploymentFixture, testAddresses } from "@/test/fixtures";
 
@@ -81,12 +82,14 @@ function setupWalletCreateForm({
   owner = seller,
   approvedAddress = zeroAddress,
   approvedForAll = false,
-  chainId = 31337
+  chainId = 31337,
+  amountRank = false
 }: {
   owner?: `0x${string}`;
   approvedAddress?: `0x${string}`;
   approvedForAll?: boolean;
   chainId?: number;
+  amountRank?: boolean;
 } = {}) {
   let currentApprovedAddress = approvedAddress;
   let currentApprovedForAll = approvedForAll;
@@ -94,6 +97,9 @@ function setupWalletCreateForm({
   const readContract = vi.fn(async (request: unknown) => {
     const { functionName } = request as { functionName?: string };
 
+    const metadata: Record<string, unknown> = { FORMULA_ID: "amount-rank-v1", ARITHMETIC_ID: "floor-delta-q136-muldiv512-v1",
+      ROUNDING_ID: "hamilton-first-participation-v1", SCORE_SCALE: AMOUNT_RANK_SCORE_SCALE, MAX_AMOUNT: AMOUNT_RANK_MAX_AMOUNT };
+    if (amountRank && functionName && functionName in metadata) return metadata[functionName];
     if (functionName === "params") return paramsTuple();
     if (functionName === "paused") return false;
     if (functionName === "ownerOf") return owner;
@@ -622,12 +628,17 @@ it("retains a proved approval and its hash after failed display refresh, then un
 
 it.each(["unavailable", "hash", "number", "timestamp"])("does not prove creation with an invalid mined block %s, and can recover from RPC unavailability", async (field) => {
   const f = setupWalletCreateForm({ approvedAddress: testAddresses.nftVault });
-  if (field === "unavailable") f.getBlock.mockRejectedValueOnce(new Error("Block unavailable"));
-  if (field === "hash") f.getBlock.mockResolvedValue({ hash: `0x${"b".repeat(64)}`, number: 42n, timestamp: 1000n });
-  if (field === "number") f.getBlock.mockResolvedValue({ hash: blockHash, number: 43n, timestamp: 1000n });
-  if (field === "timestamp") f.getBlock.mockResolvedValue({ hash: blockHash, number: 42n, timestamp: 999n });
+  // Inject receipt-block faults after mining, not into the earlier latest-block formula review.
+  f.waitForTransactionReceipt.mockImplementationOnce(async () => {
+    if (field === "unavailable") f.getBlock.mockRejectedValueOnce(new Error("Block unavailable"));
+    if (field === "hash") f.getBlock.mockResolvedValue({ hash: `0x${"b".repeat(64)}`, number: 42n, timestamp: 1000n });
+    if (field === "number") f.getBlock.mockResolvedValue({ hash: blockHash, number: 43n, timestamp: 1000n });
+    if (field === "timestamp") f.getBlock.mockResolvedValue({ hash: blockHash, number: 42n, timestamp: 999n });
+    return f.receipt;
+  });
   await submitCreateAction("create");
   await screen.findByText("Confirmation not verified");
+  expect(f.getBlock).toHaveBeenCalledWith({ blockHash });
   expect(screen.queryByRole("link", { name: "Open auction detail" })).not.toBeInTheDocument();
   expect(f.writeContract).toHaveBeenCalledTimes(1);
   if (field === "unavailable") {
@@ -707,4 +718,24 @@ it.each(listingActions)("restores submitted form details for an in-flight %s wit
   expect(f.writeContract).toHaveBeenCalledTimes(1);
   expect((f.writeContract.mock.calls[0][0] as { args: readonly unknown[] }).args).toEqual(action === "approve"
     ? [testAddresses.nftVault, 2n] : [testAddresses.localNft, 2n, 1000000000000000000n, 7200n]);
+});
+
+describe("amount-rank creation monetary bound", () => {
+  it("blocks an excessive starting price during live review before any wallet signature", async () => {
+    const { writeContract, readContract } = setupWalletCreateForm({ amountRank: true });
+    await waitForContext();
+    fireEvent.change(screen.getByLabelText("Start price in ETH"), { target: { value: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) } });
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    expect((await screen.findAllByText(/Start price exceeds this auction implementation's maximum amount/)).length).toBeGreaterThan(0);
+    expect(writeContract).not.toHaveBeenCalled();
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: "MAX_AMOUNT", address: testAddresses.auctionHouse, blockNumber: 42n }));
+  });
+  it("keeps historical creation review available when formula metadata is absent", async () => {
+    const { writeContract } = setupWalletCreateForm();
+    await waitForContext();
+    fireEvent.change(screen.getByLabelText("Start price in ETH"), { target: { value: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) } });
+    fireEvent.click(screen.getByRole("button", { name: "Review auction" }));
+    expect(await screen.findByRole("region", { name: "Create auction" })).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
 });

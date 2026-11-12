@@ -31,6 +31,16 @@ contract AuctionHouseEconomicHarness is AuctionHouse {
         )
     {}
 
+    function exposedScoreIncrement(uint256 delta, uint16 softness, uint256 rank) external pure returns (uint256) {
+        return _scoreIncrement(delta, softness, rank);
+    }
+
+    function exposedAllocateRewards(uint256[] memory scores, uint256 pool)
+        external pure returns (uint256[] memory rewards, uint256 assigned)
+    {
+        return _allocateRewards(scores, pool);
+    }
+
     function exposedFinancialEngagement(uint256 maxCap, uint256 finalPrice, uint256 cap)
         external
         pure
@@ -62,9 +72,7 @@ contract AuctionHouseEconomicHarness is AuctionHouse {
     }
 
     function exposedScore(uint256 auctionId, address bidder) external view returns (uint256) {
-        ParamsController.Params memory p = this.getAuctionParams(auctionId);
-        Modules memory modules = this.getAuctionModules(auctionId);
-        return _score(auctionId, bidder, p, modules.reputationAdapter);
+        return _score(auctionId, bidder);
     }
 
     function exposedScoreComponents(uint256 auctionId, address bidder)
@@ -75,12 +83,11 @@ contract AuctionHouseEconomicHarness is AuctionHouse {
         Auction storage auction = auctions[auctionId];
         BidderStats storage stats = bidderStats[auctionId][bidder];
         ParamsController.Params memory p = this.getAuctionParams(auctionId);
-        Modules memory modules = this.getAuctionModules(auctionId);
 
         ef = _financialEngagement(stats.maxCap, auction.highestBid, p.efCap);
         et = _timeEngagement(stats.firstBidTime, auction.startTime, auction.initialEndTime, p);
         ii = _interactionIntensity(stats.significantOverbids, p);
-        finalScore = _score(auctionId, bidder, p, modules.reputationAdapter);
+        finalScore = _score(auctionId, bidder);
     }
 
     function exposedTimeEngagementForBidder(uint256 auctionId, address bidder) external view returns (uint256) {
@@ -95,8 +102,6 @@ contract AuctionHouseEconomicHarness is AuctionHouse {
         view
         returns (address[] memory recipients, uint256[] memory amounts, uint256 assigned)
     {
-        ParamsController.Params memory p = this.getAuctionParams(auctionId);
-        Modules memory modules = this.getAuctionModules(auctionId);
-        return _buildDistribution(auctionId, p, pool, modules.reputationAdapter);
+        return _buildDistribution(auctionId, pool);
     }
 }

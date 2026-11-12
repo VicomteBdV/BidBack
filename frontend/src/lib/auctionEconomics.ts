@@ -5,6 +5,7 @@ import type {
   AuctionEconomicsSummary,
   SerializedAuction
 } from "@/lib/auctionTypes";
+import { isSupportedAmountRank } from "@/lib/auctionFormula";
 import { isZeroAddress } from "@/lib/format";
 
 function amount(status: AuctionEconomicAmount["status"], value?: string, note?: string): AuctionEconomicAmount {
@@ -45,6 +46,8 @@ function parametersSnapshot(auction: SerializedAuction): AuctionEconomicParamete
   if (!snapshot) return null;
 
   return {
+    rankSoftness: isSupportedAmountRank(auction.formula) ? snapshot.rankSoftness : undefined,
+    formulaStatus: isSupportedAmountRank(auction.formula) ? "supported" : "unavailable",
     bidbackFeeBps: snapshot.bidbackFeeBps,
     redistributionBps: snapshot.redistributionBps,
     minPremiumNet: snapshot.minPremiumNet,

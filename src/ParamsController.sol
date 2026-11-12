@@ -29,6 +29,9 @@ contract ParamsController is Ownable {
         uint256 efCap;
         uint256 etCap;
         uint256 iiCap;
+        // Amount/rank softness. Legacy EF/ET/II and per-user cap fields are inactive
+        // in the amount-rank scoring/allocation path, retained for tuple compatibility.
+        uint16 rankSoftness;
     }
 
     Params private _params;
@@ -57,7 +60,8 @@ contract ParamsController is Ownable {
             minPremiumNet: 0.01 ether,
             efCap: SCALE,
             etCap: SCALE,
-            iiCap: SCALE
+            iiCap: SCALE,
+            rankSoftness: 4
         });
         _validate(_params);
     }
@@ -78,6 +82,7 @@ contract ParamsController is Ownable {
     }
 
     function _validate(Params memory p) internal pure {
+        if (p.rankSoftness == 0) revert InvalidParams();
         if (p.bidbackFeeBps > 2_000) revert InvalidParams();
         if (p.redistributionBps > BPS) revert InvalidParams();
         if (p.minParticipants < 2) revert InvalidParams();

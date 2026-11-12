@@ -1,3 +1,5 @@
+import { formatEther } from "viem";
+import { AMOUNT_RANK_MAX_AMOUNT } from "@/lib/auctionFormula";
 import { describe, expect, it } from "vitest";
 import {
   getBidActionState,
@@ -310,5 +312,16 @@ describe("auctionActionState", () => {
         finalized: true
       }).disabledReason
     ).toBeNull();
+  });
+});
+
+describe("implementation-specific bid cap bound", () => {
+  it("checks the whole cap including prior deposits and preserves unknown/legacy bounds", () => {
+    const context = { ...walletContext(), auctionState: 0 as const, minimumNextBid: 1n, currentCap: 0n,
+      bidAmountEth: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) };
+    expect(getBidActionState({ ...context, maxCap: AMOUNT_RANK_MAX_AMOUNT }).disabledReason).toMatch(/maximum amount/);
+    expect(getBidActionState(context).disabledReason).toBeNull();
+    expect(getBidActionState({ ...context, maxCap: AMOUNT_RANK_MAX_AMOUNT, bidAmountEth: formatEther(AMOUNT_RANK_MAX_AMOUNT) }).disabledReason).toBeNull();
+    expect(getBidActionState({ ...context, maxCap: AMOUNT_RANK_MAX_AMOUNT, currentCap: AMOUNT_RANK_MAX_AMOUNT, bidAmountEth: formatEther(1n) }).disabledReason).toMatch(/maximum amount/);
   });
 });

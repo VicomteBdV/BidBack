@@ -12,6 +12,7 @@ import { useAccount, useConfig } from "wagmi";
 import { createConnectedWalletClients } from "@/lib/walletProvider";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { erc721Abi } from "@/contracts/erc721Abi";
+import { readAuctionFormula, amountRankMaximum } from "@/lib/auctionFormula";
 import { paramsControllerAbi } from "@/contracts/paramsControllerAbi";
 import { CreateAuctionFields } from "@/components/CreateAuctionFields";
 import { TechnicalDisclosure } from "@/components/TechnicalDisclosure";
@@ -50,6 +51,7 @@ type CreateContext = {
   localNft?: Address;
   paramsController: Address;
   minAuctionDuration: string | null;
+  maxAmount?: bigint | null;
   paused: boolean | null;
   defaultTokenId: string;
   defaultDuration: string;
@@ -103,21 +105,26 @@ async function verifyWalletChain(provider: Pick<EIP1193Provider, "request">) {
 }
 
 async function readCreateParams(publicClient: PublicClient, context: CreateContext) {
-  const [paramsRaw, paused] = await Promise.all([
+  const block = await publicClient.getBlock({ blockTag: "latest" });
+  const [paramsRaw, paused, formula] = await Promise.all([
     publicClient.readContract({
       address: context.paramsController,
       abi: paramsControllerAbi,
-      functionName: "params"
+      functionName: "params",
+      blockNumber: block.number
     }),
     publicClient.readContract({
       address: context.paramsController,
       abi: paramsControllerAbi,
-      functionName: "paused"
-    })
+      functionName: "paused",
+      blockNumber: block.number
+    }),
+    typeof block.number !== "bigint" ? Promise.resolve(undefined) : readAuctionFormula(publicClient, context.auctionHouse, block.number)
   ]);
 
   return {
     minAuctionDuration: toBigInt(getField(paramsRaw, "minAuctionDuration", 10)).toString(),
+    maxAmount: amountRankMaximum(formula),
     paused
   };
 }
@@ -230,6 +237,7 @@ export function WalletCreateAuctionForm() {
     () =>
       getCreateAuctionValidationIssue(values, {
         minAuctionDuration: context?.minAuctionDuration,
+        maxAmount: context?.maxAmount,
         paused: context?.paused === true
       }),
     [context, values]

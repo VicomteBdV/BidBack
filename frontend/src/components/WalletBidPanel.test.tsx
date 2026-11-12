@@ -1,8 +1,9 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics } from "viem";
+import { createPublicClient, createWalletClient, encodeAbiParameters, encodeEventTopics, formatEther } from "viem";
 import { useAccount } from "wagmi";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { AMOUNT_RANK_MAX_AMOUNT, AMOUNT_RANK_SCORE_SCALE } from "@/lib/auctionFormula";
 import { WalletBidPanel } from "@/components/WalletBidPanel";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import type { SerializedAuction } from "@/lib/auctionTypes";
@@ -147,6 +148,8 @@ type OnchainModuleOverrides = Partial<{
 }>;
 
 function setupBid({
+  amountRank = false,
+  preflightAmountRank,
   currentCap = 0n,
   minimumNextBid = 1_200_000_000_000_000_000n,
   preflightCurrentCap,
@@ -176,6 +179,8 @@ function setupBid({
   providerChainId = "0x7a69",
   onBidComplete = vi.fn(async () => undefined)
 }: {
+  amountRank?: boolean;
+  preflightAmountRank?: boolean;
   currentCap?: bigint;
   minimumNextBid?: bigint;
   preflightCurrentCap?: bigint;
@@ -242,6 +247,9 @@ function setupBid({
   let moduleReadCount = 0;
   let preflightReorgHashOffset = 0n;
   const readContract = vi.fn(async ({ functionName }: { functionName: string }) => {
+    const metadata: Record<string, unknown> = { FORMULA_ID: "amount-rank-v1", ARITHMETIC_ID: "floor-delta-q136-muldiv512-v1",
+      ROUNDING_ID: "hamilton-first-participation-v1", SCORE_SCALE: AMOUNT_RANK_SCORE_SCALE, MAX_AMOUNT: AMOUNT_RANK_MAX_AMOUNT };
+    if ((auctionReadCount > 1 ? preflightAmountRank ?? amountRank : amountRank) && functionName in metadata) return metadata[functionName];
     if (functionName === "getAuction") {
       auctionReadCount += 1;
       return {
@@ -2439,4 +2447,28 @@ describe("WalletBidPanel", () => {
 // Every component scenario uses B, while the legacy global points at unrelated A.
 afterEach(() => {
   expect(providerA.request).not.toHaveBeenCalled();
+});
+
+describe("amount-rank bid monetary bound", () => {
+  it("blocks a cap above the reported maximum before opening a wallet", async () => {
+    const { writeContract } = setupBid({ amountRank: true });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Bid cap in ETH"), { target: { value: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) } });
+    expect(review).toBeDisabled();
+    expect(screen.getByText(/New bid cap exceeds this auction implementation's maximum amount/)).toBeInTheDocument();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
+  it("rechecks the live maximum before dispatch even if metadata was initially unavailable", async () => {
+    const { writeContract, simulateContract } = setupBid({ amountRank: false, preflightAmountRank: true });
+    const review = await screen.findByRole("button", { name: "Review bid" });
+    await waitFor(() => expect(review).toBeEnabled());
+    fireEvent.change(screen.getByLabelText("Bid cap in ETH"), { target: { value: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) } });
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+    fireEvent.click(screen.getByRole("button", { name: "Continue in wallet" }));
+    expect((await screen.findAllByText(/New bid cap exceeds this auction implementation's maximum amount/)).length).toBeGreaterThan(0);
+    expect(simulateContract).not.toHaveBeenCalled();
+    expect(writeContract).not.toHaveBeenCalled();
+  });
 });

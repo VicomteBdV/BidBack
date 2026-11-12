@@ -1,3 +1,5 @@
+import { amountRankParamsControllerAbi } from "@/contracts/paramsControllerAbi";
+
 export const auctionHouseAbi = [
   {
     type: "event",
@@ -229,5 +231,29 @@ export const auctionHouseAbi = [
     stateMutability: "nonpayable",
     inputs: [{ name: "auctionId", type: "uint256" }],
     outputs: []
+  }
+] as const;
+
+// Metadata is optional on historical AuctionHouse implementations.
+export const auctionFormulaAbi = [
+  { type: "function", name: "FORMULA_ID", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "string" }] },
+  { type: "function", name: "ARITHMETIC_ID", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "string" }] },
+  { type: "function", name: "ROUNDING_ID", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "string" }] },
+  { type: "function", name: "SCORE_SCALE", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "MAX_AMOUNT", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] }
+] as const;
+
+export const amountRankAuctionHouseAbi = [
+  ...auctionHouseAbi.filter((entry) => entry.type !== "function" || entry.name !== "getAuctionParams"),
+  {
+    type: "function", name: "getAuctionParams", stateMutability: "view",
+    inputs: [{ name: "auctionId", type: "uint256" }],
+    outputs: amountRankParamsControllerAbi[1].outputs
+  },
+  ...auctionFormulaAbi,
+  {
+    type: "function", name: "bidderScores", stateMutability: "view",
+    inputs: [{ name: "auctionId", type: "uint256" }, { name: "bidder", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }]
   }
 ] as const;

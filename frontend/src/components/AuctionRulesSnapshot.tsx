@@ -2,7 +2,8 @@
 
 import React from "react";
 import { ModeBadge } from "@/components/ModeBadge";
-import type { AuctionParamsSnapshot } from "@/lib/auctionTypes";
+import { isSupportedAmountRank } from "@/lib/auctionFormula";
+import type { AuctionParamsSnapshot, AuctionFormulaMetadata } from "@/lib/auctionTypes";
 import { formatDurationSeconds, formatEth } from "@/lib/format";
 
 function formatBps(value?: string | null) {
@@ -36,15 +37,18 @@ function formatScale(value?: string | null) {
 
 export function AuctionRulesSnapshot({
   snapshot,
+  formula,
   error,
   feeRecipientSnapshot,
   feeRecipientSnapshotError
 }: {
   snapshot?: AuctionParamsSnapshot;
+  formula?: AuctionFormulaMetadata;
   error?: string;
   feeRecipientSnapshot?: `0x${string}`;
   feeRecipientSnapshotError?: string;
 }) {
+  const amountRank = isSupportedAmountRank(formula);
   return (
     <section className="rounded-lg border border-slate-800 bg-slate-900 p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -84,7 +88,7 @@ export function AuctionRulesSnapshot({
               { label: "Protocol fee", value: formatBps(snapshot.bidbackFeeBps) },
               { label: "Redistribution fraction", value: formatBps(snapshot.redistributionBps) },
               { label: "Minimum premium net", value: formatEth(snapshot.minPremiumNet) },
-              { label: "Per-user reward cap", value: formatBps(snapshot.perUserRewardCapBps) }
+              ...(amountRank ? [] : [{ label: "Legacy per-user cap parameter", value: formatBps(snapshot.perUserRewardCapBps) }])
             ]}
           />
 
@@ -117,8 +121,26 @@ export function AuctionRulesSnapshot({
             ]}
           />
 
-          <SnapshotGroup
-            title="Redistribution scoring"
+          {amountRank ? (
+            <div className="min-w-0 rounded-md border border-slate-800 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-300">
+              <h3 className="font-semibold text-white">Amount and chronological rank</h3>
+              <p>Each accepted bid adds its increase above your own previous cap, weighted by h / (h + rank - 1).
+                Rank counts all accepted bids in chronological order, including the winner&apos;s bids.
+                Earlier bids receive more weight; the curve becomes flatter as bids accumulate.</p>
+              <p className="mt-2">This auction&apos;s captured h is {snapshot.rankSoftness ?? "Unavailable"}.
+                The winner&apos;s entire score is excluded. When funding and participation conditions are met,
+                the available pool is divided among losers in proportion to their scores. The legacy 40% per-user cap
+                and EF/ET/II weights do not apply to this formula.</p>
+              <p className="mt-2">Payouts use whole wei. Remaining wei go to the largest fractional remainders;
+                ties follow first participation order. A small share may round to zero. Refunds and network gas are separate.</p>
+            </div>
+          ) : <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+            Active scoring formula unavailable. The legacy parameter fields below are preserved for reference;
+            their presence does not confirm which formula this contract executes.
+          </div>}
+
+          {!amountRank ? <SnapshotGroup
+            title="Legacy scoring parameter fields"
             items={[
               { label: "Alpha weight", value: formatBps(snapshot.alphaBps) },
               { label: "Beta weight", value: formatBps(snapshot.betaBps) },
@@ -129,7 +151,16 @@ export function AuctionRulesSnapshot({
               { label: "ET cap", value: formatScale(snapshot.etCap) },
               { label: "II cap", value: formatScale(snapshot.iiCap) }
             ]}
-          />
+          /> : null}
+
+          {formula ? <SnapshotGroup title="Formula reported by this AuctionHouse" items={[
+            { label: "Formula identifier", value: formula.formulaId ?? "Unavailable" },
+            { label: "Arithmetic identifier", value: formula.arithmeticId ?? "Unavailable" },
+            { label: "Rounding identifier", value: formula.roundingId ?? "Unavailable" },
+            { label: "AuctionHouse", value: formula.auctionHouse },
+            { label: "Read block", value: formula.readBlockNumber ?? "Unavailable" }
+          ]} /> : null}
+          {formula ? <p className="text-xs leading-5 text-slate-400">Reported identifiers do not independently verify deployed bytecode.</p> : null}
         </div>
       ) : null}
     </section>

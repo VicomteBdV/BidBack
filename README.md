@@ -26,7 +26,7 @@ The MVP covers:
 * Step-up-only bidder caps
 * Pull-based NFT, refund, proceeds, fee, and redistribution claims
 * On-chain, deterministic redistribution scoring
-* Non-blocking reputation multiplier
+* Amount and chronological-rank redistribution with snapshotted rules
 
 ### Out of Scope
 
@@ -62,9 +62,9 @@ Redistribution only opens when all conditions are met:
 * Minimum participant count is reached
 * Initial auction duration is above the configured threshold
 
-Rewards are capped per user and can never exceed the available net premium.
+The amount/rank implementation divides the available pool between losing bidders using their accumulated own-cap increments, weighted by chronological rank. The default weight is `4 / (r + 3)`. The winner is excluded; whole-wei rounding uses largest remainders, with ties in first-participation order. The full pool is assigned when losing scores exist; an individual reward can round to zero. With no losers, the pool remains in seller proceeds.
 
-If caps leave part of the candidate redistribution pool unassigned, the unassigned amount remains seller proceeds.
+The legacy per-user cap and reputation/EF/ET/II score are inactive in this implementation. See [`docs/AMOUNT_RANK_MODEL.md`](docs/AMOUNT_RANK_MODEL.md) for snapshots, funding, arithmetic bounds and compatibility limits.
 
 The system never funds redistribution from losing bidders' refundable caps.
 
@@ -90,7 +90,7 @@ Records redistribution entitlements and exposes user claims.
 
 ### ReputationAdapter
 
-Stores a non-blocking multiplier used only for redistribution.
+Retains the legacy reputation interface for compatibility. The amount/rank formula does not use its multiplier.
 
 ### ParamsController
 
@@ -99,6 +99,8 @@ Stores bounded economic and safety parameters.
 ---
 
 ## Current Product Status and Roadmap
+
+The amount/rank source implementation is new and has not been deployed by this change. Earlier local/testnet validation below concerns the previous implementation. Historical lifecycle scripts need adaptation before validating the new formula; see [implementation and tooling limits](docs/AMOUNT_RANK_MODEL.md#validation-and-operational-limits).
 
 The current source of truth is [`docs/PRODUCT_STATUS.md`](docs/PRODUCT_STATUS.md). BidBack is **Demo-ready for a controlled local demonstration** as of the 22 August 2026 checkpoint. **One complete canonical Base Sepolia cycle validated:** auction `#2` completed across five distinct public role wallets with a separately deployed valueless test-only NFT, reconciled economics, final-state verification, and rejected duplicate-action simulations. This is one bounded public-testnet scenario, not broad Base Sepolia validation. BidBack is not Controlled beta-ready, Public beta-ready, or Production-ready.
 

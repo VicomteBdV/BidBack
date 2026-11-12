@@ -1,5 +1,19 @@
 # BidBack Product Status
 
+## Amount/rank source update — 12 November 2026
+
+The Product Owner selected amount and chronological rank as the redistribution rule and authorized this contract/frontend integration. The new source accumulates own-cap increases weighted by `h/(h+r-1)`, with default `h=4`, captures `h` in the existing parameter snapshot, excludes the winner's whole score and allocates the full funded pool by largest remainders. Fees, premium-only funding, custody and refunds are preserved. The legacy per-user cap and EF/ET/II/reputation calculation are inactive in this implementation.
+
+The frontend preserves historical ABI reads, identifies supported reported formula metadata, displays captured rules and checks the new monetary bound before wallet review. Unknown metadata remains unavailable; reported identifiers do not prove bytecode verification. [AMOUNT_RANK_MODEL.md](./AMOUNT_RANK_MODEL.md) is the technical reference for this version.
+
+Local validation of this source includes 69 Foundry tests, 28 synthetic arithmetic parity vectors, three accounting invariant properties in one 256-run/128,000-call campaign, 1,846 frontend tests, typecheck and build. These are retained local observations; CI must be checked for the actual PR revision. Code and publication reviews do not constitute an external audit. Wallet mocks do not establish real extension support.
+
+No deployment, transaction, live parameter change or migration occurred. Existing addresses and auctions retain their original logic. Production capacity remains unvalidated: the measured 256-participant finalization does not fit a 16,777,216-gas transaction ceiling. The default 64-participant examples are not a worst-case certificate. Historical lifecycle scripts retain previous parameter/allocation assumptions and require adaptation before a new deployment can be validated.
+
+This update does not advance a product gate or change the historical Economic Model V1 decision. The records below describe earlier source/deployments, including the dated coverage gaps; they are not evidence that the new implementation completed an Anvil or public-testnet lifecycle.
+
+---
+
 **Checkpoint date:** 11 September 2026
 
 **Status authority:** This document is the current source of truth for BidBack product status. Procedure documents and older checkpoints must not override it.

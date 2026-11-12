@@ -40,3 +40,18 @@ export const paramsControllerAbi = [
     ]
   }
 ] as const;
+
+// Preserve the historical 19-field ABI for older deployments.
+export const amountRankParamsControllerAbi = [
+  paramsControllerAbi[0],
+  {
+    ...paramsControllerAbi[1],
+    outputs: [{
+      ...paramsControllerAbi[1].outputs[0],
+      components: [
+        ...paramsControllerAbi[1].outputs[0].components,
+        { name: "rankSoftness", type: "uint16" }
+      ]
+    }]
+  }
+] as const;

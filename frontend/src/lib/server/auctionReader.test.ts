@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PublicClient } from "viem";
-import { readAllAuctions, readAuctionsByIds, normalizeAuctionListLimit, readAuctionSettlementReadiness } from "@/lib/server/auctionReader";
+import { readAllAuctions, readAuctionsByIds, normalizeAuctionListLimit, readAuctionSettlementReadiness, readAuctionRuleSnapshot } from "@/lib/server/auctionReader";
 import { getAuctionLifecycle } from "@/lib/auctionLifecycle";
 import { filterAndSortAuctions } from "@/lib/auctionFilters";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture, localDeploymentFixture, testAddresses } from "@/test/fixtures";
+import { auctionDetailFixture, localDeploymentFixture, testAddresses, amountRankFormulaFixture } from "@/test/fixtures";
 
 function auctionTuple(auctionId: bigint) {
   return [
@@ -523,4 +523,48 @@ describe("complete settlement reads", () => {
     expect(readContract).not.toHaveBeenCalled();
   });
 
+});
+
+
+describe("auction rule snapshots across contract versions", () => {
+  function rulesClient({ metadata = true, h = 4, failParams = false }: { metadata?: boolean; h?: number; failParams?: boolean } = {}) {
+    const values: Record<string, unknown> = { FORMULA_ID: amountRankFormulaFixture.formulaId, ARITHMETIC_ID: amountRankFormulaFixture.arithmeticId,
+      ROUNDING_ID: amountRankFormulaFixture.roundingId, SCORE_SCALE: BigInt(amountRankFormulaFixture.scoreScale!), MAX_AMOUNT: BigInt(amountRankFormulaFixture.maxAmount!) };
+    const readContract = vi.fn(async (request: { functionName: string }) => {
+      if (request.functionName === "getAuctionParams") {
+        if (failParams) throw new Error("snapshot unavailable");
+        return { ...auctionDetailFixture.auction.paramsSnapshot, rankSoftness: h };
+      }
+      if (!metadata) throw new Error("legacy getter unsupported or RPC unavailable");
+      return values[request.functionName];
+    });
+    return { client: { readContract } as unknown as PublicClient, readContract };
+  }
+  it("reads the captured h with the extended ABI at the same block as metadata", async () => {
+    const { client, readContract } = rulesClient({ h: 8 });
+    const result = await readAuctionRuleSnapshot(client, testAddresses.auctionHouse, 1n, 42n);
+    expect(result.formula.status).toBe("supported");
+    expect(result.paramsSnapshot?.rankSoftness).toBe("8");
+    expect(result.paramsSnapshot?.bidbackFeeBps).toBe("500");
+    for (const [request] of readContract.mock.calls) expect(request).toMatchObject({ address: testAddresses.auctionHouse, blockNumber: 42n });
+  });
+  it("preserves historical parameter reads without inferring a formula from an extra tuple field", async () => {
+    const { client } = rulesClient({ metadata: false, h: 8 });
+    const result = await readAuctionRuleSnapshot(client, testAddresses.auctionHouse, 1n, 42n);
+    expect(result.formula.status).toBe("unavailable");
+    expect(result.paramsSnapshot?.rankSoftness).toBeUndefined();
+    expect(result.paramsSnapshot?.alphaBps).toBeDefined();
+  });
+  it.each([0, 65536])("refuses an invalid captured h=%s without filling a default", async (h) => {
+    const { client } = rulesClient({ h });
+    const result = await readAuctionRuleSnapshot(client, testAddresses.auctionHouse, 1n, 42n);
+    expect(result.paramsSnapshot).toBeUndefined();
+    expect(result.paramsSnapshotError).toMatch(/Unable to read/);
+  });
+  it("does not replace an unavailable snapshot with current global parameters", async () => {
+    const { client, readContract } = rulesClient({ failParams: true });
+    const result = await readAuctionRuleSnapshot(client, testAddresses.auctionHouse, 1n, 42n);
+    expect(result.paramsSnapshot).toBeUndefined();
+    expect(readContract.mock.calls.some(([r]) => r.functionName === "params")).toBe(false);
+  });
 });

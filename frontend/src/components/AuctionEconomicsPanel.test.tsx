@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AuctionEconomicsPanel } from "@/components/AuctionEconomicsPanel";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture, testAddresses } from "@/test/fixtures";
+import { auctionDetailFixture, testAddresses, amountRankFormulaFixture } from "@/test/fixtures";
 
 function finalizedAuction(): SerializedAuction {
   return {
@@ -78,4 +78,12 @@ describe("AuctionEconomicsPanel", () => {
     expect(screen.getByText(/Unavailable fields:/)).toBeInTheDocument();
     expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
   });
+});
+
+it("shows captured h instead of an active legacy per-user cap for the reported new model", () => {
+  render(<AuctionEconomicsPanel auction={{ ...auctionDetailFixture.auction, formula: amountRankFormulaFixture,
+    paramsSnapshot: { ...auctionDetailFixture.auction.paramsSnapshot!, rankSoftness: "4" } }} />);
+  expect(screen.getByText("Chronological curve h")).toBeInTheDocument();
+  expect(screen.queryByText("Legacy per-user cap parameter bps")).not.toBeInTheDocument();
+  expect(screen.getByText(/No legacy per-user cap applies/)).toBeInTheDocument();
 });

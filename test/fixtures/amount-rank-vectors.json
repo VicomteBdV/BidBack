@@ -1,0 +1,3463 @@
+{
+  "maxAmount": 5192296858534827628530496329220095,
+  "schemaVersion": 1,
+  "scoreScale": 87112285931760246646623899502532662132736,
+  "sourceCommit": "278483e897ba18109f788a3d557bb78c3e463cbc",
+  "vectorCount": 28,
+  "vectors": [
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 2903742864392008221554129983417755404424533333333333333333333,
+      "expectedRemainders": [
+        2000000000000000000,
+        2903742864392008221554129983417755404424531333333333333333333,
+        0
+      ],
+      "expectedRewards": [
+        6000000000000000000,
+        4000000000000000000,
+        0
+      ],
+      "expectedScores": [
+        1742245718635204932932477990050653242654720000000000000000000,
+        1161497145756803288621651993367102161769813333333333333333333,
+        1393796574908163946345982392040522594123776000000000000000000
+      ],
+      "expectedUnallocated": 0,
+      "h": 2,
+      "id": "H1-h2",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 3426416579982569701433873380432951377220949333333333333333333,
+      "expectedRemainders": [
+        1974545147786565590656808388724073675008681310734463276836158,
+        1451871432196004110777064991708877702212268022598870056497175,
+        0
+      ],
+      "expectedRewards": [
+        5932203389830508475,
+        4067796610169491525,
+        0
+      ],
+      "expectedScores": [
+        2032620005074405755087890988392428783097173333333333333333333,
+        1393796574908163946345982392040522594123776000000000000000000,
+        1991137964154519923351403417200746563033965714285714285714285
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "H1-h4",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 3813582295234837464307757378221985431144220444444444444444444,
+      "expectedRemainders": [
+        3136042293543368879278460382091175836778498639593908629441624,
+        677540001691468585029296996130809594365721804850535815002820,
+        0
+      ],
+      "expectedRewards": [
+        5939086294416243655,
+        4060913705583756345,
+        0
+      ],
+      "expectedScores": [
+        2264919434225766412812221387065849215451136000000000000000000,
+        1548662861009071051495535991156136215693084444444444444444444,
+        2534175590742116266083604349164586534770501818181818181818181
+      ],
+      "expectedUnallocated": 0,
+      "h": 8,
+      "id": "H1-h8",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 5226737155905614798797433970151959727964160000000000000000000,
+      "expectedRemainders": [
+        1742245718635204932932477990050653242654720000000000000000000,
+        1742245718635204932932477990050653242654720000000000000000000,
+        1742245718635204932932477990050653242654720000000000000000000,
+        0
+      ],
+      "expectedRewards": [
+        3333333333333333334,
+        3333333333333333333,
+        3333333333333333333,
+        0
+      ],
+      "expectedScores": [
+        1742245718635204932932477990050653242654720000000000000000000,
+        1742245718635204932932477990050653242654720000000000000000000,
+        1742245718635204932932477990050653242654720000000000000000000,
+        1742245718635204932932477990050653242654720000000000000000000
+      ],
+      "expectedUnallocated": 0,
+      "h": 2,
+      "id": "H2-h2",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 6155934872511057429694755564845641457380010666666666666666666,
+      "expectedRemainders": [
+        5342886870481295127659599169488669944141143220125786163522012,
+        3949090295573131181313616777448147350017367597484276729559748,
+        3019892578967688550416295182754465620601510515723270440251572,
+        0
+      ],
+      "expectedRewards": [
+        2830188679245283019,
+        3396226415094339623,
+        3773584905660377358,
+        0
+      ],
+      "expectedScores": [
+        1742245718635204932932477990050653242654720000000000000000000,
+        2090694862362245919518973588060783891185664000000000000000000,
+        2322994291513606577243303986734204323539626666666666666666666,
+        2488922455193149904189254271500933203792457142857142857142857
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "H2-h4",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 6852833159965139402867746760865902754441898666666666666666666,
+      "expectedRemainders": [
+        2671443435240647563829799584744334972070572361581920903954802,
+        1277646860332483617483817192703812377946790259887005649717514,
+        2903742864392008221554129983417755404424536045197740112994350,
+        0
+      ],
+      "expectedRewards": [
+        2542372881355932203,
+        3389830508474576271,
+        4067796610169491526,
+        0
+      ],
+      "expectedScores": [
+        1742245718635204932932477990050653242654720000000000000000000,
+        2322994291513606577243303986734204323539626666666666666666666,
+        2787593149816327892691964784081045188247552000000000000000000,
+        3167719488427645332604505436455733168463127272727272727272727
+      ],
+      "expectedUnallocated": 0,
+      "h": 8,
+      "id": "H2-h8",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 15000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 3861978009641370934666992877945614687884629333333333333333333,
+      "expectedRemainders": [
+        1480908860839924192992606291543055256256513127819548872180451,
+        2352031720157526659458845286568381877583873203007518796992481,
+        29037428643920082215541299834177554044243002506265664160401,
+        0
+      ],
+      "expectedRewards": [
+        3383458646616541353,
+        3609022556390977444,
+        3007518796992481203,
+        0
+      ],
+      "expectedScores": [
+        1306684288976403699699358492537989931991040000000000000000000,
+        1393796574908163946345982392040522594123776000000000000000000,
+        1161497145756803288621651993367102161769813333333333333333333,
+        1244461227596574952094627135750466601896228571428571428571428
+      ],
+      "expectedUnallocated": 0,
+      "h": 2,
+      "id": "H3-h2",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 15000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 4986141318570276974725806057240202851597555809523809523809523,
+      "expectedRemainders": [
+        2613368577952807399398716985075979863982075690515806988352745,
+        4222871765644377670774434747313250002434537099912843673243007,
+        3136042293543368879278460382091175836778498828618968386023294,
+        0
+      ],
+      "expectedRewards": [
+        2911813643926788685,
+        3594009983361064892,
+        3494176372712146423,
+        0
+      ],
+      "expectedScores": [
+        1451871432196004110777064991708877702212266666666666666666666,
+        1792024167739067931016263075480671906730569142857142857142857,
+        1742245718635204932932477990050653242654720000000000000000000,
+        1935828576261338814369419988945170269616355555555555555555555
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "H3-h4",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 15000000000000000000
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20000000000000000000
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30000000000000000000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 40000000000000000000
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 50000000000000000000
+        }
+      ],
+      "expectedAllocated": 10000000000000000000,
+      "expectedDenominator": 6002828430570387905285537802083614354237626181818181818181817,
+      "expectedRemainders": [
+        5575186299632655785383929568162090376495107087071240105540896,
+        3062128838813390488184355255240542062847688703126249300391780,
+        3368341722694729537002790780764596269132456573438874230430958,
+        0
+      ],
+      "expectedRewards": [
+        2612137203166226913,
+        3518029903254177660,
+        3869832893579595427,
+        0
+      ],
+      "expectedScores": [
+        1568021146771684439639230191045587918389248000000000000000000,
+        2111812992285096888403003624303822112308751515151515151515151,
+        2322994291513606577243303986734204323539626666666666666666666,
+        2680378028669546050665350753924081911776492307692307692307692
+      ],
+      "expectedUnallocated": 0,
+      "h": 8,
+      "id": "H3-h8",
+      "poolWei": 10000000000000000000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 0,
+      "bids": [],
+      "expectedAllocated": 0,
+      "expectedDenominator": 0,
+      "expectedRemainders": [],
+      "expectedRewards": [],
+      "expectedScores": [],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "empty-zero-pool",
+      "poolWei": 0,
+      "winnerIndex": 0
+    },
+    {
+      "bidderCount": 0,
+      "bids": [],
+      "expectedAllocated": 0,
+      "expectedDenominator": 0,
+      "expectedRemainders": [],
+      "expectedRewards": [],
+      "expectedScores": [],
+      "expectedUnallocated": 10,
+      "h": 4,
+      "id": "empty-nonzero-pool",
+      "poolWei": 10,
+      "winnerIndex": 0
+    },
+    {
+      "bidderCount": 1,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10
+        }
+      ],
+      "expectedAllocated": 0,
+      "expectedDenominator": 0,
+      "expectedRemainders": [
+        0
+      ],
+      "expectedRewards": [
+        0
+      ],
+      "expectedScores": [
+        871122859317602466466238995025326621327360
+      ],
+      "expectedUnallocated": 10,
+      "h": 4,
+      "id": "sole-bid-no-loser",
+      "poolWei": 10,
+      "winnerIndex": 0
+    },
+    {
+      "bidderCount": 2,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 10
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 20
+        }
+      ],
+      "expectedAllocated": 17,
+      "expectedDenominator": 871122859317602466466238995025326621327360,
+      "expectedRemainders": [
+        0,
+        0
+      ],
+      "expectedRewards": [
+        17,
+        0
+      ],
+      "expectedScores": [
+        871122859317602466466238995025326621327360,
+        1393796574908163946345982392040522594123776
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "sole-loser-full-pool",
+      "poolWei": 17,
+      "winnerIndex": 1
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 7
+        }
+      ],
+      "expectedAllocated": 0,
+      "expectedDenominator": 1045347431181122959759486794030391945592832,
+      "expectedRemainders": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedRewards": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedScores": [
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "positive-scores-zero-pool",
+      "poolWei": 0,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 7
+        }
+      ],
+      "expectedAllocated": 1,
+      "expectedDenominator": 1045347431181122959759486794030391945592832,
+      "expectedRemainders": [
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        0
+      ],
+      "expectedRewards": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "expectedScores": [
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "tiny-pool-tie-one",
+      "poolWei": 1,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 7
+        }
+      ],
+      "expectedAllocated": 2,
+      "expectedDenominator": 1045347431181122959759486794030391945592832,
+      "expectedRemainders": [
+        696898287454081973172991196020261297061888,
+        696898287454081973172991196020261297061888,
+        696898287454081973172991196020261297061888,
+        0
+      ],
+      "expectedRewards": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "expectedScores": [
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "tiny-pool-tie-two",
+      "poolWei": 2,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 7
+        }
+      ],
+      "expectedAllocated": 8,
+      "expectedDenominator": 1045347431181122959759486794030391945592832,
+      "expectedRemainders": [
+        696898287454081973172991196020261297061888,
+        696898287454081973172991196020261297061888,
+        696898287454081973172991196020261297061888,
+        0
+      ],
+      "expectedRewards": [
+        3,
+        3,
+        2,
+        0
+      ],
+      "expectedScores": [
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "tie-eight-wei",
+      "poolWei": 8,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 7
+        }
+      ],
+      "expectedAllocated": 7,
+      "expectedDenominator": 696898287454081973172991196020261297061888,
+      "expectedRemainders": [
+        0,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedRewards": [
+        0,
+        4,
+        3
+      ],
+      "expectedScores": [
+        497784491038629980837850854300186640758491,
+        348449143727040986586495598010130648530944,
+        348449143727040986586495598010130648530944
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "winner-returns-first-index",
+      "poolWei": 7,
+      "winnerIndex": 0
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 3
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 4
+        }
+      ],
+      "expectedAllocated": 8,
+      "expectedDenominator": 261336857795280739939871698507597986398208,
+      "expectedRemainders": [
+        174224571863520493293247799005065324265472,
+        174224571863520493293247799005065324265472,
+        174224571863520493293247799005065324265472,
+        0
+      ],
+      "expectedRewards": [
+        3,
+        3,
+        2,
+        0
+      ],
+      "expectedScores": [
+        87112285931760246646623899502532662132736,
+        87112285931760246646623899502532662132736,
+        87112285931760246646623899502532662132736,
+        87112285931760246646623899502532662132736
+      ],
+      "expectedUnallocated": 0,
+      "h": 1,
+      "id": "h1-equal-scores",
+      "poolWei": 8,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 3
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 8
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 13
+        }
+      ],
+      "expectedAllocated": 23,
+      "expectedDenominator": 1132439778895767433901658571479556688972287,
+      "expectedRemainders": [
+        174197989128993806078562638336686295112183,
+        958241789766773627823095933142870393860104,
+        0
+      ],
+      "expectedRewards": [
+        14,
+        9,
+        0
+      ],
+      "expectedScores": [
+        696884995376945125247903593002194780031487,
+        435554783518822308653754978477361908940800,
+        1132407878803027265583698988383536485203929
+      ],
+      "expectedUnallocated": 0,
+      "h": 65535,
+      "id": "h65535-small-caps",
+      "poolWei": 23,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1298074214633706907132624082305023
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2596148429267413814265248164610047
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 5192296858534827628530496329220095
+        }
+      ],
+      "expectedAllocated": 5192296858534827628530496329220095,
+      "expectedDenominator": 226156424291633194186662080095093439357489041159709256703716339966462132224,
+      "expectedRemainders": [
+        226156424291633194186662080095093395801346075279585933391766588700131065856,
+        43556142965880123323311949751266331066368,
+        0
+      ],
+      "expectedRewards": [
+        2596148429267413814265248164610047,
+        2596148429267413814265248164610048,
+        0
+      ],
+      "expectedScores": [
+        113078212145816597093331040047546697900673037639792966695883294350065532928,
+        113078212145816597093331040047546741456816003519916290007833045616396599296,
+        150770949527755462791108053396729017646516648613303935551743894999416176640
+      ],
+      "expectedUnallocated": 0,
+      "h": 1,
+      "id": "maxcap-h1",
+      "poolWei": 5192296858534827628530496329220095,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 2,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1298074214633706907132624082305023
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2596148429267413814265248164610047
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 5192296858534827628530496329220095
+        }
+      ],
+      "expectedAllocated": 5192296858534827628530496329220095,
+      "expectedDenominator": 226152973418459798904768362717162344402235009481131410695292317030961643520,
+      "expectedRemainders": [
+        0,
+        0
+      ],
+      "expectedRewards": [
+        0,
+        5192296858534827628530496329220095
+      ],
+      "expectedScores": [
+        452302496121712229660191731390573319007418817564031002869890294687717129856,
+        226152973418459798904768362717162344402235009481131410695292317030961643520
+      ],
+      "expectedUnallocated": 0,
+      "h": 65535,
+      "id": "maxcap-h65535",
+      "poolWei": 5192296858534827628530496329220095,
+      "winnerIndex": 0
+    },
+    {
+      "bidderCount": 3,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 3
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 7
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 8
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 9
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 10
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 11
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 12
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 13
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 14
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 15
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 16
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 17
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 18
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 19
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 20
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 21
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 22
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 23
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 24
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 25
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 26
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 27
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 28
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 29
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 30
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 31
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 32
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 33
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 34
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 35
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 36
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 37
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 38
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 39
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 40
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 41
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 42
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 43
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 44
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 45
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 46
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 47
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 48
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 49
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 50
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 51
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 52
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 53
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 54
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 55
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 56
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 57
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 58
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 59
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 60
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 61
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 62
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 63
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 64
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 65
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 66
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 67
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 68
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 69
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 70
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 71
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 72
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 73
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 74
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 75
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 76
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 77
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 78
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 79
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 80
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 81
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 82
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 83
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 84
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 85
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 86
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 87
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 88
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 89
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 90
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 91
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 92
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 93
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 94
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 95
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 96
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 97
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 98
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 99
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 100
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 101
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 102
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 103
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 104
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 105
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 106
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 107
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 108
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 109
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 110
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 111
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 112
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 113
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 114
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 115
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 116
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 117
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 118
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 119
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 120
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 121
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 122
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 123
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 124
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 125
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 126
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 127
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 128
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 129
+        }
+      ],
+      "expectedAllocated": 97,
+      "expectedDenominator": 2437674660665834272691688880530743249910868,
+      "expectedRemainders": [
+        1603609111783192044209425313754421149794362,
+        834065548882642228482263566776322100116506,
+        0
+      ],
+      "expectedRewards": [
+        49,
+        48,
+        0
+      ],
+      "expectedScores": [
+        1222804049729311723024850428651856671603258,
+        1214870610936522549666838451878886578307610,
+        340529845005971873254984334418991315609786
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "long-rebids-fixed-participants",
+      "poolWei": 97,
+      "winnerIndex": 2
+    },
+    {
+      "bidderCount": 256,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 3
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 4
+        },
+        {
+          "bidderIndex": 4,
+          "newCapWei": 5
+        },
+        {
+          "bidderIndex": 5,
+          "newCapWei": 6
+        },
+        {
+          "bidderIndex": 6,
+          "newCapWei": 7
+        },
+        {
+          "bidderIndex": 7,
+          "newCapWei": 8
+        },
+        {
+          "bidderIndex": 8,
+          "newCapWei": 9
+        },
+        {
+          "bidderIndex": 9,
+          "newCapWei": 10
+        },
+        {
+          "bidderIndex": 10,
+          "newCapWei": 11
+        },
+        {
+          "bidderIndex": 11,
+          "newCapWei": 12
+        },
+        {
+          "bidderIndex": 12,
+          "newCapWei": 13
+        },
+        {
+          "bidderIndex": 13,
+          "newCapWei": 14
+        },
+        {
+          "bidderIndex": 14,
+          "newCapWei": 15
+        },
+        {
+          "bidderIndex": 15,
+          "newCapWei": 16
+        },
+        {
+          "bidderIndex": 16,
+          "newCapWei": 17
+        },
+        {
+          "bidderIndex": 17,
+          "newCapWei": 18
+        },
+        {
+          "bidderIndex": 18,
+          "newCapWei": 19
+        },
+        {
+          "bidderIndex": 19,
+          "newCapWei": 20
+        },
+        {
+          "bidderIndex": 20,
+          "newCapWei": 21
+        },
+        {
+          "bidderIndex": 21,
+          "newCapWei": 22
+        },
+        {
+          "bidderIndex": 22,
+          "newCapWei": 23
+        },
+        {
+          "bidderIndex": 23,
+          "newCapWei": 24
+        },
+        {
+          "bidderIndex": 24,
+          "newCapWei": 25
+        },
+        {
+          "bidderIndex": 25,
+          "newCapWei": 26
+        },
+        {
+          "bidderIndex": 26,
+          "newCapWei": 27
+        },
+        {
+          "bidderIndex": 27,
+          "newCapWei": 28
+        },
+        {
+          "bidderIndex": 28,
+          "newCapWei": 29
+        },
+        {
+          "bidderIndex": 29,
+          "newCapWei": 30
+        },
+        {
+          "bidderIndex": 30,
+          "newCapWei": 31
+        },
+        {
+          "bidderIndex": 31,
+          "newCapWei": 32
+        },
+        {
+          "bidderIndex": 32,
+          "newCapWei": 33
+        },
+        {
+          "bidderIndex": 33,
+          "newCapWei": 34
+        },
+        {
+          "bidderIndex": 34,
+          "newCapWei": 35
+        },
+        {
+          "bidderIndex": 35,
+          "newCapWei": 36
+        },
+        {
+          "bidderIndex": 36,
+          "newCapWei": 37
+        },
+        {
+          "bidderIndex": 37,
+          "newCapWei": 38
+        },
+        {
+          "bidderIndex": 38,
+          "newCapWei": 39
+        },
+        {
+          "bidderIndex": 39,
+          "newCapWei": 40
+        },
+        {
+          "bidderIndex": 40,
+          "newCapWei": 41
+        },
+        {
+          "bidderIndex": 41,
+          "newCapWei": 42
+        },
+        {
+          "bidderIndex": 42,
+          "newCapWei": 43
+        },
+        {
+          "bidderIndex": 43,
+          "newCapWei": 44
+        },
+        {
+          "bidderIndex": 44,
+          "newCapWei": 45
+        },
+        {
+          "bidderIndex": 45,
+          "newCapWei": 46
+        },
+        {
+          "bidderIndex": 46,
+          "newCapWei": 47
+        },
+        {
+          "bidderIndex": 47,
+          "newCapWei": 48
+        },
+        {
+          "bidderIndex": 48,
+          "newCapWei": 49
+        },
+        {
+          "bidderIndex": 49,
+          "newCapWei": 50
+        },
+        {
+          "bidderIndex": 50,
+          "newCapWei": 51
+        },
+        {
+          "bidderIndex": 51,
+          "newCapWei": 52
+        },
+        {
+          "bidderIndex": 52,
+          "newCapWei": 53
+        },
+        {
+          "bidderIndex": 53,
+          "newCapWei": 54
+        },
+        {
+          "bidderIndex": 54,
+          "newCapWei": 55
+        },
+        {
+          "bidderIndex": 55,
+          "newCapWei": 56
+        },
+        {
+          "bidderIndex": 56,
+          "newCapWei": 57
+        },
+        {
+          "bidderIndex": 57,
+          "newCapWei": 58
+        },
+        {
+          "bidderIndex": 58,
+          "newCapWei": 59
+        },
+        {
+          "bidderIndex": 59,
+          "newCapWei": 60
+        },
+        {
+          "bidderIndex": 60,
+          "newCapWei": 61
+        },
+        {
+          "bidderIndex": 61,
+          "newCapWei": 62
+        },
+        {
+          "bidderIndex": 62,
+          "newCapWei": 63
+        },
+        {
+          "bidderIndex": 63,
+          "newCapWei": 64
+        },
+        {
+          "bidderIndex": 64,
+          "newCapWei": 65
+        },
+        {
+          "bidderIndex": 65,
+          "newCapWei": 66
+        },
+        {
+          "bidderIndex": 66,
+          "newCapWei": 67
+        },
+        {
+          "bidderIndex": 67,
+          "newCapWei": 68
+        },
+        {
+          "bidderIndex": 68,
+          "newCapWei": 69
+        },
+        {
+          "bidderIndex": 69,
+          "newCapWei": 70
+        },
+        {
+          "bidderIndex": 70,
+          "newCapWei": 71
+        },
+        {
+          "bidderIndex": 71,
+          "newCapWei": 72
+        },
+        {
+          "bidderIndex": 72,
+          "newCapWei": 73
+        },
+        {
+          "bidderIndex": 73,
+          "newCapWei": 74
+        },
+        {
+          "bidderIndex": 74,
+          "newCapWei": 75
+        },
+        {
+          "bidderIndex": 75,
+          "newCapWei": 76
+        },
+        {
+          "bidderIndex": 76,
+          "newCapWei": 77
+        },
+        {
+          "bidderIndex": 77,
+          "newCapWei": 78
+        },
+        {
+          "bidderIndex": 78,
+          "newCapWei": 79
+        },
+        {
+          "bidderIndex": 79,
+          "newCapWei": 80
+        },
+        {
+          "bidderIndex": 80,
+          "newCapWei": 81
+        },
+        {
+          "bidderIndex": 81,
+          "newCapWei": 82
+        },
+        {
+          "bidderIndex": 82,
+          "newCapWei": 83
+        },
+        {
+          "bidderIndex": 83,
+          "newCapWei": 84
+        },
+        {
+          "bidderIndex": 84,
+          "newCapWei": 85
+        },
+        {
+          "bidderIndex": 85,
+          "newCapWei": 86
+        },
+        {
+          "bidderIndex": 86,
+          "newCapWei": 87
+        },
+        {
+          "bidderIndex": 87,
+          "newCapWei": 88
+        },
+        {
+          "bidderIndex": 88,
+          "newCapWei": 89
+        },
+        {
+          "bidderIndex": 89,
+          "newCapWei": 90
+        },
+        {
+          "bidderIndex": 90,
+          "newCapWei": 91
+        },
+        {
+          "bidderIndex": 91,
+          "newCapWei": 92
+        },
+        {
+          "bidderIndex": 92,
+          "newCapWei": 93
+        },
+        {
+          "bidderIndex": 93,
+          "newCapWei": 94
+        },
+        {
+          "bidderIndex": 94,
+          "newCapWei": 95
+        },
+        {
+          "bidderIndex": 95,
+          "newCapWei": 96
+        },
+        {
+          "bidderIndex": 96,
+          "newCapWei": 97
+        },
+        {
+          "bidderIndex": 97,
+          "newCapWei": 98
+        },
+        {
+          "bidderIndex": 98,
+          "newCapWei": 99
+        },
+        {
+          "bidderIndex": 99,
+          "newCapWei": 100
+        },
+        {
+          "bidderIndex": 100,
+          "newCapWei": 101
+        },
+        {
+          "bidderIndex": 101,
+          "newCapWei": 102
+        },
+        {
+          "bidderIndex": 102,
+          "newCapWei": 103
+        },
+        {
+          "bidderIndex": 103,
+          "newCapWei": 104
+        },
+        {
+          "bidderIndex": 104,
+          "newCapWei": 105
+        },
+        {
+          "bidderIndex": 105,
+          "newCapWei": 106
+        },
+        {
+          "bidderIndex": 106,
+          "newCapWei": 107
+        },
+        {
+          "bidderIndex": 107,
+          "newCapWei": 108
+        },
+        {
+          "bidderIndex": 108,
+          "newCapWei": 109
+        },
+        {
+          "bidderIndex": 109,
+          "newCapWei": 110
+        },
+        {
+          "bidderIndex": 110,
+          "newCapWei": 111
+        },
+        {
+          "bidderIndex": 111,
+          "newCapWei": 112
+        },
+        {
+          "bidderIndex": 112,
+          "newCapWei": 113
+        },
+        {
+          "bidderIndex": 113,
+          "newCapWei": 114
+        },
+        {
+          "bidderIndex": 114,
+          "newCapWei": 115
+        },
+        {
+          "bidderIndex": 115,
+          "newCapWei": 116
+        },
+        {
+          "bidderIndex": 116,
+          "newCapWei": 117
+        },
+        {
+          "bidderIndex": 117,
+          "newCapWei": 118
+        },
+        {
+          "bidderIndex": 118,
+          "newCapWei": 119
+        },
+        {
+          "bidderIndex": 119,
+          "newCapWei": 120
+        },
+        {
+          "bidderIndex": 120,
+          "newCapWei": 121
+        },
+        {
+          "bidderIndex": 121,
+          "newCapWei": 122
+        },
+        {
+          "bidderIndex": 122,
+          "newCapWei": 123
+        },
+        {
+          "bidderIndex": 123,
+          "newCapWei": 124
+        },
+        {
+          "bidderIndex": 124,
+          "newCapWei": 125
+        },
+        {
+          "bidderIndex": 125,
+          "newCapWei": 126
+        },
+        {
+          "bidderIndex": 126,
+          "newCapWei": 127
+        },
+        {
+          "bidderIndex": 127,
+          "newCapWei": 128
+        },
+        {
+          "bidderIndex": 128,
+          "newCapWei": 129
+        },
+        {
+          "bidderIndex": 129,
+          "newCapWei": 130
+        },
+        {
+          "bidderIndex": 130,
+          "newCapWei": 131
+        },
+        {
+          "bidderIndex": 131,
+          "newCapWei": 132
+        },
+        {
+          "bidderIndex": 132,
+          "newCapWei": 133
+        },
+        {
+          "bidderIndex": 133,
+          "newCapWei": 134
+        },
+        {
+          "bidderIndex": 134,
+          "newCapWei": 135
+        },
+        {
+          "bidderIndex": 135,
+          "newCapWei": 136
+        },
+        {
+          "bidderIndex": 136,
+          "newCapWei": 137
+        },
+        {
+          "bidderIndex": 137,
+          "newCapWei": 138
+        },
+        {
+          "bidderIndex": 138,
+          "newCapWei": 139
+        },
+        {
+          "bidderIndex": 139,
+          "newCapWei": 140
+        },
+        {
+          "bidderIndex": 140,
+          "newCapWei": 141
+        },
+        {
+          "bidderIndex": 141,
+          "newCapWei": 142
+        },
+        {
+          "bidderIndex": 142,
+          "newCapWei": 143
+        },
+        {
+          "bidderIndex": 143,
+          "newCapWei": 144
+        },
+        {
+          "bidderIndex": 144,
+          "newCapWei": 145
+        },
+        {
+          "bidderIndex": 145,
+          "newCapWei": 146
+        },
+        {
+          "bidderIndex": 146,
+          "newCapWei": 147
+        },
+        {
+          "bidderIndex": 147,
+          "newCapWei": 148
+        },
+        {
+          "bidderIndex": 148,
+          "newCapWei": 149
+        },
+        {
+          "bidderIndex": 149,
+          "newCapWei": 150
+        },
+        {
+          "bidderIndex": 150,
+          "newCapWei": 151
+        },
+        {
+          "bidderIndex": 151,
+          "newCapWei": 152
+        },
+        {
+          "bidderIndex": 152,
+          "newCapWei": 153
+        },
+        {
+          "bidderIndex": 153,
+          "newCapWei": 154
+        },
+        {
+          "bidderIndex": 154,
+          "newCapWei": 155
+        },
+        {
+          "bidderIndex": 155,
+          "newCapWei": 156
+        },
+        {
+          "bidderIndex": 156,
+          "newCapWei": 157
+        },
+        {
+          "bidderIndex": 157,
+          "newCapWei": 158
+        },
+        {
+          "bidderIndex": 158,
+          "newCapWei": 159
+        },
+        {
+          "bidderIndex": 159,
+          "newCapWei": 160
+        },
+        {
+          "bidderIndex": 160,
+          "newCapWei": 161
+        },
+        {
+          "bidderIndex": 161,
+          "newCapWei": 162
+        },
+        {
+          "bidderIndex": 162,
+          "newCapWei": 163
+        },
+        {
+          "bidderIndex": 163,
+          "newCapWei": 164
+        },
+        {
+          "bidderIndex": 164,
+          "newCapWei": 165
+        },
+        {
+          "bidderIndex": 165,
+          "newCapWei": 166
+        },
+        {
+          "bidderIndex": 166,
+          "newCapWei": 167
+        },
+        {
+          "bidderIndex": 167,
+          "newCapWei": 168
+        },
+        {
+          "bidderIndex": 168,
+          "newCapWei": 169
+        },
+        {
+          "bidderIndex": 169,
+          "newCapWei": 170
+        },
+        {
+          "bidderIndex": 170,
+          "newCapWei": 171
+        },
+        {
+          "bidderIndex": 171,
+          "newCapWei": 172
+        },
+        {
+          "bidderIndex": 172,
+          "newCapWei": 173
+        },
+        {
+          "bidderIndex": 173,
+          "newCapWei": 174
+        },
+        {
+          "bidderIndex": 174,
+          "newCapWei": 175
+        },
+        {
+          "bidderIndex": 175,
+          "newCapWei": 176
+        },
+        {
+          "bidderIndex": 176,
+          "newCapWei": 177
+        },
+        {
+          "bidderIndex": 177,
+          "newCapWei": 178
+        },
+        {
+          "bidderIndex": 178,
+          "newCapWei": 179
+        },
+        {
+          "bidderIndex": 179,
+          "newCapWei": 180
+        },
+        {
+          "bidderIndex": 180,
+          "newCapWei": 181
+        },
+        {
+          "bidderIndex": 181,
+          "newCapWei": 182
+        },
+        {
+          "bidderIndex": 182,
+          "newCapWei": 183
+        },
+        {
+          "bidderIndex": 183,
+          "newCapWei": 184
+        },
+        {
+          "bidderIndex": 184,
+          "newCapWei": 185
+        },
+        {
+          "bidderIndex": 185,
+          "newCapWei": 186
+        },
+        {
+          "bidderIndex": 186,
+          "newCapWei": 187
+        },
+        {
+          "bidderIndex": 187,
+          "newCapWei": 188
+        },
+        {
+          "bidderIndex": 188,
+          "newCapWei": 189
+        },
+        {
+          "bidderIndex": 189,
+          "newCapWei": 190
+        },
+        {
+          "bidderIndex": 190,
+          "newCapWei": 191
+        },
+        {
+          "bidderIndex": 191,
+          "newCapWei": 192
+        },
+        {
+          "bidderIndex": 192,
+          "newCapWei": 193
+        },
+        {
+          "bidderIndex": 193,
+          "newCapWei": 194
+        },
+        {
+          "bidderIndex": 194,
+          "newCapWei": 195
+        },
+        {
+          "bidderIndex": 195,
+          "newCapWei": 196
+        },
+        {
+          "bidderIndex": 196,
+          "newCapWei": 197
+        },
+        {
+          "bidderIndex": 197,
+          "newCapWei": 198
+        },
+        {
+          "bidderIndex": 198,
+          "newCapWei": 199
+        },
+        {
+          "bidderIndex": 199,
+          "newCapWei": 200
+        },
+        {
+          "bidderIndex": 200,
+          "newCapWei": 201
+        },
+        {
+          "bidderIndex": 201,
+          "newCapWei": 202
+        },
+        {
+          "bidderIndex": 202,
+          "newCapWei": 203
+        },
+        {
+          "bidderIndex": 203,
+          "newCapWei": 204
+        },
+        {
+          "bidderIndex": 204,
+          "newCapWei": 205
+        },
+        {
+          "bidderIndex": 205,
+          "newCapWei": 206
+        },
+        {
+          "bidderIndex": 206,
+          "newCapWei": 207
+        },
+        {
+          "bidderIndex": 207,
+          "newCapWei": 208
+        },
+        {
+          "bidderIndex": 208,
+          "newCapWei": 209
+        },
+        {
+          "bidderIndex": 209,
+          "newCapWei": 210
+        },
+        {
+          "bidderIndex": 210,
+          "newCapWei": 211
+        },
+        {
+          "bidderIndex": 211,
+          "newCapWei": 212
+        },
+        {
+          "bidderIndex": 212,
+          "newCapWei": 213
+        },
+        {
+          "bidderIndex": 213,
+          "newCapWei": 214
+        },
+        {
+          "bidderIndex": 214,
+          "newCapWei": 215
+        },
+        {
+          "bidderIndex": 215,
+          "newCapWei": 216
+        },
+        {
+          "bidderIndex": 216,
+          "newCapWei": 217
+        },
+        {
+          "bidderIndex": 217,
+          "newCapWei": 218
+        },
+        {
+          "bidderIndex": 218,
+          "newCapWei": 219
+        },
+        {
+          "bidderIndex": 219,
+          "newCapWei": 220
+        },
+        {
+          "bidderIndex": 220,
+          "newCapWei": 221
+        },
+        {
+          "bidderIndex": 221,
+          "newCapWei": 222
+        },
+        {
+          "bidderIndex": 222,
+          "newCapWei": 223
+        },
+        {
+          "bidderIndex": 223,
+          "newCapWei": 224
+        },
+        {
+          "bidderIndex": 224,
+          "newCapWei": 225
+        },
+        {
+          "bidderIndex": 225,
+          "newCapWei": 226
+        },
+        {
+          "bidderIndex": 226,
+          "newCapWei": 227
+        },
+        {
+          "bidderIndex": 227,
+          "newCapWei": 228
+        },
+        {
+          "bidderIndex": 228,
+          "newCapWei": 229
+        },
+        {
+          "bidderIndex": 229,
+          "newCapWei": 230
+        },
+        {
+          "bidderIndex": 230,
+          "newCapWei": 231
+        },
+        {
+          "bidderIndex": 231,
+          "newCapWei": 232
+        },
+        {
+          "bidderIndex": 232,
+          "newCapWei": 233
+        },
+        {
+          "bidderIndex": 233,
+          "newCapWei": 234
+        },
+        {
+          "bidderIndex": 234,
+          "newCapWei": 235
+        },
+        {
+          "bidderIndex": 235,
+          "newCapWei": 236
+        },
+        {
+          "bidderIndex": 236,
+          "newCapWei": 237
+        },
+        {
+          "bidderIndex": 237,
+          "newCapWei": 238
+        },
+        {
+          "bidderIndex": 238,
+          "newCapWei": 239
+        },
+        {
+          "bidderIndex": 239,
+          "newCapWei": 240
+        },
+        {
+          "bidderIndex": 240,
+          "newCapWei": 241
+        },
+        {
+          "bidderIndex": 241,
+          "newCapWei": 242
+        },
+        {
+          "bidderIndex": 242,
+          "newCapWei": 243
+        },
+        {
+          "bidderIndex": 243,
+          "newCapWei": 244
+        },
+        {
+          "bidderIndex": 244,
+          "newCapWei": 245
+        },
+        {
+          "bidderIndex": 245,
+          "newCapWei": 246
+        },
+        {
+          "bidderIndex": 246,
+          "newCapWei": 247
+        },
+        {
+          "bidderIndex": 247,
+          "newCapWei": 248
+        },
+        {
+          "bidderIndex": 248,
+          "newCapWei": 249
+        },
+        {
+          "bidderIndex": 249,
+          "newCapWei": 250
+        },
+        {
+          "bidderIndex": 250,
+          "newCapWei": 251
+        },
+        {
+          "bidderIndex": 251,
+          "newCapWei": 252
+        },
+        {
+          "bidderIndex": 252,
+          "newCapWei": 253
+        },
+        {
+          "bidderIndex": 253,
+          "newCapWei": 254
+        },
+        {
+          "bidderIndex": 254,
+          "newCapWei": 255
+        },
+        {
+          "bidderIndex": 255,
+          "newCapWei": 256
+        }
+      ],
+      "expectedAllocated": 5192296858534827628530496329220095,
+      "expectedDenominator": 84360814432384476497671896537881067691659852,
+      "expectedRemainders": [
+        73824077577010818081368253323875866500786868,
+        13383914763663718327653588049593835403139,
+        63287340721637159665064610109870665309913884,
+        48225299555365590984433396755583028825587284,
+        58018972293950330456912788502868064714477392,
+        56262849481259856148505629548180200296518498,
+        21113625460230604846125074820689680217175480,
+        23031829240395424767719730696358185734113026,
+        52750603866263501248760966895865464119040900,
+        71407965899048338210384625627715195880305999,
+        3039176066935478659609411949781112031047674,
+        26767834719624295190134804629684000026373,
+        7936012436227848395849107823423629975492728,
+        19877158519373110933453688458220470369015929,
+        49238358246074849490481476615020231612343207,
+        26668433857026686738489434089018399464277183,
+        31663746235560223839291199251274971572671698,
+        72337949333048386476650095133374543238380926,
+        32622848125642633800088527189109224331140471,
+        62382740920287119098035971085844142933333733,
+        47482235438576672040609145288862863523604408,
+        50645933275026124194044872393556044850414874,
+        14630509236180703843317612571581947393796984,
+        46896861164218316032116873884946577831471380,
+        22626521538912660746033367815820687479607795,
+        78572825663016563813174675415846943479378681,
+        63300724636400823383392263697920259145317023,
+        10915488127249185687817493687534297121534273,
+        67255346939751083862989164021582480297660248,
+        7699582939802013405964275421712217080116272,
+        31045512762535328453688092255775118483981875,
+        60288316404184969018972986552768831114295722,
+        45726112625886197732201986334174999105645514,
+        43351165059844714104452796966078083503355364,
+        76621557647554354605041913340114616877442428,
+        51945233306942674625099757663811907245547277,
+        79119213839417271584710209735508151096249733,
+        24721981591008628936430004763161161647613634,
+        57275908171969114654553709407617403083274421,
+        80468181010784761654978011588014138961845874,
+        37418357565670089887005511621219495465044146,
+        28151500615371572081011708970429739065974005,
+        52298303962992332535979233569586954766140777,
+        48493919583247115007254240617785426996000072,
+        2667644008541019187697286216421029380056236,
+        67175732925754472016569472041996606492670627,
+        4249492926765745264415149768767620043461469,
+        34768297510256067627099560188293334522303857,
+        70602595339727511586723416395661639006812376,
+        12765273680357666468689404237872492284725582,
+        44555364087554079432287098783403420379819648,
+        38377459455752499847802839559053748223512919,
+        32420194272305103359977931934575227039277808,
+        8911784480409866349065785762109120433244356,
+        18212939118164816644712637465647821193333325,
+        25768956071059747291309563787996866324319374,
+        10576888604856946429821431606684479026302496,
+        11095527595715618141499787106272827521489481,
+        68745084782665604079705943139372565706070973,
+        80375499258942651640722327925971714709312140,
+        12554199759128225098887295582780837767084156,
+        64924849674998437207577163378607463056927503,
+        67137132191538166368046747820726773849972020,
+        25214294260620978381767052366085217136415635,
+        78810097100308675462641242423492976387294774,
+        77057096458150427086874171662481912160443139,
+        51251091707537405925715155117314547021231819,
+        35677460548207075493258004993379650292282215,
+        43969989818388020282329655008017631016906715,
+        27767147010296400146978290986514141647009741,
+        602108819175040219619112055028639369931714,
+        16904284288140444453762541073131834338363618,
+        17237305113029860469913670242046906056975246,
+        27422030978940116832950352247930958613511470,
+        4899142940127872050675178589630303076417623,
+        4303622810085423201044828187596978136630687,
+        18486133206365170530480404625478425001768851,
+        71895136539460826064901139262182723793155688,
+        33467924300949235884443664222510712287890775,
+        33573297104558344477587567887598526239479172,
+        7564480372641092065402154461533050995281195,
+        54618688194909554265363113841884120891293413,
+        61341024010837302243717667634937200945006895,
+        26213248417470590993472475413895467214684887,
+        81996519504472204608567365920480413042435957,
+        980206251538833778640428201226860045856403,
+        77363091026726797276303050780820286678290839,
+        10229817805154312080129130333435798914144767,
+        47256085484344939254950864811458360682544299,
+        59901345523676251377778127444024966003696589,
+        45353893297068478919855782149822844962083994,
+        22232617491563397570715435404303478165369761,
+        22440755509715431010077304949140646154112076,
+        4380920542147479173674462960739624399478405,
+        12514392749533770746410035778722652699979298,
+        58829377131322058522850273107771270209370652,
+        23231679966231645619168822911048693321204645,
+        33442689473183310312576172351189301280923070,
+        38491082257976806800511028120811550560625839,
+        8222855567484598356073377506677386673998750,
+        56408231175308677209590370038760950967490146,
+        48238683475321551561295877972163118990210518,
+        27489570345623754650573363959866377606446749,
+        52068164215720377461423099643674695005871956,
+        43384615549221961132372211232631841653993782,
+        53435256272083405646976517840374727037749992,
+        40295663230725022910862667806191757411230370,
+        70713237834541427516656561870206228130970286,
+        37317030641597473096217627808217744983722862,
+        54531150712784516393021895768937402202600532,
+        25562825745649854590761554721984691680706136,
+        29375478905253943414331708329374726125025090,
+        72393810278123419558153515028429327741970499,
+        17337384297048528977935893620373623027001054,
+        76171818757167033310719392003869098472073571,
+        2868273896739163531158897954096836029229097,
+        26395377807873394631139377644272370977235206,
+        9793385599435860255357385747344005691186573,
+        26654697300706582057711141579801297060218651,
+        8262967060134612701224251863000206604096538,
+        13299068677989336777978271327410632306679471,
+        60772443149155535032602247206069533585105259,
+        19114275918724008987753877534975454972910102,
+        71108316209816383866183967120243112307178677,
+        27384033385009033965672309632320550347626036,
+        54965305007393284534274334564891224053247172,
+        53569358340347991590749829715968614827937662,
+        26435696529432027325606541325139695908178282,
+        12495092385021766351416087482352984543240042,
+        15890001005261086186250038941470836619012085,
+        75894487849351500426680722478648025713511654,
+        9406140066524828129906544055912900300476630,
+        18331574839407020898713334783736085811901419,
+        2495816566204232210796338962893838880638089,
+        17455074515731748281562385588965305533865554,
+        64365445044643714815575478645268552731942288,
+        4552072140425237700982877316381622964259894,
+        16186946387419243485809112062187964167411954,
+        81126070993144548982426198792295242291444944,
+        60206205895159475930693410670857043536291308,
+        911521195850544879290127261733164962097342,
+        49485658738199808913479897451539301240878012,
+        34990507007996973060450393519921954122978781,
+        22414217503319128108425798413101856109375504,
+        63588395131224679774874166137384984994879741,
+        30606504089483715605467950351030967320384012,
+        29559075649515143643109932377496048633265767,
+        43609904468091476451393697895652120200824761,
+        29725586061959851651185496961953584492571581,
+        67852281984678545357538816277611311803953117,
+        76998356211107218081539786233836144616669619,
+        19082028346646356732288012849712756962665198,
+        23556504972912709012298837321480034837682722,
+        48929853000022273292808653060780547468345756,
+        65439152124083722836319610389403906213619180,
+        60517940708045744971402097627471031058093692,
+        30350000106031358252201450339404095800358336,
+        57146679627435595471111095938890615221128658,
+        14874094558983096199843283203080959514831876,
+        35226312566189901812489771911582907628323457,
+        80021302869515629178019028406860773289249224,
+        69055335966510689431106576067864783037689471,
+        37893582057724093655022445784729394583823544,
+        5589559071846511057444337484733586086915851,
+        67069580905361557268498273526371942642944434,
+        31480980087215670619486134689468710589206209,
+        6235870384111311870806856678666409899290691,
+        2992901356601691838769512195982859532640112,
+        9597038292075185859984133575192949926147432,
+        32704408854385767986317395993109021172703258,
+        34213557711584068483697485733612616906816354,
+        79573082662502658668829214871194403642057418,
+        62105193255084875291244930986905089820691889,
+        8611958553484985486184104871278774829665118,
+        63777443844810428125117410396218847168232038,
+        21712214451982835982181885934845810247573988,
+        59788479016212171625112773417075026638619330,
+        18676179117678579276789782769794482340775735,
+        26221842405425929027025813193382782756546294,
+        31841087204101002315959868947154285682868406,
+        2554569028829004365600732163453529794916134,
+        59313489505080793642976866594867842049849338,
+        51057606264686898675850311748677366301322205,
+        70859916939258905541458215753244989888294002,
+        1603472937786922627320604646901020099296029,
+        54934411090112581196189106677543749302402594,
+        32223242248630471772318965728816622382158791,
+        72468397947358904347555166744585020573492833,
+        32327311260302636921267314315500454541139996,
+        42431898238230344399957652896267361487869048,
+        65477800990114750822634427775975229345043039,
+        77904466043054199790054569093403018868307729,
+        27364129880211806789433679730291457814073607,
+        53133158323449291958238117977831387733297109,
+        50521622071105950677653798394815766568769284,
+        62349737894860354729630258660602263936376381,
+        32722773485964595796545659482189229960076233,
+        36547342760800221348893899909935247664250489,
+        37828278242036576572516748016524782104545493,
+        71511093796050769481303300009806953016403643,
+        82532881848029414636052710356011192425616756,
+        55587652810275117237665342628578358412856973,
+        67398768505379458843101298863209358646913259,
+        53828276826643370917262939675400812672259657,
+        7130641876907021772187898591370073101999105,
+        10123986021017719292167296102506023786372440,
+        45226275243105697196876600827011690959189217,
+        36815898410346944974494085036312629030725589,
+        34851718675660650312247930006598072102697285,
+        11914793375739230314477033520719371932839335,
+        4960608397112871898104263393826945121190010,
+        66736892696307262524788875044961152407391459,
+        42799241280055901982414767457246052291080849,
+        1588035266325861719762397199124241948605949,
+        5644154425294385990880972492176961137129028,
+        9278022196435671865717128851764202384415177,
+        41254765120807432871659995744026010169699143,
+        34006365245116382098004670025498429218465423,
+        56463552422715635174556942776033245529569101,
+        31431877813124529132084408536852696392382952,
+        81945856042435896213173424013979537801775315,
+        5657067955717019967978545547303433281533136,
+        6192101645644941363903661456458298719554298,
+        31250235266847947626385650078901218222365654,
+        33888346378269848711609439201922477304437026,
+        18820801085744876650685027736069065259196068,
+        77975080174264131372230464274558028372426429,
+        37283254998509168546443390661040329380209069,
+        57303838641910482766038005540879547170459160,
+        13791445069129670489157733308327932766679872,
+        29775625653969185905196608651116942977584485,
+        77214203296238169123071534632785524286710250,
+        17012435665240051393484995759658898689680770,
+        57697390417954997215520572277379193008728727,
+        64721477667410593001376645272653835159918385,
+        74863553012548729013991368194157766832745406,
+        34304622409381618731798350663066316952701561,
+        3883536883391444545799134047774821456408472,
+        26003626302566703114639940900336886145067197,
+        23987352042952011744047963362674060652610556,
+        34434282153202064015816818816565531829583236,
+        80950565963701181153227615391921660920200342,
+        67418824251704466015676736041370768611962153,
+        21550184205367860292370947549505874323879403,
+        69936875058035679624786331959310733298643572,
+        11213405561189653309253554485458997248571654,
+        51493155077426540503262371629699650092026540,
+        18854596159798807330690246141800593401439727,
+        30664071464806925910105600608417858950539009,
+        67054895843600755017164677169210500757001054,
+        56661091607756964920053231586786439453063249,
+        74469078879563040903626667495474907260282969,
+        34798950197949438399064816657090406637896976,
+        83080874860638741462445141040557024735226268,
+        48589586009141563683365829123375743490707544,
+        0
+      ],
+      "expectedRewards": [
+        5361646300200158804721812161602,
+        8578634080320254087554899458563,
+        10723292600400317609443624323204,
+        12255191543314648696506999226519,
+        13404115750500397011804530404005,
+        14297723467200423479258165764272,
+        15012609640560444653221074052485,
+        15597516509673189250099817197387,
+        16084938900600476414165436484806,
+        16497373231385104014528652804929,
+        16850888372057641957697123936463,
+        17157268160640508175109798917126,
+        17425350475650516115345889525206,
+        17661893694776993709671851826453,
+        17872154334000529349072707205340,
+        18060282274358429658010314649606,
+        18229597420680539936054161349446,
+        18382787314971973044760498839778,
+        18522050855236912234493532921897,
+        18649204522435334972945433605572,
+        18765762050700555816526342565607,
+        18872994976704558992620778808839,
+        18971979216092869616707950725668,
+        19063631289600564639010887685696,
+        19148736786429138588292186291435,
+        19227972938648845368657533269193,
+        19301926680720571696998523781767,
+        19371109213626380197704611680626,
+        19435967838225575667116569085807,
+        19496895637091486562624771496734,
+        19554239447788814464279550236430,
+        19608306469303437914411198762430,
+        19659369767400582283979977925874,
+        19707672887222205336274769026429,
+        19753433737579532438448781648007,
+        19796847877662124817434383365915,
+        19838091310740587577470704997927,
+        19877322869034735080919888989353,
+        19914686257886304131823873743093,
+        19950311814698265319895115019914,
+        19984318028018773726690390784152,
+        20016812854080592870961432069980,
+        20047894861617985095916341125990,
+        20077654230536764885766785966850,
+        20106173625750595517706795606007,
+        20133528964016922858547213014995,
+        20159790088752597105754013727623,
+        20185021365459421382482116373089,
+        20209282208446752417797599686038,
+        20232627547925127564987970421139,
+        20255108245200599928949068166052,
+        20276771462575146025129762356604,
+        20297660993614886903589717468921,
+        20317817558653233365261603980807,
+        20337279069724740293772390957800,
+        20356080868556535123011625833878,
+        20374255940760603457942886214087,
+        20391835108957981027794433139207,
+        20408847207213507708295930163517,
+        20425319238857747827511665377531,
+        20441276519513105443001908866107,
+        20456742806917528978015529478112,
+        20471740418946060890756010071571,
+        20486290341063293343414685274180,
+        20500412324294724841583399441419,
+        20514124974678868470239976966129,
+        20527445835052036566649223704419,
+        20540391459921735139215956450080,
+        20552977484100608751433613286141,
+        20565218685699239250987772674637,
+        20577129044011420277581008836418,
+        20588721792768609810131758700551,
+        20600009469190083828668015147207,
+        20611003959211000080489044153690,
+        20621716539231380018160816006161,
+        20632157914694281982726973381354,
+        20642338255770611398178976822167,
+        20652267230400611692261794992837,
+        20661954034917685149903568817880,
+        20671407422458443584469637249549,
+        20680635729343469675355561194750,
+        20689646899595906917044169282417,
+        20698448507749450269391181833161,
+        20707047780083371935477343520669,
+        20715451614409704472788819715280,
+        20723666598526456503643858242596,
+        20731699027440614044924340358194,
+        20739554919455559332550306383339,
+        20747240031209310157401794886199,
+        20754759871742550211826369657814,
+        20762119715668700052327017306629,
+        20769324615512194106711861847047,
+        20776379413275615368297022126207,
+        20783288751291337222426818275900,
+        20790057082408779038717230830701,
+        20796688679564252333466422929850,
+        20803187644776616162320631187015,
+        20809557917608537143078716508395,
+        20815803283130028300684682509749,
+        20821927379418092445521600627580,
+        20827933704623693818342424166223,
+        20833825623634902784061898685082,
+        20839606374362881391937609533773,
+        20845279073675383764152092142303,
+        20850846723000617573918158406230,
+        20856312213622636084422461986415,
+        20861678331687890622008505501506,
+        20866947762941158591349755439748,
+        20872123097207761061238483057664,
+        20877206832637786496261923461105,
+        20882201379726934292074426313607,
+        20887109065127575169698885638240,
+        20891932135262687756329819802104,
+        20896672759754465085069626886243,
+        20901333034678585170949437240143,
+        20905914985654400717570763386414,
+        20910420570780619338415067430247,
+        20914851683425412858088391241951,
+        20919210154879308123340840892807,
+        20923497756878668506231462094056,
+        20927716204007071463591589404962,
+        20931867155981419973633954678894,
+        20935952219829191523199457011969,
+        20939972951962824938126132536650,
+        20943930860156870330944578756257,
+        20947827405433178585889870770910,
+        20951664003859082098451389062260,
+        20955442028263216091737158982749,
+        20959162809873348054821629358989,
+        20962827639880320138761972361150,
+        20966437770931964281150966960294,
+        20969994418560621102911976454265,
+        20973498762547680030235324043913,
+        20976951948228358535261980427873,
+        20980355087739751844563612806268,
+        20983709261215009998335725294327,
+        20987015517926335892768236175413,
+        20990274877379345107847094419888,
+        20993488330361185179051602548244,
+        20996656839944677836672830842637,
+        20999781342450621985160430966274,
+        21002862748370277248841305570965,
+        21005901943249937234937510660522,
+        21008899788539397765440570102603,
+        21011857122406027748234128741413,
+        21014774760516058670855961760909,
+        21017653496784622514509503673479,
+        21020494104095986837055051653433,
+        21023297334995359523777631896807,
+        21026063922353563940085537888635,
+        21028794580005817649688146400049,
+        21031490003365784214650721253251,
+        21034150870016007618524032326284,
+        21036777840275782316615517780553,
+        21039371557747458600807111013881,
+        21041932649842132667587489237985,
+        21044461728285623308533112734287,
+        21046959389605592326609846497717,
+        21049426215600623455574521819622,
+        21051862773792034570686869836964,
+        21054269617859160184395408732144,
+        21056647288058805487634753216473,
+        21058996311629539401678442947978,
+        21061317203181462131122807053957,
+        21063610465072052447121404920579,
+        21065876587768671280090433581678,
+        21068116050198271067965708964412,
+        21070329320084834601012033757874,
+        21072516854275042744139215239784,
+        21074679099052647324918105606296,
+        21076816490442003577182296083538,
+        21078929454501195757992038669612,
+        21081018407605169845838034180844,
+        21083083756719268520262041042231,
+        21085125899663545861265553444502,
+        21087145225368222338123775205406,
+        21089142114120624631905794502301,
+        21091116937803939607524476569395,
+        21093070060128097275718777514873,
+        21095001836853083821856310144007,
+        21096912616004972688144521766303,
+        21098802738084949242364752722412,
+        21100672536271592715356809152111,
+        21102522336616667808958576208230,
+        21104352458234667635607132976518,
+        21106163213486339421762054223449,
+        21107954908156414662799555246727,
+        21109727841625756131679595526307,
+        21111482307038125293592135386307,
+        21113218591461765241391591931697,
+        21114936976045986220657033461154,
+        21116637736172933138596675590309,
+        21118321141604707128802239738554,
+        21119987456626006256163077347224,
+        21121636940182443776176835788129,
+        21123269846014695994481913239678,
+        21124886422788625690603939916711,
+        21126486914221521260396394188998,
+        21128071559204586180982982577401,
+        21129640591921808097425860735377,
+        21131194241965331759785965578078,
+        21132732734447455191293776714997,
+        21134256290109363832204424636994,
+        21135765125426712969338158086315,
+        21137259452712164518614836406315,
+        21138739480214980167898436464880,
+        21140205412217769001474573665745,
+        21141657449130484007244301983188,
+        21143095787581758305412429090090,
+        21144520620507668525663484580965,
+        21145932137238009491519670394355,
+        21147330523580161239088821921109,
+        21148715961900626396402703526319,
+        21150088631204313073004014794153,
+        21151448707211635651654855316411,
+        21152796362433503229587423322484,
+        21154131766244262920447877073957,
+        21155455084952662795101448891026,
+        21156766481870896905118502043078,
+        21158066117381792592624191489729,
+        21159354149004198140062865852036,
+        21160630731456626749302085331122,
+        21161896016719210857574586053756,
+        21163150154094018894408562540948,
+        21164393290263784755480837480007,
+        21165625569349098512962961546236,
+        21166847132964105194293067142324,
+        21168058120270756839421180482168,
+        21169258668031661487608534224256,
+        21170448910661571246111876346239,
+        21171628980277550151978437766325,
+        21172799006747861152263156110496,
+        21173959117739610194918342943275,
+        21175109438765184140167156891390,
+        21176250093227517968229006016411,
+        21177381202464225571788245525323,
+        21178502885790627278651158038327,
+        21179615260541706149772469617614,
+        21180718442113024038487819944179,
+        21181812544000627376678764095217,
+        21182897677839971671114044769607,
+        21183973953443892746819241520125,
+        21185041478839651862559355370232,
+        21186100360305080944973638338961,
+        21187150702403853341239419025685,
+        21188192608019904674081378180788,
+        21189226178391027596260601662651,
+        21190251513141663483203337308004,
+        21191268710314913371043352829188,
+        21192277866403789741983447279059,
+        21193279076381730078506690591529,
+        21194272433732392451606222191744,
+        21195258030478752774915913701332,
+        21196235957211522745515023954037,
+        21197206303116906902388559708659,
+        0
+      ],
+      "expectedScores": [
+        87112285931760246646623899502532662132736,
+        139379657490816394634598239204052259412377,
+        174224571863520493293247799005065324265472,
+        199113796415451992335140341720074656303396,
+        217780714829400616616559748756331655331840,
+        232299429151360657724330398673420432353962,
+        243914400608928690610546918607091453971660,
+        253417559074211626608360434916458653477050,
+        261336857795280739939871698507597986398208,
+        268037802866954605066535075392408191177649,
+        273781470071246489460817969865102652417170,
+        278759314981632789269196478408104518824755,
+        283114929278220801601527673383231151931392,
+        286958118363445518365349316008342887025483,
+        290374286439200822155412998341775540442453,
+        293430857875402936072838398324320546131321,
+        296181772167984838598521258308611051251302,
+        298670694623177988502710512580111984455094,
+        300933351400626306597428016463294651003997,
+        302999255414818249205648346095765781331255,
+        304893000761160863263183648258864317464576,
+        306635246479796068196116126248914970707230,
+        308243473296997795826515336701269419854296,
+        309732572201814210299107198231227243138616,
+        311115306899143738023656783937616650474057,
+        312402680582864332801685708560806788338087,
+        313604229354336887927846038209117583677849,
+        314728258850230568529737959493021230931175,
+        315782036502630894094011635696680900231168,
+        316771948842764533260450543645573316846312,
+        317703631045243252475922457009236767778213,
+        318582074264723187736224546752119450085434,
+        319411715083120904370954298175953094486698,
+        320196510451875501187590549522822758109516,
+        320940000801221961329666998167225597331132,
+        321645363440345526079842090470889829413179,
+        322315457947512912592508428159370849891123,
+        322952864917745304641142261570364991321362,
+        323559919175109487544603055295121316493019,
+        324138738350735801475809858614075021889250,
+        324691247563833646591961807236712649767470,
+        325219200811904920814062558142788605295547,
+        325724199570929617896071972052948214931099,
+        326207709021059647017144815158420181603436,
+        326671072244100924924839623134497482997760,
+        327115522682528273122016275682979792498437,
+        327542195103418527391305862129522809619087,
+        327952135272509163846113504009534728029123,
+        328346308512019391206505467355700034192620,
+        328725607289661308100467545292576083519758,
+        329090857964427598442801398120678945834780,
+        329442826796475114590868565391396249520165,
+        329782225313092362305076190973873649502500,
+        330109715109828303081943198114860614397736,
+        330425912154952659694090653285468718434515,
+        330731390656174495743114465907920615554794,
+        331026686540688937257170818109624116104396,
+        331312300592924216754372863681763567455651,
+        331588701288635777558116778751575939731059,
+        331856327359086653891900569533457760505660,
+        332115590114835940340253616853405774381056,
+        332366875555023710282503493486586157060285,
+        332610546284902759923473070827851982688628,
+        332846943261651091664712213024602410537021,
+        333076387386142119531209027509683708154578,
+        333299180956300074126213180705342359464381,
+        333515608995882087161360072381125049308189,
+        333725940470968832223685924854773015494425,
+        333930429405080945478724948093041871508821,
+        334129315902642041932256052886426649276247,
+        334322827089458243887043073766476703320230,
+        334511177977959347123035774089725422589706,
+        334694572264131473958081298088678122931038,
+        334873203062351078018190574711034649237530,
+        335047253583693256333168844240510238972061,
+        335216897762722974437641334794556066941161,
+        335382300837276949589502013084750749211033,
+        335543619885298727824032798083829513400168,
+        335701004322393145613818929790247819926153,
+        335854596363412999119513829407354841957536,
+        336004531451075237065549326652625982511981,
+        336150938654321892942266341609773096229851,
+        336293941038888394031152728312102835210097,
+        336433656012315435324892301527022695133325,
+        336570195645437316589228702623421649149207,
+        336703666972196908386950802571586918805181,
+        336834172269472953700279078076459626913245,
+        336961809318457217797929809064741726051901,
+        337086671648985302241283785031539431731021,
+        337208848768104180567576385171094175997687,
+        337328426374050316801820206584275415067190,
+        337445486556713376483764158072968628051019,
+        337560107985570955755667610572314065764352,
+        337672366085998481846707074360332793421739,
+        337782333204784629854255936846555220514690,
+        337890078765615502144480579888611537969400,
+        337995669415229756988900730069826729075015,
+        338099169160891254311649194108839639168638,
+        338200639499775075216304551009832688280033,
+        338300139540816491831549124281680241292178,
+        338397726119530188896500532682915341361782,
+        338493453906268386969738580924126915715774,
+        338587375508351147343481571651353366025351,
+        338679541566469743971920955075267172403908,
+        338770000845734292514648498065404797182862,
+        338858800321709583285949847606182098571376,
+        338945985261758050588682081700763449025554,
+        339031599301985824786860581847694685057134,
+        339115684520066674445785894492002149016722,
+        339198281504199190482429343195702401224812,
+        339279429418434644834219398062495631464340,
+        339359166064596439110326147627257675091006,
+        339437527940996823140293125647799683482729,
+        339514550298142499750944428830383708825022,
+        339590267191607741164805031959025632042869,
+        339664711532241633983474700581303825458735,
+        339737915133864961921833208059877382317670,
+        339809908758601953861210583183433194435135,
+        339880722159982601670434230845947107993297,
+        339950384123942425938044485863542096127750,
+        340018922507838382072306188380853294131001,
+        340086364277592002908419703657887512966201,
+        340152735543063820239198083771794204518302,
+        340218061591756553832483890970521263132575,
+        340282366920938463463374607431768211456000,
+        340345675268272591549600351544778772983712,
+        340408009641032348434499545748358402795614,
+        340469392343978979260087301872494068793594,
+        340529845005971873254984334418991315609786,
+        340589388605378407941687426626443491045283,
+        340648043494346039125603905517366529533982,
+        340705829421995631329017918054349967452478,
+        340762765556591553058852312759907178342761,
+        340818870506740818997010292944215378855083,
+        340874162341670530356354389357736503997662,
+        340928658610630030041463318916386821584232,
+        340982376361461536873927835195627848919566,
+        341035332158380540063378670392893826221774,
+        341087542099004909405090761432451832012684,
+        341139021830669497357408277772155879680644,
+        341189786566060966032610273051586260019882,
+        341239851098205655829533620120265876492372,
+        341289229814841514259375825448278648903595,
+        341337936712203415431669157234413696520108,
+        341385985408249615236769335888303675925587,
+        341433389155355597594821189996503856949784,
+        341480160852500166854765686049928035560325,
+        341526313056967324601333433811253880679335,
+        341571857995586230272288448049404385730991,
+        341616807575530379006368233343265341697003,
+        341661173394696032302343086360582648884237,
+        341704966751678902975144070306708765010990,
+        341748198655367121459832221125320443751502,
+        341790879834167591938346000595924330406148,
+        341833020744881980512068466402343357736052,
+        341874631581247760424486247104279126860548,
+        341915722282158968087998805547440698870988,
+        341956302539580595532088847736649953216702,
+        341996381806169857205264198046980080965556,
+        342035969302616919348707335470066894263503,
+        342075074024717066100157263900189234228548,
+        342113704750185695921286587137219182194017,
+        342151870045226992853004713708742745244240,
+        342189578270866597605899868704559439275897,
+        342226837589058111826022462331378315521462,
+        342263655968572803392652480885690459503767,
+        342300041190681439764380969809951872380397,
+        342336000854636758751644798045040637153208,
+        342371542382964690308824163161116741870520,
+        342406673026572067743955211917469423411910,
+        342441399869678210955693949768576671832134,
+        342475729834577426816441387758528408841842,
+        342509669686239151587862150316776148840075,
+        342543226036752156305368553976060637538894,
+        342576405349618947486723200290858783668062,
+        342609213943906221448174442736217844365620,
+        342641657998256970143387338043295137722094,
+        342673743554769589018763626772393676455845,
+        342705476522749102192212703537436187291422,
+        342736862682335396642454686567341621505846,
+        342767907688013144413889691520835040130982,
+        342798617072007889506714588312669070446658,
+        342828996247572583577035991590612412264315,
+        342859050512168671293664117828149942939538,
+        342888785050545651694157902297203031799067,
+        342918204937722875688297255184573019189182,
+        342947315141877181535129878041549638290981,
+        342976120527139819257911897517824931538311,
+        343004625856305971171081604291222357147648,
+        343032835793460038608467169025517218761032,
+        343060754906519734216601336185231720976341,
+        343088387669701894485164896502282484707391,
+        343115738465912808220375767428342934522817,
+        343142811589065743135939827482057592969559,
+        343169611246328244365488088949371093250172,
+        343196141560301675230920287487364859859623,
+        343222406571135371787698164039978688802979,
+        343248410238577688279234469681621235866303,
+        343274156443966120449072396059485143849791,
+        343299648992158607474379899517370097074821,
+        343324891613408030901400074509981668405488,
+        343349887965181850197424930722177517089027,
+        343374641633928739209022361145905444911561,
+        343399156136794015766401458908534552175423,
+        343423434923285587741498065346522994946363,
+        343447481376892072903435852584147911949160,
+        343471298816654686778117089467128782123359,
+        343494890498694432274839262493398933148987,
+        343518259617696066964988584830742007278147,
+        343541409308350268465559040291678104185437,
+        343564342646755365279208276542698910467426,
+        343587062651779949564358450130919523202605,
+        343609572286387639550572048037767722856903,
+        343631874458925212578387363936257874588119,
+        343653972024375284936222722808156373551160,
+        343675867785574671701749082968895982112711,
+        343697564494399518587588839855447048778249,
+        343719064852918258261792037856146974568985,
+        343740371514513405686678089928912666794039,
+        343761487084973170623448572027931581510348,
+        343782414123553830516140746251066398773833,
+        343803155144013773432008990036662239883864,
+        343823712615620088534462470602916524877878,
+        343844088964128550640418563675195001193530,
+        343864286572737815710357498036313139997642,
+        343884307783018615583179061791657321257612,
+        343904154895818712848410872818694161810975,
+        343923830172144350397060590243765315433139,
+        343943335834018904863394361828965166006836,
+        343962674065319428819287500181674030738700,
+        343981847012591743168720013420257178677983,
+        344000856785844718672625441439788555145442,
+        344019705459324363875650314984578140286906,
+        344038395072268315870210843604939121334349,
+        344056927629641310284985149295717236994839,
+        344075305102852187591686029834271268005450,
+        344093529430452974254164403035004015424307,
+        344111602518820559367576565669755578217280,
+        344129526242821470223853090596781921483039,
+        344147302446460233665674664701363603487352,
+        344164932943511794128464914428038878262120,
+        344182419518138443893599733544700477324442,
+        344199763925491706262270041936836372329347,
+        344216967892299598085445044188145256038665,
+        344234033117439684329400893195491971330972,
+        344250961272498324097501675142538713006474,
+        344267754002316494747457650834009080748572,
+        344284412925522568420123140663396019265633,
+        344300939635052403412846840890962426524623,
+        344317335698657101370054938745188387876426,
+        344333602659398770209489744490325955831759,
+        344349742036134622038419179210011464430579,
+        344365755323989725024935102720949429993472,
+        344381643994818718260583198033358695435252,
+        344397409497656789068047974777454710757328,
+        344413053259160202958080591083372378470740
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "maximum-participants",
+      "poolWei": 5192296858534827628530496329220095,
+      "winnerIndex": 255
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 1
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 2
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 3
+        },
+        {
+          "bidderIndex": 0,
+          "newCapWei": 20
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 21
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 22
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 30
+        }
+      ],
+      "expectedAllocated": 29,
+      "expectedDenominator": 3776747403234787793581189603467301456992987,
+      "expectedRemainders": [
+        3443798425380608575823036564109913605376113,
+        2499642033413146508632860360410746469331387,
+        1610054347675820502706482282413942839278474,
+        0
+      ],
+      "expectedRewards": [
+        10,
+        10,
+        9,
+        0
+      ],
+      "expectedScores": [
+        1290845691534265473036335965355711266148724,
+        1258288574569870229340122992814360675250630,
+        1227613137130652091204730645297229515593633,
+        1493353473115889942513552562900559922275474
+      ],
+      "expectedUnallocated": 0,
+      "h": 8,
+      "id": "late-own-delta",
+      "poolWei": 29,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 2500
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 7500
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 10000
+        }
+      ],
+      "expectedAllocated": 10000,
+      "expectedDenominator": 1001791288215242836436174844279125614526464000,
+      "expectedRemainders": [
+        914679002283482589789550944776592952393728000,
+        261336857795280739939871698507597986398208000,
+        827566716351722343142927045274060290260992000,
+        0
+      ],
+      "expectedRewards": [
+        2174,
+        3478,
+        4348,
+        0
+      ],
+      "expectedScores": [
+        217780714829400616616559748756331655331840000,
+        348449143727040986586495598010130648530944000,
+        435561429658801233233119497512663310663680000,
+        497784491038629980837850854300186640758491428
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "legacy-allocation-pool10000",
+      "poolWei": 10000,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 2500
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 5000
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 7500
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 10000
+        }
+      ],
+      "expectedAllocated": 1,
+      "expectedDenominator": 1001791288215242836436174844279125614526464000,
+      "expectedRemainders": [
+        217780714829400616616559748756331655331840000,
+        348449143727040986586495598010130648530944000,
+        435561429658801233233119497512663310663680000,
+        0
+      ],
+      "expectedRewards": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "expectedScores": [
+        217780714829400616616559748756331655331840000,
+        348449143727040986586495598010130648530944000,
+        435561429658801233233119497512663310663680000,
+        497784491038629980837850854300186640758491428
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "legacy-allocation-pool1",
+      "poolWei": 1,
+      "winnerIndex": 3
+    },
+    {
+      "bidderCount": 4,
+      "bids": [
+        {
+          "bidderIndex": 0,
+          "newCapWei": 7250
+        },
+        {
+          "bidderIndex": 1,
+          "newCapWei": 14500
+        },
+        {
+          "bidderIndex": 2,
+          "newCapWei": 21750
+        },
+        {
+          "bidderIndex": 3,
+          "newCapWei": 29000
+        }
+      ],
+      "expectedAllocated": 29000,
+      "expectedDenominator": 2905194735824204225664907048409464282126745600,
+      "expectedRemainders": [
+        1010502516808418861100837234229378880739737600,
+        2778881921223151868027302394130791922034278400,
+        2021005033616837722201674468458757761479475200,
+        0
+      ],
+      "expectedRewards": [
+        6304,
+        10087,
+        12609,
+        0
+      ],
+      "expectedScores": [
+        631564073005261788188023271393361800462336000,
+        1010502516808418861100837234229378880739737600,
+        1263128146010523576376046542786723600924672000,
+        1443575024012026944429767477470541258199625142
+      ],
+      "expectedUnallocated": 0,
+      "h": 4,
+      "id": "legacy-allocation-pool29000",
+      "poolWei": 29000,
+      "winnerIndex": 3
+    }
+  ]
+}

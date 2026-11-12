@@ -156,10 +156,10 @@ contract AuctionParameterSnapshotsTest {
         assertEq(settlementDistributionVault, address(distributionVault), "distribution vault recorded");
         assertEq(finalPrice, 2 ether, "final price recorded");
         assertEq(feeAmount, 0.05 ether, "fee uses auction snapshot");
-        assertEq(distributionReserve, 0.19 ether, "distribution reserve uses auction snapshot and cap");
-        assertEq(sellerProceeds, 1.76 ether, "seller proceeds use snapshotted economics");
+        assertEq(distributionReserve, 0.475 ether, "distribution reserve uses auction snapshot and full pool");
+        assertEq(sellerProceeds, 1.475 ether, "seller proceeds use snapshotted economics");
         assertTrue(distributionOpened, "distribution opened");
-        assertEq(totalAssigned, 0.19 ether, "assigned reward uses auction snapshot");
+        assertEq(totalAssigned, 0.475 ether, "assigned reward uses auction snapshot");
         assertEq(totalClaimed, 0, "nothing claimed yet");
     }
 
@@ -196,6 +196,30 @@ contract AuctionParameterSnapshotsTest {
         assertTrue(auction.state == AuctionHouse.State.FINALIZED, "pause does not block finalization");
     }
 
+    function testSoftnessIsSnapshottedAndAffectsOnlyNewAuctionScores() external {
+        uint256 oldId = _createAuction(8, 1 ether, 2 hours);
+        ParamsController.Params memory changed = params.params();
+        changed.rankSoftness = 8;
+        params.setParams(changed);
+        uint256 newId = _createAuction(9, 1 ether, 2 hours);
+        _bid(BIDDER_ONE, oldId, 1 ether);
+        _bid(BIDDER_TWO, oldId, 2 ether);
+        _bid(BIDDER_ONE, newId, 1 ether);
+        _bid(BIDDER_TWO, newId, 2 ether);
+        uint256 q = auctionHouse.SCORE_SCALE();
+        assertEq(auctionHouse.bidderScores(oldId, BIDDER_TWO), 2 ether * q * 4 / 5, "old score uses h4");
+        assertEq(auctionHouse.bidderScores(newId, BIDDER_TWO), 2 ether * q * 8 / 9, "new score uses h8");
+        assertEq(uint256(auctionHouse.getAuctionParams(oldId).rankSoftness), 4, "old softness snapshot");
+        assertEq(uint256(auctionHouse.getAuctionParams(newId).rankSoftness), 8, "new softness snapshot");
+    }
+
+    function testZeroSoftnessIsRejected() external {
+        ParamsController.Params memory p = params.params();
+        p.rankSoftness = 0;
+        vm.expectRevert();
+        params.setParams(p);
+    }
+
     function _changedParams() internal view returns (ParamsController.Params memory changedParams) {
         changedParams = params.params();
         changedParams.bidbackFeeBps = 1_000;
@@ -209,6 +233,7 @@ contract AuctionParameterSnapshotsTest {
         changedParams.maxAntiSnipeExtensions = 3;
         changedParams.minExposure = 10 minutes;
         changedParams.minPremiumNet = 0.02 ether;
+        changedParams.rankSoftness = 8;
     }
 
     function _createAuction(uint256 tokenId, uint256 startPrice, uint64 duration) internal returns (uint256 auctionId) {
@@ -247,6 +272,7 @@ contract AuctionParameterSnapshotsTest {
         assertEq(actual.efCap, expected.efCap, context);
         assertEq(actual.etCap, expected.etCap, context);
         assertEq(actual.iiCap, expected.iiCap, context);
+        assertEq(uint256(actual.rankSoftness), uint256(expected.rankSoftness), context);
     }
 
     function assertEq(uint256 actual, uint256 expected, string memory message) internal pure {

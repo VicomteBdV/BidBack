@@ -195,6 +195,7 @@ export function AuctionDetail({
         <div className="grid gap-5">
           <AuctionRulesSnapshot
             snapshot={auction.paramsSnapshot}
+            formula={auction.formula}
             error={auction.paramsSnapshotError}
             feeRecipientSnapshot={auction.auctionFeeRecipient}
             feeRecipientSnapshotError={auction.auctionFeeRecipientError}
