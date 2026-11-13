@@ -1,9 +1,10 @@
 # Amount and chronological rank redistribution
 
-This document describes the `amount-rank-v1` source implementation. It has not
-been deployed by this change. Existing deployments, auctions and claims retain
-their existing contracts and rules. The historical Economic Model V1 evaluation
-and its recorded decision remain unchanged.
+This document describes the `amount-rank-v1` source implementation. It was
+deployed and exercised only on a fresh local Anvil chain on 13 November 2026.
+Existing public deployments, auctions and claims retain their existing contracts
+and rules. The historical Economic Model V1 evaluation and its recorded decision
+remain unchanged.
 
 ## Bid score
 
@@ -102,9 +103,29 @@ the measured 256-participant finalization exceeds a transaction ceiling of
 its actual chain before accepting bids. This change approves no production
 capacity, governance, wallet support matrix or real-value launch.
 
-Historical lifecycle tools still contain 19-field parameter and previous
-allocation assumptions. In particular, `frontend/scripts/local-lifecycle-core.mjs`,
-`local-lifecycle-smoke.mjs` and `verify-base-sepolia-lifecycle.mjs` require a
-separately scoped adaptation before they can validate this version. Their mock
-tests and earlier local/testnet lifecycle records do not validate a deployment
-of the new formula. No deployment address or live manifest is changed here.
+Lifecycle tools distinguish explicit `legacy-capped-v1` and `amount-rank-v1`
+profiles before validating phases. Exact static tuple widths are checked to
+prevent an ABI19 decoder from hiding a twentieth field; the new profile also
+checks the five reported constants, captured softness and scores at pinned
+blocks. Unknown identities, mismatched shapes or failed reads do not select a
+legacy fallback. The helper's bigint allocation is checked against the existing
+28 synthetic vectors with lossless integer parsing.
+
+Schema1 sessions keep their historical legacy shape and amounts. Schema2
+sessions carry `profile` and `expectedFormula`; snapshots and assembled evidence
+also retain observed model metadata. Source/manifest identity, historical reads,
+block/reorg checks and create-only output rules remain required. Neither the
+source commit nor getters prove deployed bytecode equivalence.
+
+The current full local wrapper deploys only the amount-rank sources and rejects
+a legacy full-run request before deployment. Its network-only preflight is a
+separate, non-certifying operation. Tooling tests use mocks and a fake-npm
+boundary. A full local Anvil run on 13 November 2026 additionally completed
+deployment, bidding, settlement and every pull action with valueless assets:
+reward `0.475 ETH`, seller proceeds `1.475 ETH`, fee `0.05 ETH`, losing-cap
+refund `1.5 ETH`, and final escrow balance zero. All 24 local transactions
+succeeded and the runner reported failures for five duplicate pull simulations.
+Exact revert causes were not retained; that helper catches any simulation
+exception. This evidence covers
+that deterministic local scenario; public deployment addresses and manifests
+are unchanged, and no new public-chain or production validation is established.

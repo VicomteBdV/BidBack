@@ -44,7 +44,7 @@ export function calldata(signature, types = [], values = []) {
 export function expectedTransactions(session, manifest) {
   const c = manifest.contracts;
   const id = BigInt(session.auctionId);
-  const e = calculateCanonicalEconomics();
+  const e = calculateCanonicalEconomics(session.schemaVersion === 1 ? "legacy-capped-v1" : session.profile);
   const action = (to, signature, types, values, value = 0n) => ({ to, input: calldata(signature, types, values), value });
   return {
     P1: { to: null, value: 0n },
@@ -63,8 +63,11 @@ export function expectedTransactions(session, manifest) {
 }
 
 export function validateTransactionInput(input, session, provenance) {
-  exactKeys(input, ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId", "manifestChecksum", "transactions"]);
+  exactKeys(input, ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId", "manifestChecksum", "transactions",
+    ...(session.schemaVersion === 2 ? ["profile", "expectedFormula"] : [])]);
   for (const key of ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId"]) check(input[key] === session[key], "transaction session identity");
+  if (session.schemaVersion === 2) check(input.profile === session.profile &&
+    isDeepStrictEqual(input.expectedFormula, session.expectedFormula), "transaction profile identity");
   check(input.manifestChecksum === provenance.checksum, "transaction manifest checksum");
   check(input.transactions && TRANSACTION_IDS.every((id) => input.transactions[id]), "required P1 and T1-T11 hashes", "missing");
   exactKeys(input.transactions, TRANSACTION_IDS);
@@ -137,9 +140,13 @@ export function validateSnapshots(snapshots, session, manifest, provenance) {
   check(Array.isArray(snapshots) && snapshots.length === PHASES.length, "required canonical phases", "missing");
   const found = new Map();
   for (const snapshot of snapshots) {
-    exactKeys(snapshot, ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId", "phase", "generatedAt", "manifest", "block", "deployment", "lifecycle"]);
+    exactKeys(snapshot, ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId", "phase", "generatedAt", "manifest", "block", "deployment", "lifecycle",
+      ...(session.schemaVersion === 2 ? ["profile", "expectedFormula"] : [])]);
     check(PHASES.includes(snapshot.phase) && !found.has(snapshot.phase), "unknown or duplicate phase");
     for (const key of ["schemaVersion", "runId", "sourceCommit", "chainId", "auctionId"]) check(snapshot[key] === session[key], "snapshot session identity");
+    if (session.schemaVersion === 2) check(snapshot.profile === session.profile &&
+      isDeepStrictEqual(snapshot.expectedFormula, session.expectedFormula) &&
+      isDeepStrictEqual(snapshot.deployment?.observedFormula, session.expectedFormula), "snapshot profile identity");
     check(isDeepStrictEqual(snapshot.manifest, provenance), "snapshot manifest checksum and provenance");
     check(typeof snapshot.generatedAt === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(snapshot.generatedAt) &&
       Number.isFinite(Date.parse(snapshot.generatedAt)), "snapshot timestamp");
@@ -209,7 +216,8 @@ export async function assembleEvidence(client, bundle, input, snapshots) {
   for (const record of transactions) {
     check((await client.getBlock({ blockNumber: BigInt(record.blockNumber) })).hash.toLowerCase() === record.blockHash, "transaction block changed during assembly");
   }
-  return { schemaVersion: 1, status: "complete", session, manifest: provenance, contracts: manifest.contracts,
+  return { schemaVersion: session.schemaVersion,
+    ...(session.schemaVersion === 2 ? { profile: session.profile, expectedFormula: session.expectedFormula } : {}), status: "complete", session, manifest: provenance, contracts: manifest.contracts,
     generatedAt: new Date().toISOString(), transactions, snapshots: verifiedSnapshots, duplicateSimulations,
     finalBeforeSimulations: before, finalAfterSimulations: after,
     sourceVerification: "pending-not-evidenced", coreDeploymentTransactions: "pending-not-evidenced",
@@ -222,7 +230,9 @@ export async function writeEvidenceDirectory(directory, produce) {
   try {
     const evidence = await produce();
     const report = `# Base Sepolia session evidence\n\nRun: ${evidence.session.runId}\n\nSource: ${evidence.session.sourceCommit}\n\n` +
-      `Auction: ${evidence.session.auctionId}; chain: 84532.\n\nManifest SHA-256: ${evidence.manifest.checksum}\n\n` +
+      `Auction: ${evidence.session.auctionId}; chain: 84532.\n\n` +
+      (evidence.schemaVersion === 2 ? `Profile: ${evidence.profile}. Reported formula metadata is checked; deployed source verification remains pending.\n\n` : "") +
+      `Manifest SHA-256: ${evidence.manifest.checksum}\n\n` +
       `All 12 transactions and 11 phase snapshots verified. Five duplicate eth_call simulations returned the expected custom errors; final lifecycle passed afterward.\n\n` +
       `Public receipt/block/log data and historical phase checks are retained in public-evidence.json.\n\n` +
       `Source verification, core deployment receipts and manual browser/wallet observations remain pending/not evidenced. This package does not advance a readiness gate or issue an independent review verdict.\n`;

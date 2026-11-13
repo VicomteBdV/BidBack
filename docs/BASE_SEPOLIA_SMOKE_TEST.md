@@ -6,6 +6,27 @@ This runbook defines the canonical wallet-signed BidBack lifecycle on Base Sepol
 
 This runbook remains the procedure for future canonical runs. Each later run must independently satisfy the transaction and read-only checks below and retain its own evidence. The deterministic Anvil lifecycle is a separate prerequisite and never substitutes for a public-chain run. One successful public run does not prove repeatability or any beta or production readiness gate.
 
+## Model boundary — 12 November 2026
+
+The accepted August record uses the historical `legacy-capped-v1` tooling
+profile. Its transactions, amounts, deployment addresses and stored evidence
+remain unchanged. New amount-rank sources and mocked tooling checks are not a
+second public run and do not certify this historical deployment as amount-rank.
+
+Direct verifier invocations require `--profile legacy-capped-v1` or
+`--profile amount-rank-v1`. The verifier checks exact static parameter widths
+before decoding (19 versus20 fields); the new profile additionally requires the
+five expected reported identity values and `rankSoftness=4`. Getter/RPC errors,
+unknown metadata and incompatible tuples fail rather than select a fallback.
+All formula, parameters and score reads share the pinned snapshot block, with a
+reorg recheck. Reported getters do not verify bytecode/source equivalence.
+
+The command and schema1 examples below are explicitly legacy references. For a
+separately approved new deployment, select amount-rank and use schema2 session,
+transaction and snapshot envelopes, as described in section14. Do not reuse the
+legacy manifest or relabel the old evidence. No live manifest or deployment was
+changed or executed by this tooling adaptation.
+
 ## 1. Deployment Decision
 
 The 22 August 2026 canonical run used the fresh six-contract deployment recorded in `frontend/public/deployments/84532.json` at commit `bd56f9005b52dcae61b8c16599f10e67e29de3f6`. Deployment transaction hashes, checksums, exact block metadata, and BaseScan source-verification status remain pending archival evidence in the run report.
@@ -58,7 +79,7 @@ Use a two-hour auction and finish all bids during the first 30 minutes so the an
 | Bidder B outbid | `0.015 ETH` | `0.015 ETH` |
 | Bidder A step-up | `0.030 ETH` | `0.018 ETH` delta |
 
-Expected settlement under the exact snapshotted parameter profile:
+Expected settlement under the historical legacy-capped profile:
 
 ```text
 gross premium             0.0200 ETH
@@ -73,6 +94,13 @@ final escrow balance      0 ETH
 ```
 
 The `0.015 ETH` refund is the losing bidder's full cap and is independent of the conditional `0.0038 ETH` reward. The positive reward is expected only for this controlled scenario; rewards can be zero in other auctions.
+
+For the same inputs under `amount-rank-v1`, the entire positive pool goes to
+the sole losing bidder: reward `0.0095 ETH`, seller proceeds `0.0195 ETH`.
+The protocol fee remains `0.001 ETH`, the losing cap refund `0.015 ETH`, and
+total deposits `0.045 ETH`. These are model-specific test expectations, not a
+new public execution. The one-loser case does not by itself prove general
+Hamilton behavior; the separate synthetic vectors cover arithmetic cases.
 
 ## 5. Prerequisites
 
@@ -96,6 +124,7 @@ Example from the repository root:
 
 ```text
 npm run verify:base-sepolia:lifecycle -- \
+  --profile legacy-capped-v1 \
   --rpc-url <BASE_SEPOLIA_RPC> \
   --manifest frontend/public/deployments/84532.json \
   --auction-id <AUCTION_ID> \
@@ -272,7 +301,7 @@ npm --prefix frontend run test:base-sepolia-verifier
 npm --prefix frontend run test
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
-npm run smoke:local:lifecycle
+npm run smoke:local:lifecycle -- --profile amount-rank-v1
 ```
 
 Passing Anvil proves the local deterministic lifecycle only. Passing this Base Sepolia run proves one canonical public multi-wallet execution only; neither is a production-readiness claim.
@@ -285,9 +314,43 @@ This procedure prepares evidence for a **separately authorized future session**.
 
 Copy [SESSION_TEMPLATE.json](./evidence/base-sepolia/SESSION_TEMPLATE.json) into a new evidence workspace **outside the Git checkout** and replace every placeholder. The committed template is deliberately invalid until completed. Store the session, hash input, snapshots, and output in that external workspace; never commit future real run data as part of this implementation lot.
 
-Use schema version `1`, chain ID `84532`, a unique lowercase run ID (letters, digits and hyphens; at most 80 characters), the exact approved 40-character lowercase source SHA, and the literal repository-relative manifest path `frontend/public/deployments/84532.json`. Supply five valid, non-zero, pairwise distinct public role addresses. NFT address must be valid and non-zero; token ID is a decimal uint256 string. Auction ID is the positive decimal `nextAuctionId` observed before creation. Do not assume the historical auction ID `2`.
+For historical legacy verification use schema version `1`, chain ID `84532`, a unique lowercase run ID (letters, digits and hyphens; at most 80 characters), the exact approved 40-character lowercase source SHA, and the literal repository-relative manifest path `frontend/public/deployments/84532.json`. Supply five valid, non-zero, pairwise distinct public role addresses. NFT address must be valid and non-zero; token ID is a decimal uint256 string. Auction ID is the positive decimal `nextAuctionId` observed before creation. Do not assume the historical auction ID `2`.
 
 Only the documented fields are accepted, including within `roles` and `nft`. Private keys, seeds, RPC URLs, credentials, wallet exports and extra fields are unsupported. RPC configuration remains runtime-only. The operator/reviewer must approve the SHA independently: a matching SHA proves checkout consistency, not approval, deployed-source equivalence, or the browser bundle's identity.
+
+### New amount-rank session envelope
+
+For a separately authorized amount-rank deployment, retain the same documented
+run/source/manifest/auction/roles/NFT fields and use schema2 with these exact
+additional fields. The following fragment is not a complete valid session:
+
+```json
+{
+  "schemaVersion": 2,
+  "profile": "amount-rank-v1",
+  "expectedFormula": {
+    "formulaId": "amount-rank-v1",
+    "arithmeticId": "floor-delta-q136-muldiv512-v1",
+    "roundingId": "hamilton-first-participation-v1",
+    "scoreScale": "87112285931760246646623899502532662132736",
+    "maxAmount": "5192296858534827628530496329220095"
+  }
+}
+```
+
+Use the matching schema2 envelope for transaction input, copying `profile` and
+`expectedFormula` unchanged alongside all existing required identity fields.
+The collector rejects cross-model or cross-schema mixtures. Generated snapshots
+carry these expectations and `deployment.observedFormula`; assembled evidence
+retains that same identity. A schema1 session cannot be upgraded by attaching a
+CLI flag: `--session` permits no profile override. Schema1 objects remain strict
+legacy records with no extra model fields.
+
+`sourceCommit` identifies the exact approved tooling checkout and requires it
+to be clean. Keep `sourceVerification: "pending-not-evidenced"` where emitted;
+neither this SHA nor the model getters prove that deployed bytecode matches
+source. New real run data stays outside the checkout and needs separate
+execution and archival authorization.
 
 ### Preflight and phase persistence
 

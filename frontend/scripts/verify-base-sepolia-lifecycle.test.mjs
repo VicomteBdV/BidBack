@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { toFunctionSelector } from "viem";
+import { LEGACY_PROFILE, AMOUNT_RANK_PROFILE, AMOUNT_RANK_IDENTITY, SCORE_SCALE, MAX_AMOUNT,
+  calculateAmountRankScores } from "./local-lifecycle-core.mjs";
 import {
   BASE_SEPOLIA_CHAIN_ID,
   LifecycleVerificationError,
@@ -12,24 +15,24 @@ import {
 const address = (suffix) => `0x${suffix.toString(16).padStart(40, "0")}`;
 const roles = { owner: address(1), seller: address(2), feeRecipient: address(3), bidderA: address(4), bidderB: address(5) };
 const manifest = { chainId: BASE_SEPOLIA_CHAIN_ID, contracts: { auctionHouse: address(10), nftVault: address(11), escrowVault: address(12), distributionVault: address(13), paramsController: address(14), reputationAdapter: address(15) } };
-const context = (phase) => ({ phase, roles, manifest, auctionId: "7", nft: address(20), tokenId: "1" });
+const context = (phase, profile = LEGACY_PROFILE) => ({ phase, profile, roles, manifest, auctionId: "7", nft: address(20), tokenId: "1" });
 
-function baseAuction() {
+function baseAuction(profile = LEGACY_PROFILE) {
   return {
     seller: roles.seller, nft: address(20), tokenId: "1", startPrice: "10000000000000000",
     duration: "7200", extensionsUsed: "0", state: "0", highestBidder: address(0), highestBid: "0",
     participantCount: "0", bidCount: "0", nftClaimed: false, feeRecipient: roles.feeRecipient,
     modules: { nftVault: manifest.contracts.nftVault, escrowVault: manifest.contracts.escrowVault, distributionVault: manifest.contracts.distributionVault, reputationAdapter: manifest.contracts.reputationAdapter },
-    params: { bidbackFeeBps: "500", redistributionBps: "5000", minParticipants: "2", alphaBps: "6000", betaBps: "3000", gammaBps: "1000", minBidIncrementBps: "500", perUserRewardCapBps: "4000", maxParticipants: "64", maxInteractionCount: "5", minAuctionDuration: "3600", antiSnipeWindow: "600", antiSnipeExtension: "600", maxAntiSnipeExtensions: "6", minExposure: "300", minPremiumNet: "10000000000000000", efCap: "1000000000000000000", etCap: "1000000000000000000", iiCap: "1000000000000000000" }
+    params: { ...(profile === AMOUNT_RANK_PROFILE ? { rankSoftness: "4" } : {}), bidbackFeeBps: "500", redistributionBps: "5000", minParticipants: "2", alphaBps: "6000", betaBps: "3000", gammaBps: "1000", minBidIncrementBps: "500", perUserRewardCapBps: "4000", maxParticipants: "64", maxInteractionCount: "5", minAuctionDuration: "3600", antiSnipeWindow: "600", antiSnipeExtension: "600", maxAntiSnipeExtensions: "6", minExposure: "300", minPremiumNet: "10000000000000000", efCap: "1000000000000000000", etCap: "1000000000000000000", iiCap: "1000000000000000000" }
   };
 }
 
-function snapshot(phase) {
+function snapshot(phase, profile = LEGACY_PROFILE) {
   const rank = ["before-create", "after-create", "after-bid-a", "after-bid-b", "after-step-up", "after-finalize", "after-nft-claim", "after-refund", "after-reward", "after-seller-withdraw", "final"].indexOf(phase);
-  const economics = calculateCanonicalEconomics();
+  const economics = calculateCanonicalEconomics(profile);
   const result = { chainId: "84532", nextAuctionId: rank === 0 ? "7" : "8", nft: { owner: rank >= 6 ? roles.bidderA : rank >= 1 ? manifest.contracts.nftVault : roles.seller, approved: rank === 0 ? manifest.contracts.nftVault : address(0) }, escrow: { balance: "0" } };
   if (rank === 0) return result;
-  result.auction = baseAuction(); result.participants = []; result.bids = [];
+  result.auction = baseAuction(profile); result.participants = []; result.bids = [];
   result.caps = { bidderA: "0", bidderB: "0" };
   result.lock = { nft: address(20), tokenId: "1", seller: roles.seller, locked: rank < 6, released: rank >= 6 };
   result.settlement = { finalized: false }; result.distribution = { opened: false };
@@ -44,6 +47,11 @@ function snapshot(phase) {
     result.distribution = { opened: true, totalAssigned: economics.rewardBidderB.toString(), totalClaimed: rank >= 8 ? economics.rewardBidderB.toString() : "0", escrow: manifest.contracts.escrowVault };
     result.credits = { seller: rank >= 9 ? "0" : economics.sellerProceeds.toString(), feeRecipient: rank >= 10 ? "0" : economics.protocolFee.toString() };
     result.escrow.balance = rank < 7 ? economics.totalDeposits.toString() : rank === 7 ? economics.bidderAFinalCap.toString() : rank === 8 ? (economics.sellerProceeds + economics.protocolFee).toString() : rank === 9 ? economics.protocolFee.toString() : "0";
+  }
+  if (profile === AMOUNT_RANK_PROFILE) {
+    const scores = calculateAmountRankScores({ bidderCount: 2, h: 4n,
+      bids: result.bids.map((bid) => ({ bidderIndex: bid.bidder === roles.bidderA ? 0 : 1, newCapWei: BigInt(bid.amount) })) }).scores;
+    result.scores = { bidderA: scores[0].toString(), bidderB: scores[1].toString() };
   }
   return result;
 }
@@ -87,26 +95,40 @@ test("never silently accepts missing phase data", () => {
 // Reused deterministic fixtures for the collector integration suite. No RPC.
 export { roles, manifest, context, snapshot };
 
-export function lifecycleClient() {
+export function lifecycleClient(profile = LEGACY_PROFILE) {
   const pinnedReads = [];
   const blockHash = (number) => `0x${number.toString(16).padStart(64, "0")}`;
   const client = {
     pinnedReads,
+    rawWidth: profile === AMOUNT_RANK_PROFILE ? 640 : 608,
+    identity: { FORMULA_ID: AMOUNT_RANK_IDENTITY.formulaId, ARITHMETIC_ID: AMOUNT_RANK_IDENTITY.arithmeticId,
+      ROUNDING_ID: AMOUNT_RANK_IDENTITY.roundingId, SCORE_SCALE, MAX_AMOUNT },
+    async call(args) {
+      pinnedReads.push(args.blockNumber);
+      assert.ok([toFunctionSelector("params()"), toFunctionSelector("getAuctionParams(uint256)")].includes(args.data.slice(0, 10)));
+      return { data: `0x${"00".repeat(client.rawWidth)}` };
+    },
     async getChainId() { return 84532; },
     async getBlock({ blockNumber = 112n } = {}) { return { number: blockNumber, hash: blockHash(blockNumber), timestamp: 1800000000n + blockNumber }; },
     async getBytecode(args) { pinnedReads.push(args.blockNumber); return "0x6000"; },
-    async getBalance(args) { pinnedReads.push(args.blockNumber); return BigInt(snapshotForBlock(args.blockNumber).escrow.balance); },
+    async getBalance(args) { pinnedReads.push(args.blockNumber); return BigInt(snapshotForBlock(args.blockNumber, profile).escrow.balance); },
     async readContract(args) {
       pinnedReads.push(args.blockNumber);
-      const s = snapshotForBlock(args.blockNumber);
+      const s = snapshotForBlock(args.blockNumber, profile);
       const bidder = String(args.args?.[1]).toLowerCase() === roles.bidderA.toLowerCase() ? "bidderA" : "bidderB";
       const fn = args.functionName;
+      if (Object.hasOwn(client.identity, fn)) return client.identity[fn];
+      if (fn === "bidderScores") return BigInt(s.scores[bidder]);
       if (fn === "owner") return roles.owner;
       if (fn === "feeRecipient" || fn === "getAuctionFeeRecipient") return roles.feeRecipient;
       if (fn === "auctionHouse") return manifest.contracts.auctionHouse;
       if (Object.hasOwn(manifest.contracts, fn)) return manifest.contracts[fn];
       if (fn === "paused") return false;
-      if (fn === "params" || fn === "getAuctionParams") return baseAuction().params;
+      if (fn === "params" || fn === "getAuctionParams") {
+        const entry = args.abi.find((item) => item.name === fn);
+        assert.equal(entry.outputs[0].components.length, profile === AMOUNT_RANK_PROFILE ? 20 : 19);
+        return baseAuction(profile).params;
+      }
       if (fn === "nextAuctionId") return BigInt(s.nextAuctionId);
       if (fn === "ownerOf") return s.nft.owner;
       if (fn === "getApproved") return s.nft.approved;
@@ -133,9 +155,9 @@ export function lifecycleClient() {
   return client;
 }
 
-function snapshotForBlock(number) {
+function snapshotForBlock(number, profile) {
   const phases = ["before-create", "after-create", "after-bid-a", "after-bid-b", "after-step-up", "after-finalize", "after-nft-claim", "after-refund", "after-reward", "after-seller-withdraw", "final"];
-  return snapshot(phases[Math.min(10, Number(number) - 101)]);
+  return snapshot(phases[Math.min(10, Number(number) - 101)], profile);
 }
 
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -160,7 +182,7 @@ test("session CLI rejects overrides and requires persisted output; explicit invo
   assert.throws(() => parseArgs(["--rpc-url", "x", "--session", "s", "--phase", "final"]));
   assert.throws(() => parseArgs(["--rpc-url", "x", "--session", "s", "--phase", "final", "--output", "o", "--owner", roles.owner]));
   const args = { "rpc-url": "https://example.invalid", "auction-id": "7", owner: roles.owner, seller: roles.seller,
-    "fee-recipient": roles.feeRecipient, "bidder-a": roles.bidderA, "bidder-b": roles.bidderB, nft: address(20), "token-id": "1", phase: "final", manifest: "manifest.json" };
+    "fee-recipient": roles.feeRecipient, "bidder-a": roles.bidderA, "bidder-b": roles.bidderB, nft: address(20), "token-id": "1", phase: "final", manifest: "manifest.json", profile: LEGACY_PROFILE };
   assert.deepEqual(parseArgs(Object.entries(args).flatMap(([key, value]) => [`--${key}`, value])), args);
 });
 
@@ -180,4 +202,84 @@ test("reorg during phase verification is rejected", async () => {
   const getBlock = client.getBlock;
   client.getBlock = async (args) => ({ ...await getBlock(args), ...(reads++ ? { hash: `0x${"f".repeat(64)}` } : {}) });
   await assert.rejects(verifyPhase(client, manifest, context("final"), 112n), /Block changed/);
+});
+
+test("amount-rank economics assigns the whole pool without changing fees or refunds", () => {
+  const old = calculateCanonicalEconomics(LEGACY_PROFILE);
+  const current = calculateCanonicalEconomics(AMOUNT_RANK_PROFILE);
+  assert.equal(current.rewardBidderB, 9500000000000000n);
+  assert.equal(current.sellerProceeds, 19500000000000000n);
+  for (const key of ["protocolFee", "refundBidderB", "totalDeposits", "candidateDistribution"]) assert.equal(current[key], old[key]);
+  assert.throws(() => calculateCanonicalEconomics("unknown"));
+});
+
+test("all amount-rank phases verify 20 fields, five identities and both raw bidder scores at one block", async () => {
+  for (const [index, phase] of PHASES.entries()) {
+    const client = lifecycleClient(AMOUNT_RANK_PROFILE);
+    const blockNumber = 101n + BigInt(index);
+    const result = await verifyPhase(client, manifest, context(phase, AMOUNT_RANK_PROFILE), blockNumber);
+    assert.deepEqual(result.deployment.observedFormula, AMOUNT_RANK_IDENTITY);
+    assert.equal(result.deployment.params.rankSoftness, "4");
+    assert.ok(client.pinnedReads.every((number) => number === blockNumber));
+    if (index > 0) {
+      assert.equal(result.lifecycle.auction.params.rankSoftness, "4");
+      assert.deepEqual(result.lifecycle.scores, snapshot(phase, AMOUNT_RANK_PROFILE).scores);
+    }
+    if (index >= 5) {
+      assert.equal(result.lifecycle.rewards.bidderA.entitlement, "0");
+      assert.ok(BigInt(result.lifecycle.scores.bidderA) > 0n);
+      assert.equal(result.lifecycle.rewards.bidderB.entitlement, "9500000000000000");
+    }
+  }
+});
+
+test("profile selection cannot be inferred from missing getters, width or RPC failures, including before-create", async () => {
+  for (const profile of [LEGACY_PROFILE, AMOUNT_RANK_PROFILE]) {
+    const client = lifecycleClient(profile);
+    client.rawWidth = profile === LEGACY_PROFILE ? 640 : 608;
+    await assert.rejects(verifyPhase(client, manifest, context("before-create", profile), 101n), /raw tuple bytes/);
+  }
+  for (const getter of ["FORMULA_ID", "ARITHMETIC_ID", "ROUNDING_ID", "SCORE_SCALE", "MAX_AMOUNT"]) {
+    const client = lifecycleClient(AMOUNT_RANK_PROFILE);
+    client.identity[getter] = typeof client.identity[getter] === "bigint" ? 1n : "unknown";
+    await assert.rejects(verifyPhase(client, manifest, context("before-create", AMOUNT_RANK_PROFILE), 101n), /formula identity/);
+    const missing = lifecycleClient(AMOUNT_RANK_PROFILE);
+    const read = missing.readContract;
+    missing.readContract = async (args) => { if (args.functionName === getter) throw new Error("unsupported or RPC timeout"); return read(args); };
+    await assert.rejects(verifyPhase(missing, manifest, context("before-create", AMOUNT_RANK_PROFILE), 101n));
+  }
+  const failed = lifecycleClient(AMOUNT_RANK_PROFILE);
+  failed.call = async () => { throw new Error("RPC timeout"); };
+  await assert.rejects(verifyPhase(failed, manifest, context("final", AMOUNT_RANK_PROFILE), 112n));
+  await assert.rejects(verifyPhase(lifecycleClient(), manifest, { ...context("final"), profile: undefined }, 112n), /profile/);
+});
+
+test("new verification rejects missing or wrong captured softness, changed winner history and reorgs", async () => {
+  for (const mutate of [
+    (args, result) => args.functionName === "getAuctionParams" ? { ...result, rankSoftness: undefined } : result,
+    (args, result) => args.functionName === "getAuctionParams" ? { ...result, rankSoftness: "5" } : result,
+    (args, result) => args.functionName === "params" ? { ...result, rankSoftness: "5" } : result,
+    (args, result) => args.functionName === "bidderScores" && args.args[1] === roles.bidderA ? result + 1n : result
+  ]) {
+    const client = lifecycleClient(AMOUNT_RANK_PROFILE);
+    const read = client.readContract;
+    client.readContract = async (args) => mutate(args, await read(args));
+    await assert.rejects(verifyPhase(client, manifest, context("after-finalize", AMOUNT_RANK_PROFILE), 106n));
+  }
+  const client = lifecycleClient(AMOUNT_RANK_PROFILE);
+  const block = client.getBlock;
+  let calls = 0;
+  client.getBlock = async (args) => ({ ...await block(args), ...(calls++ ? { hash: `0x${"f".repeat(64)}` } : {}) });
+  await assert.rejects(verifyPhase(client, manifest, context("final", AMOUNT_RANK_PROFILE), 112n), /Block changed/);
+});
+
+test("direct CLI requires profile and persisted session forbids profile overrides", () => {
+  const direct = { "rpc-url": "https://example.invalid", "auction-id": "7", owner: roles.owner, seller: roles.seller,
+    "fee-recipient": roles.feeRecipient, "bidder-a": roles.bidderA, "bidder-b": roles.bidderB, nft: address(20),
+    "token-id": "1", phase: "final", manifest: "manifest.json" };
+  const argv = Object.entries(direct).flatMap(([key, value]) => [`--${key}`, value]);
+  assert.throws(() => parseArgs(argv), /profile/);
+  assert.throws(() => parseArgs([...argv, "--profile", "unknown"]));
+  assert.equal(parseArgs([...argv, "--profile", AMOUNT_RANK_PROFILE]).profile, AMOUNT_RANK_PROFILE);
+  assert.throws(() => parseArgs(["--rpc-url", "x", "--session", "s", "--phase", "final", "--output", "o", "--profile", AMOUNT_RANK_PROFILE]));
 });
