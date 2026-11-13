@@ -1,9 +1,10 @@
 # Amount and chronological rank redistribution
 
-This document describes the `amount-rank-v1` source implementation. It has not
-been deployed by this change. Existing deployments, auctions and claims retain
-their existing contracts and rules. The historical Economic Model V1 evaluation
-and its recorded decision remain unchanged.
+This document describes the `amount-rank-v1` source implementation. It was
+deployed and exercised only on a fresh local Anvil chain on 13 November 2026.
+Existing public deployments, auctions and claims retain their existing contracts
+and rules. The historical Economic Model V1 evaluation and its recorded decision
+remain unchanged.
 
 ## Bid score
 
@@ -119,5 +120,12 @@ source commit nor getters prove deployed bytecode equivalence.
 The current full local wrapper deploys only the amount-rank sources and rejects
 a legacy full-run request before deployment. Its network-only preflight is a
 separate, non-certifying operation. Tooling tests use mocks and a fake-npm
-boundary; earlier local/testnet records do not validate a new deployment. No
-operational lifecycle, deployment address or live manifest is changed here.
+boundary. A full local Anvil run on 13 November 2026 additionally completed
+deployment, bidding, settlement and every pull action with valueless assets:
+reward `0.475 ETH`, seller proceeds `1.475 ETH`, fee `0.05 ETH`, losing-cap
+refund `1.5 ETH`, and final escrow balance zero. All 24 local transactions
+succeeded and the runner reported failures for five duplicate pull simulations.
+Exact revert causes were not retained; that helper catches any simulation
+exception. This evidence covers
+that deterministic local scenario; public deployment addresses and manifests
+are unchanged, and no new public-chain or production validation is established.

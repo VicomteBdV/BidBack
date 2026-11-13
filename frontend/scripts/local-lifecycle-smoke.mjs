@@ -569,7 +569,7 @@ async function main() {
   assertEqual("reward claimed flag", await publicClient.readContract({ address: deployment.contracts.distributionVault, abi: distributionVaultAbi, functionName: "claimed", args: [auctionId, actors.bidderB.address] }), true);
   settlement = settlementFromTuple(await publicClient.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "settlements", args: [auctionId] }));
   assertEqual("distribution reserve after reward", settlement.distributionReserve, 0n);
-  assertEqual("escrow after reward", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), 181n * WEI_PER_ETH / 100n);
+  assertEqual("escrow after reward", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), expectedEconomics.sellerProceeds + expectedEconomics.protocolFee);
   ok("Reward claimed", formatEth(expectedEconomics.assignedReward));
 
   await sendContract(publicClient, ownerWallet, { address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "withdrawSellerProceeds" }, "seller proceeds withdrawal");

@@ -15,10 +15,16 @@ Both profiles can be named for network-only `--preflight-only`, which exits
 before deployment and does not certify a contract or formula. Missing, duplicate
 or unknown arguments fail before the wrapper starts any command.
 
-New tooling is checked with pure calculations, mocked RPC transports and a
-fake-npm wrapper boundary. No new Anvil, wallet or public-chain lifecycle was
-executed as part of this adaptation. Running the operational commands below
-still requires separate authorization; an instruction example is not permission.
+The initial tooling adaptation was checked with pure calculations, mocked RPC
+transports and a fake-npm wrapper boundary. On 13 November 2026, the full root
+command below also passed on a fresh loopback Anvil chain `31337`, using
+Node.js 24.19.0 and Foundry/Anvil 1.9.0 with valueless development assets.
+All 24 local transactions succeeded. The run checked the new reward, seller
+proceeds and fee, reported failures for five duplicate pull simulations, and
+ended with zero escrow balance. Exact revert causes were not retained; the
+existing duplicate-check helper catches any simulation exception. No public-chain lifecycle or
+production readiness is established. An instruction example is not permission
+to repeat an operational run.
 
 ## Prerequisites
 
