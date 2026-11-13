@@ -6,6 +6,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { toFunctionSelector } from "viem";
+import { LEGACY_PROFILE, AMOUNT_RANK_PROFILE, AMOUNT_RANK_IDENTITY } from "./local-lifecycle-core.mjs";
 import { roles, manifest as fixtureManifest, lifecycleClient } from "./verify-base-sepolia-lifecycle.test.mjs";
 import {
   MANIFEST_PATH, PHASES, REPO_ROOT, assertSessionSource, manifestProvenance, phaseEvidence,
@@ -26,8 +27,8 @@ const bundle = { session, manifest, provenance };
 const input = { schemaVersion: 1, runId: session.runId, sourceCommit: session.sourceCommit, chainId: 84532,
   auctionId: "7", manifestChecksum: provenance.checksum, transactions: Object.fromEntries(TRANSACTION_IDS.map((id, index) => [id, hash(index + 1)])) };
 
-function fixture() {
-  const client = lifecycleClient();
+function fixture(profile = LEGACY_PROFILE) {
+  const client = lifecycleClient(profile);
   const actions = expectedTransactions(session, manifest);
   const txs = {}; const receipts = {};
   TRANSACTION_IDS.forEach((id, index) => {
@@ -43,7 +44,9 @@ function fixture() {
   client.getTransaction = async ({ hash }) => txs[hash];
   client.getTransactionReceipt = async ({ hash }) => receipts[hash];
   const calls = [];
+  const parameterCall = client.call;
   client.call = async (args) => {
+    if (!args.account) return parameterCall(args);
     calls.push(args);
     const id = ["T7", "T8", "T9", "T10", "T11"].find((id) => actions[id].input === args.data);
     assert.equal(args.account, roles[ACTORS[id]]);
@@ -55,9 +58,9 @@ function fixture() {
   return { client, txs, receipts, calls };
 }
 
-async function snapshots(client) {
-  return Promise.all(PHASES.map(async (phase, index) => phaseEvidence(session, provenance, phase,
-    await verifyPhase(client, manifest, sessionContext(session, manifest, phase), 101n + BigInt(index)), "2026-09-11T00:00:00.000Z")));
+async function snapshots(client, selectedSession = session) {
+  return Promise.all(PHASES.map(async (phase, index) => phaseEvidence(selectedSession, provenance, phase,
+    await verifyPhase(client, manifest, sessionContext(selectedSession, manifest, phase), 101n + BigInt(index)), "2026-09-11T00:00:00.000Z")));
 }
 
 test("strict session accepts public metadata and rejects bad identities and unsupported fields", () => {
@@ -245,4 +248,83 @@ test("real viem public-client error wrapping preserves expected custom revert by
   assert.equal(results.length, 5);
   assert.deepEqual(methods, ["eth_chainId", ...Array(5).fill("eth_call"), "eth_getBlockByNumber"]);
   assert.ok(!JSON.stringify(results).includes("SECRET"));
+});
+
+const modernSession = validateSession({ ...session, schemaVersion: 2, profile: AMOUNT_RANK_PROFILE,
+  expectedFormula: { ...AMOUNT_RANK_IDENTITY } });
+const modernInput = { ...input, schemaVersion: 2, profile: AMOUNT_RANK_PROFILE, expectedFormula: { ...AMOUNT_RANK_IDENTITY } };
+
+test("schema 1 remains strict legacy and schema 2 requires explicit expected amount-rank identity", () => {
+  assert.equal(sessionContext(session, manifest, "final").profile, LEGACY_PROFILE);
+  assert.equal(sessionContext(modernSession, manifest, "final").profile, AMOUNT_RANK_PROFILE);
+  assert.deepEqual(validateSession(modernSession), modernSession);
+  assert.throws(() => validateSession({ ...session, profile: LEGACY_PROFILE }));
+  for (const mutate of [
+    (s) => { delete s.profile; }, (s) => { s.profile = LEGACY_PROFILE; }, (s) => { s.profile = "unknown"; },
+    (s) => { delete s.expectedFormula; }, (s) => { s.schemaVersion = 3; }
+  ]) { const bad = clone(modernSession); mutate(bad); assert.throws(() => validateSession(bad)); }
+  for (const key of Object.keys(AMOUNT_RANK_IDENTITY)) {
+    const missing = clone(modernSession); delete missing.expectedFormula[key];
+    assert.throws(() => validateSession(missing));
+    const wrong = clone(modernSession); wrong.expectedFormula[key] = "unknown";
+    assert.throws(() => validateSession(wrong));
+  }
+  assert.throws(() => validateSession({ ...modernSession, expectedFormula: { ...AMOUNT_RANK_IDENTITY, extra: "unsupported" } }));
+});
+
+test("schema 2 package preserves profile identity and replays every new phase without upgrading historical schema", async () => {
+  const f = fixture(AMOUNT_RANK_PROFILE);
+  const all = await snapshots(f.client, modernSession);
+  const result = await assembleEvidence(f.client, { ...bundle, session: modernSession }, modernInput, all);
+  assert.equal(result.schemaVersion, 2);
+  assert.equal(result.profile, AMOUNT_RANK_PROFILE);
+  assert.deepEqual(result.expectedFormula, AMOUNT_RANK_IDENTITY);
+  assert.equal(result.sourceVerification, "pending-not-evidenced");
+  assert.equal(result.readinessGateAdvanced, false);
+  assert.equal(f.calls.length, 5);
+  for (const phase of result.snapshots) {
+    assert.equal(phase.schemaVersion, 2);
+    assert.equal(phase.profile, AMOUNT_RANK_PROFILE);
+    assert.deepEqual(phase.expectedFormula, AMOUNT_RANK_IDENTITY);
+    assert.deepEqual(phase.deployment.observedFormula, AMOUNT_RANK_IDENTITY);
+  }
+  assert.equal(result.finalAfterSimulations.lifecycle.rewards.bidderB.entitlement, "9500000000000000");
+  assert.deepEqual(expectedTransactions(modernSession, manifest), expectedTransactions(session, manifest));
+  const historical = await snapshots(fixture().client);
+  assert.equal(historical[0].schemaVersion, 1);
+  assert.ok(!Object.hasOwn(historical[0], "profile"));
+  assert.ok(!Object.hasOwn(historical[0], "expectedFormula"));
+  assert.ok(!Object.hasOwn(historical[0].deployment, "observedFormula"));
+});
+
+test("new and historical session, transaction and snapshot identities cannot be mixed or stripped", async () => {
+  const modern = await snapshots(fixture(AMOUNT_RANK_PROFILE).client, modernSession);
+  const historical = await snapshots(fixture().client);
+  assert.throws(() => validateTransactionInput(input, modernSession, provenance));
+  assert.throws(() => validateTransactionInput(modernInput, session, provenance));
+  assert.throws(() => validateSnapshots(historical, modernSession, manifest, provenance));
+  assert.throws(() => validateSnapshots(modern, session, manifest, provenance));
+  for (const mutate of [
+    (s) => { delete s.profile; }, (s) => { s.profile = LEGACY_PROFILE; },
+    (s) => { s.expectedFormula.scoreScale = "1"; }, (s) => { s.deployment.observedFormula.formulaId = "unknown"; },
+    (s) => { delete s.deployment.observedFormula; }
+  ]) {
+    const bad = clone(modern); mutate(bad[0]);
+    assert.throws(() => validateSnapshots(bad, modernSession, manifest, provenance));
+  }
+  for (const mutate of [
+    (i) => { i.profile = LEGACY_PROFILE; }, (i) => { delete i.profile; },
+    (i) => { i.expectedFormula.maxAmount = "1"; }, (i) => { delete i.expectedFormula; }
+  ]) { const bad = clone(modernInput); mutate(bad); assert.throws(() => validateTransactionInput(bad, modernSession, provenance)); }
+  const f = fixture(AMOUNT_RANK_PROFILE);
+  const bad = clone(modern); bad[5].lifecycle.scores.bidderA = "1";
+  await assert.rejects(assembleEvidence(f.client, { ...bundle, session: modernSession }, modernInput, bad));
+});
+
+test("schema 2 cannot turn RPC or identity failure into a historical legacy package", async () => {
+  const f = fixture(AMOUNT_RANK_PROFILE);
+  const all = await snapshots(f.client, modernSession);
+  const read = f.client.readContract;
+  f.client.readContract = async (args) => { if (args.functionName === "FORMULA_ID") throw new Error("RPC unavailable"); return read(args); };
+  await assert.rejects(assembleEvidence(f.client, { ...bundle, session: modernSession }, modernInput, all));
 });

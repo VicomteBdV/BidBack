@@ -7,6 +7,9 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createPublicClient, getAddress, http, isAddress } from "viem";
 import { assertValidDeploymentJson, coreContractKeys } from "./deployment-json-validator.mjs";
+import { LEGACY_PROFILE, AMOUNT_RANK_PROFILE, AMOUNT_RANK_IDENTITY, assertLifecycleProfile,
+  assertFormulaIdentity, assertParameterTupleWidths, readFormulaIdentity, bidderScoresAbi,
+  calculateAmountRankScores, allocateAmountRankRewards } from "./local-lifecycle-core.mjs";
 
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 export const BPS = 10_000n;
@@ -114,13 +117,20 @@ const auctionHouseAbi = [
   }
 ];
 
-const paramsAbi = [
-  { type: "function", name: "paused", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "bool" }] },
-  auctionHouseAbi.find((item) => item.name === "getAuctionParams") && {
-    ...auctionHouseAbi.find((item) => item.name === "getAuctionParams"),
-    name: "params", inputs: []
-  }
-].filter(Boolean);
+function selectedAuctionAbi(profile) {
+  assertLifecycleProfile(profile);
+  return profile === LEGACY_PROFILE ? auctionHouseAbi : auctionHouseAbi.map((entry) => entry.name === "getAuctionParams"
+    ? { ...entry, outputs: [{ ...entry.outputs[0], components: [...entry.outputs[0].components, { name: "rankSoftness", type: "uint16" }] }] }
+    : entry);
+}
+function selectedParamsAbi(profile) {
+  return [{ type: "function", name: "paused", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "bool" }] },
+    { ...selectedAuctionAbi(profile).find((entry) => entry.name === "getAuctionParams"), name: "params", inputs: [] }];
+}
+function profileParams(profile) {
+  assertLifecycleProfile(profile);
+  return profile === AMOUNT_RANK_PROFILE ? { ...expectedParams, rankSoftness: "4" } : expectedParams;
+}
 
 const vaultAbi = [{ type: "function", name: "auctionHouse", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] }];
 
@@ -220,13 +230,18 @@ export function validateDistinctRoleAddresses(roles) {
   return Object.fromEntries(entries);
 }
 
-export function calculateCanonicalEconomics() {
+export function calculateCanonicalEconomics(profile = LEGACY_PROFILE) {
+  assertLifecycleProfile(profile);
   const grossPremium = BID_A_FINAL - START_PRICE;
   const protocolFee = (grossPremium * 500n) / BPS;
   const netPremium = grossPremium - protocolFee;
   const candidateDistribution = (netPremium * 5_000n) / BPS;
   const perUserCap = (candidateDistribution * 4_000n) / BPS;
-  const rewardBidderB = candidateDistribution < perUserCap ? candidateDistribution : perUserCap;
+  const rewardBidderB = profile === AMOUNT_RANK_PROFILE
+    ? allocateAmountRankRewards({ ...calculateAmountRankScores({ bidderCount: 2, h: 4n,
+      bids: [{ bidderIndex: 0, newCapWei: BID_A_INITIAL }, { bidderIndex: 1, newCapWei: BID_B },
+        { bidderIndex: 0, newCapWei: BID_A_FINAL }] }), pool: candidateDistribution, winnerIndex: 0 }).rewards[1]
+    : candidateDistribution < perUserCap ? candidateDistribution : perUserCap;
   return {
     startPrice: START_PRICE,
     bidderAInitialCap: BID_A_INITIAL,
@@ -248,10 +263,10 @@ function getPath(source, dottedPath) {
   return dottedPath.split(".").reduce((value, key) => value?.[key], source);
 }
 
-function expectedAuctionState(phase, roles, manifest, auctionId, nft, tokenId) {
+function expectedAuctionState(phase, roles, manifest, auctionId, nft, tokenId, profile) {
   const rank = PHASES.indexOf(phase);
   if (rank < 0) throw new LifecycleVerificationError("phase", PHASES, phase);
-  const economics = calculateCanonicalEconomics();
+  const economics = calculateCanonicalEconomics(profile);
   const expected = [
     ["chainId", String(BASE_SEPOLIA_CHAIN_ID)],
     ["nextAuctionId", (BigInt(auctionId) + (rank === 0 ? 0n : 1n)).toString()],
@@ -284,13 +299,19 @@ function expectedAuctionState(phase, roles, manifest, auctionId, nft, tokenId) {
     ["lock.nft", nft], ["lock.tokenId", BigInt(tokenId).toString()], ["lock.seller", roles.seller],
     ["lock.locked", rank < 6], ["lock.released", rank >= 6]
   );
-  for (const [key, value] of Object.entries(expectedParams)) expected.push([`auction.params.${key}`, value]);
+  for (const [key, value] of Object.entries(profileParams(profile))) expected.push([`auction.params.${key}`, value]);
   if (participantCount >= 1) expected.push(["participants.0", roles.bidderA]);
   if (participantCount >= 2) expected.push(["participants.1", roles.bidderB]);
   if (bidCount >= 1) expected.push(["bids.0.bidder", roles.bidderA], ["bids.0.amount", BID_A_INITIAL.toString()]);
   if (bidCount >= 2) expected.push(["bids.1.bidder", roles.bidderB], ["bids.1.amount", BID_B.toString()]);
   if (bidCount >= 3) expected.push(["bids.2.bidder", roles.bidderA], ["bids.2.amount", BID_A_FINAL.toString()]);
 
+  if (profile === AMOUNT_RANK_PROFILE) {
+    const scores = calculateAmountRankScores({ bidderCount: 2, h: 4n,
+      bids: [{ bidderIndex: 0, newCapWei: BID_A_INITIAL }, { bidderIndex: 1, newCapWei: BID_B },
+        { bidderIndex: 0, newCapWei: BID_A_FINAL }].slice(0, bidCount) }).scores;
+    expected.push(["scores.bidderA", scores[0].toString()], ["scores.bidderB", scores[1].toString()]);
+  }
   const finalized = rank >= 5;
   expected.push(["settlement.finalized", finalized], ["distribution.opened", finalized]);
   if (finalized) {
@@ -315,7 +336,7 @@ function expectedAuctionState(phase, roles, manifest, auctionId, nft, tokenId) {
 
 export function assertLifecyclePhase(snapshot, context) {
   for (const [pathName, expected] of expectedAuctionState(
-    context.phase, context.roles, context.manifest, context.auctionId, context.nft, context.tokenId
+    context.phase, context.roles, context.manifest, context.auctionId, context.nft, context.tokenId, context.profile
   )) {
     const observed = getPath(snapshot, pathName);
     if (observed === undefined || observed === null) {
@@ -326,8 +347,8 @@ export function assertLifecyclePhase(snapshot, context) {
   return snapshot;
 }
 
-function serializeParams(raw) {
-  const keys = Object.keys(expectedParams);
+function serializeParams(raw, profile) {
+  const keys = Object.keys(profileParams(profile));
   return Object.fromEntries(keys.map((key, index) => [key, decimal(field(raw, key, index))]));
 }
 
@@ -356,11 +377,13 @@ export function parseArgs(argv) {
     if (Object.hasOwn(values, key.slice(2))) throw new Error("Duplicate argument.");
     values[key.slice(2)] = value;
   }
-  const required = values.session ? ["rpc-url", "session", "phase", "output"] : ["rpc-url", "auction-id", "owner", "seller", "fee-recipient", "bidder-a", "bidder-b", "nft", "token-id", "phase", "manifest"];
+  const required = values.session ? ["rpc-url", "session", "phase", "output"] : ["rpc-url", "auction-id", "owner", "seller", "fee-recipient", "bidder-a", "bidder-b", "nft", "token-id", "phase", "manifest", "profile"];
   for (const key of required) if (!values[key]) throw new Error(`Missing --${key}.`);
   if (values.session) {
     if (Object.keys(values).some((key) => !required.includes(key))) throw new Error("Session arguments cannot be overridden.");
   } else {
+    assertLifecycleProfile(values.profile);
+    if (Object.keys(values).some((key) => ![...required, "output"].includes(key))) throw new Error("Unknown argument.");
     if (!/^\d+$/.test(values["auction-id"]) || BigInt(values["auction-id"]) < 1n) throw new Error("--auction-id must be positive.");
     if (!/^\d+$/.test(values["token-id"])) throw new Error("--token-id must be non-negative.");
   }
@@ -368,7 +391,9 @@ export function parseArgs(argv) {
   return values;
 }
 
-async function readDeploymentChecks(client, manifest, roles) {
+async function readDeploymentChecks(client, manifest, roles, profile) {
+  const auctionHouseAbi = selectedAuctionAbi(profile);
+  const paramsAbi = selectedParamsAbi(profile);
   const contracts = manifest.contracts;
   for (const key of coreContractKeys) {
     const code = await client.getBytecode({ address: contracts[key] });
@@ -398,12 +423,13 @@ async function readDeploymentChecks(client, manifest, roles) {
     assertObserved(`${key}.auctionHouse`, observed, contracts.auctionHouse);
   }
   assertObserved("ParamsController.paused", paused, false);
-  const serializedParams = serializeParams(params);
-  for (const [key, value] of Object.entries(expectedParams)) assertObserved(`Params.${key}`, serializedParams[key], value);
+  const serializedParams = serializeParams(params, profile);
+  for (const [key, value] of Object.entries(profileParams(profile))) assertObserved(`Params.${key}`, serializedParams[key], value);
   return { owners, feeRecipient, paused, params: serializedParams };
 }
 
 async function readLifecycleSnapshot(client, manifest, context) {
+  const auctionHouseAbi = selectedAuctionAbi(context.profile);
   const contracts = manifest.contracts;
   const auctionId = BigInt(context.auctionId);
   const tokenId = BigInt(context.tokenId);
@@ -449,7 +475,7 @@ async function readLifecycleSnapshot(client, manifest, context) {
   ]);
   assertObserved("bidder B reputation", decimal(reputationB), "10000");
   const auction = serializeAuction(auctionRaw);
-  auction.params = serializeParams(paramsRaw);
+  auction.params = serializeParams(paramsRaw, context.profile);
   auction.feeRecipient = feeRecipient;
   auction.modules = {
     nftVault: field(modulesRaw, "nftVault", 0), escrowVault: field(modulesRaw, "escrowVault", 1),
@@ -461,8 +487,12 @@ async function readLifecycleSnapshot(client, manifest, context) {
     const raw = await client.readContract({ address: contracts.auctionHouse, abi: auctionHouseAbi, functionName: "getBid", args: [auctionId, index] });
     bids.push({ bidder: field(raw, "bidder", 0), amount: decimal(field(raw, "amount", 1)), timestamp: decimal(field(raw, "timestamp", 2)) });
   }
+  const scores = context.profile === AMOUNT_RANK_PROFILE ? Object.fromEntries(await Promise.all(
+    ["bidderA", "bidderB"].map(async (role) => [role, decimal(await client.readContract({
+      address: contracts.auctionHouse, abi: bidderScoresAbi, functionName: "bidderScores", args: [auctionId, context.roles[role]]
+    }))]))) : undefined;
   return {
-    ...snapshot, auction, participants, bids,
+    ...snapshot, auction, participants, bids, ...(scores ? { scores } : {}),
     caps: { bidderA: decimal(capA), bidderB: decimal(capB) },
     lock: { nft: field(lockRaw, "nft", 0), tokenId: decimal(field(lockRaw, "tokenId", 1)), seller: field(lockRaw, "seller", 2), locked: Boolean(field(lockRaw, "locked", 3)), released: Boolean(field(lockRaw, "released", 4)) },
     settlement: { finalized: Boolean(field(settlementRaw, "finalized", 0)), winner: field(settlementRaw, "winner", 1), distributionVault: field(settlementRaw, "distributionVault", 2), finalPrice: decimal(field(settlementRaw, "finalPrice", 3)), sellerProceeds: decimal(field(settlementRaw, "sellerProceeds", 4)), feeAmount: decimal(field(settlementRaw, "feeAmount", 5)), distributionReserve: decimal(field(settlementRaw, "distributionReserve", 6)) },
@@ -494,8 +524,14 @@ export function uintString(value, positive = false) {
 }
 
 export function validateSession(session) {
-  exactKeys(session, ["schemaVersion", "runId", "chainId", "sourceCommit", "manifest", "auctionId", "roles", "nft"]);
-  requireEvidence(session.schemaVersion === 1 && session.chainId === BASE_SEPOLIA_CHAIN_ID, "Invalid session version or chain.");
+  const modern = session?.schemaVersion === 2;
+  exactKeys(session, ["schemaVersion", "runId", "chainId", "sourceCommit", "manifest", "auctionId", "roles", "nft",
+    ...(modern ? ["profile", "expectedFormula"] : [])]);
+  requireEvidence([1, 2].includes(session.schemaVersion) && session.chainId === BASE_SEPOLIA_CHAIN_ID, "Invalid session version or chain.");
+  if (modern) {
+    requireEvidence(session.profile === AMOUNT_RANK_PROFILE, "Invalid schema 2 profile.");
+    assertFormulaIdentity(session.expectedFormula);
+  }
   requireEvidence(typeof session.runId === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/.test(session.runId), "Invalid run ID.");
   requireEvidence(typeof session.sourceCommit === "string" && /^[a-f0-9]{40}$/.test(session.sourceCommit), "Invalid source commit.");
   requireEvidence(session.manifest === MANIFEST_PATH, "Session must use the canonical Base Sepolia manifest path.");
@@ -537,7 +573,8 @@ export async function loadSession(filename) {
 }
 
 export function sessionContext(session, manifest, phase) {
-  return { phase, roles: session.roles, manifest, auctionId: session.auctionId, nft: session.nft.address, tokenId: session.nft.tokenId };
+  return { phase, roles: session.roles, manifest, auctionId: session.auctionId, nft: session.nft.address, tokenId: session.nft.tokenId,
+    profile: session.schemaVersion === 1 ? LEGACY_PROFILE : session.profile };
 }
 
 export function publicBlock(block) {
@@ -547,14 +584,19 @@ export function publicBlock(block) {
 }
 
 export async function verifyPhase(client, manifest, context, blockNumber) {
+  assertLifecycleProfile(context.profile);
   assertBaseSepoliaChainId(await client.getChainId());
   const block = publicBlock(await client.getBlock(blockNumber === undefined ? { blockTag: "latest" } : { blockNumber }));
   // Every read observes the same block; recheck the hash to detect a reorg during collection.
-  const pinned = Object.fromEntries(["getBytecode", "readContract", "getBalance"].map((method) =>
+  const pinned = Object.fromEntries(["getBytecode", "readContract", "getBalance", "call"].map((method) =>
     [method, (args) => client[method]({ ...args, blockNumber: BigInt(block.number) })]));
+  await assertParameterTupleWidths(pinned, manifest.contracts, context.auctionId, context.profile, BigInt(block.number));
+  const observedFormula = context.profile === AMOUNT_RANK_PROFILE
+    ? await readFormulaIdentity(pinned, manifest.contracts.auctionHouse, BigInt(block.number)) : undefined;
   const nftCode = await pinned.getBytecode({ address: context.nft });
   requireEvidence(nftCode && nftCode !== "0x", "NFT bytecode missing.");
-  const deployment = await readDeploymentChecks(pinned, manifest, context.roles);
+  const deployment = await readDeploymentChecks(pinned, manifest, context.roles, context.profile);
+  if (observedFormula) deployment.observedFormula = observedFormula;
   const lifecycle = await readLifecycleSnapshot(pinned, manifest, context);
   assertLifecyclePhase(lifecycle, context);
   requireEvidence((await client.getBlock({ blockNumber: BigInt(block.number) })).hash.toLowerCase() === block.hash, "Block changed during verification.");
@@ -562,7 +604,7 @@ export async function verifyPhase(client, manifest, context, blockNumber) {
 }
 
 export function phaseEvidence(session, provenance, phase, verified, generatedAt = new Date().toISOString()) {
-  return { schemaVersion: 1, runId: session.runId, sourceCommit: session.sourceCommit, chainId: session.chainId,
+  return { schemaVersion: session.schemaVersion, ...(session.schemaVersion === 2 ? { profile: session.profile, expectedFormula: session.expectedFormula } : {}), runId: session.runId, sourceCommit: session.sourceCommit, chainId: session.chainId,
     auctionId: session.auctionId, phase, generatedAt, manifest: provenance, ...verified };
 }
 
@@ -590,8 +632,9 @@ async function main() {
     const manifestPath = path.resolve(args.manifest);
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     assertValidDeploymentJson(manifest, BASE_SEPOLIA_CHAIN_ID);
-    const context = { phase: args.phase, roles, manifest, auctionId: args["auction-id"], nft: getAddress(args.nft), tokenId: args["token-id"] };
-    output = { generatedAt: new Date().toISOString(), manifestPath, ...await verifyPhase(client, manifest, context) };
+    const context = { phase: args.phase, roles, manifest, auctionId: args["auction-id"], nft: getAddress(args.nft), tokenId: args["token-id"], profile: args.profile };
+    output = { generatedAt: new Date().toISOString(), manifestPath, profile: args.profile,
+      ...(args.profile === AMOUNT_RANK_PROFILE ? { expectedFormula: AMOUNT_RANK_IDENTITY } : {}), ...await verifyPhase(client, manifest, context) };
   }
   if (args.output) await writeSnapshot(path.resolve(args.output), output);
   else console.log(JSON.stringify(output, null, 2));

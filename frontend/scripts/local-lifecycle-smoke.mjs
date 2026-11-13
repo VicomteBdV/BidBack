@@ -13,6 +13,9 @@ import {
 } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
 import {
+  AMOUNT_RANK_PROFILE, AMOUNT_RANK_IDENTITY, normalizeLifecycleParameterAbi,
+  assertParameterTupleWidths, readFormulaIdentity, parseLocalLifecycleArgs,
+  calculateAmountRankEconomics, calculateAmountRankScores, bidderScoresAbi,
   LOCAL_ANVIL_CHAIN_ID,
   LifecycleSmokeError,
   WEI_PER_ETH,
@@ -64,10 +67,12 @@ async function readJson(filePath, step) {
   }
 }
 
-async function loadArtifact(sourceName, contractName) {
+async function loadArtifact(sourceName, contractName, profile) {
   const artifactPath = path.join(repoRoot, "out", `${sourceName}.sol`, `${contractName}.json`);
   const artifact = await readJson(artifactPath, `${contractName} artifact`);
   assertTrue(`${contractName} ABI`, Array.isArray(artifact.abi));
+  if (contractName === "AuctionHouse") return normalizeLifecycleParameterAbi(artifact.abi, "getAuctionParams", profile);
+  if (contractName === "ParamsController") return normalizeLifecycleParameterAbi(artifact.abi, "params", profile);
   return artifact.abi;
 }
 
@@ -156,6 +161,7 @@ async function expectSimulationRevert(publicClient, request, step) {
 }
 
 async function main() {
+  const { profile, preflightOnly } = parseLocalLifecycleArgs(process.argv.slice(2));
   console.log("LOCAL ANVIL ONLY");
 
   activeStep = "network preflight";
@@ -176,7 +182,7 @@ async function main() {
   }
   assertLocalChainId(rawChainId);
 
-  if (process.argv.includes("--preflight-only")) {
+  if (preflightOnly) {
     ok("Local Anvil preflight", `chain ID ${LOCAL_ANVIL_CHAIN_ID}`);
     return;
   }
@@ -194,14 +200,31 @@ async function main() {
 
   const [auctionHouseAbi, nftVaultAbi, escrowVaultAbi, distributionVaultAbi, paramsControllerAbi, reputationAdapterAbi, localNftAbi] =
     await Promise.all([
-      loadArtifact("AuctionHouse", "AuctionHouse"),
-      loadArtifact("NFTVault", "NFTVault"),
-      loadArtifact("EscrowVault", "EscrowVault"),
-      loadArtifact("DistributionVault", "DistributionVault"),
-      loadArtifact("ParamsController", "ParamsController"),
-      loadArtifact("ReputationAdapter", "ReputationAdapter"),
-      loadArtifact("LocalERC721", "LocalERC721")
+      loadArtifact("AuctionHouse", "AuctionHouse", profile),
+      loadArtifact("NFTVault", "NFTVault", profile),
+      loadArtifact("EscrowVault", "EscrowVault", profile),
+      loadArtifact("DistributionVault", "DistributionVault", profile),
+      loadArtifact("ParamsController", "ParamsController", profile),
+      loadArtifact("ReputationAdapter", "ReputationAdapter", profile),
+      loadArtifact("LocalERC721", "LocalERC721", profile)
     ]);
+
+  const preflightBlock = await publicClient.getBlock({ blockTag: "latest" });
+  const preflightBlockNumber = preflightBlock.number;
+  const expectedAuctionId = toBigInt(await publicClient.readContract({
+    address: deployment.contracts.auctionHouse, abi: auctionHouseAbi, functionName: "nextAuctionId", blockNumber: preflightBlockNumber
+  }));
+  await assertParameterTupleWidths(publicClient, deployment.contracts, expectedAuctionId, profile, preflightBlockNumber);
+  if (profile === AMOUNT_RANK_PROFILE) {
+    const observed = await readFormulaIdentity(publicClient, deployment.contracts.auctionHouse, preflightBlockNumber);
+    ok("Formula identity", JSON.stringify({ expected: AMOUNT_RANK_IDENTITY, observed, blockNumber: preflightBlockNumber.toString() }));
+  }
+  const currentParams = paramsFromTuple(await publicClient.readContract({
+    address: deployment.contracts.paramsController, abi: paramsControllerAbi, functionName: "params", blockNumber: preflightBlockNumber
+  }), profile);
+  assertExpectedLocalParams("current params", currentParams, profile);
+  assertEqual("preflight block hash", (await publicClient.getBlock({ blockNumber: preflightBlockNumber })).hash, preflightBlock.hash);
+  ok("Lifecycle profile", profile);
 
   // Wallet accounts and clients are intentionally created only after every network and deployment preflight guard.
   const actors = createLocalActors();
@@ -232,17 +255,26 @@ async function main() {
   });
   assertAddressEqual("current fee recipient", currentFeeRecipient, actors.owner.address);
 
-  const currentParams = paramsFromTuple(await publicClient.readContract({
-    address: deployment.contracts.paramsController,
-    abi: paramsControllerAbi,
-    functionName: "params"
-  }));
-  assertExpectedLocalParams("current params", currentParams);
   assertEqual("current pause state", await publicClient.readContract({
     address: deployment.contracts.paramsController,
     abi: paramsControllerAbi,
     functionName: "paused"
   }), false);
+
+  const checkScores = async (bidCount) => {
+    if (profile !== AMOUNT_RANK_PROFILE) return;
+    const block = await publicClient.getBlock({ blockTag: "latest" });
+    const expected = calculateAmountRankScores({ bidderCount: 2, h: snapshot.rankSoftness,
+      bids: [{ bidderIndex: 0, newCapWei: BIDDER_A_INITIAL_CAP }, { bidderIndex: 1, newCapWei: BIDDER_B_CAP },
+        { bidderIndex: 0, newCapWei: BIDDER_A_FINAL_CAP }].slice(0, bidCount) }).scores;
+    for (const [index, actor] of [actors.bidderA, actors.bidderB].entries()) {
+      assertEqual(`bidder ${index} score after ${bidCount} bids`, await publicClient.readContract({
+        address: deployment.contracts.auctionHouse, abi: bidderScoresAbi, functionName: "bidderScores",
+        args: [auctionId, actor.address], blockNumber: block.number
+      }), expected[index]);
+    }
+    assertEqual("score block hash", (await publicClient.getBlock({ blockNumber: block.number })).hash, block.hash);
+  };
 
   activeStep = "NFT preparation";
   const ownerBefore = await publicClient.readContract({
@@ -253,11 +285,6 @@ async function main() {
   });
   assertAddressEqual("test NFT owner", ownerBefore, actors.owner.address);
 
-  const expectedAuctionId = toBigInt(await publicClient.readContract({
-    address: deployment.contracts.auctionHouse,
-    abi: auctionHouseAbi,
-    functionName: "nextAuctionId"
-  }));
   const emptyLock = lockFromTuple(await publicClient.readContract({
     address: deployment.contracts.nftVault,
     abi: nftVaultAbi,
@@ -328,13 +355,18 @@ async function main() {
   assertEqual("auction participants", auction.participantCount, 0n);
   assertEqual("auction bids", auction.bidCount, 0n);
 
+  const snapshotBlock = await publicClient.getBlock({ blockTag: "latest" });
+  await assertParameterTupleWidths(publicClient, deployment.contracts, auctionId, profile, snapshotBlock.number);
+  if (profile === AMOUNT_RANK_PROFILE) await readFormulaIdentity(publicClient, deployment.contracts.auctionHouse, snapshotBlock.number);
   const snapshot = paramsFromTuple(await publicClient.readContract({
     address: deployment.contracts.auctionHouse,
     abi: auctionHouseAbi,
     functionName: "getAuctionParams",
-    args: [auctionId]
-  }));
-  assertExpectedLocalParams("auction params snapshot", snapshot);
+    args: [auctionId], blockNumber: snapshotBlock.number
+  }), profile);
+  assertEqual("snapshot block hash", (await publicClient.getBlock({ blockNumber: snapshotBlock.number })).hash, snapshotBlock.hash);
+  assertExpectedLocalParams("auction params snapshot", snapshot, profile);
+  await checkScores(0);
   const snapshotFeeRecipient = await publicClient.readContract({
     address: deployment.contracts.auctionHouse,
     abi: auctionHouseAbi,
@@ -392,6 +424,7 @@ async function main() {
   assertEqual("bids after bidder A", auction.bidCount, 1n);
   assertEqual("end time after bidder A", auction.endTime, initialEndTime);
   assertEqual("escrow after bidder A", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), BIDDER_A_INITIAL_CAP);
+  await checkScores(1);
   ok("Bidder A cap", formatEth(BIDDER_A_INITIAL_CAP));
 
   await testClient.increaseTime({ seconds: 10 * 60 });
@@ -412,6 +445,7 @@ async function main() {
   assertEqual("bids after bidder B", auction.bidCount, 2n);
   assertEqual("end time after bidder B", auction.endTime, initialEndTime);
   assertEqual("escrow after bidder B", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), BIDDER_A_INITIAL_CAP + BIDDER_B_CAP);
+  await checkScores(2);
   ok("Bidder B highest bid", formatEth(BIDDER_B_CAP));
 
   await testClient.increaseTime({ seconds: 10 * 60 });
@@ -435,6 +469,7 @@ async function main() {
   assertEqual("anti-sniping extensions", auction.extensionsUsed, 0);
   assertEqual("end time after step-up", auction.endTime, initialEndTime);
   assertEqual("total escrow deposits", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), 35n * WEI_PER_ETH / 10n);
+  await checkScores(3);
   ok("Bidder A step-up", `cap ${formatEth(BIDDER_A_FINAL_CAP)}, value ${formatEth(BIDDER_A_STEP_UP_DELTA)}`);
 
   activeStep = "finalization";
@@ -451,7 +486,7 @@ async function main() {
     args: [auctionId]
   }, "auction finalization");
 
-  const expectedEconomics = calculateSingleLoserEconomics({
+  const economicInput = {
     startPrice: auction.startPrice,
     finalPrice: BIDDER_A_FINAL_CAP,
     feeBps: snapshot.bidbackFeeBps,
@@ -463,14 +498,21 @@ async function main() {
     initialDuration: auction.initialEndTime - auction.startTime,
     minAuctionDuration: snapshot.minAuctionDuration,
     winnerCap: BIDDER_A_FINAL_CAP,
-    losingCap: BIDDER_B_CAP
-  });
+    losingCap: BIDDER_B_CAP,
+    h: snapshot.rankSoftness,
+    bidderCount: 2,
+    winnerIndex: 0,
+    bids: [{ bidderIndex: 0, newCapWei: BIDDER_A_INITIAL_CAP }, { bidderIndex: 1, newCapWei: BIDDER_B_CAP },
+      { bidderIndex: 0, newCapWei: BIDDER_A_FINAL_CAP }]
+  };
+  const expectedEconomics = profile === AMOUNT_RANK_PROFILE
+    ? calculateAmountRankEconomics(economicInput) : calculateSingleLoserEconomics(economicInput);
   assertEqual("expected protocol fee", expectedEconomics.protocolFee, 5n * WEI_PER_ETH / 100n);
   assertEqual("expected gross premium", expectedEconomics.grossPremium, 1n * WEI_PER_ETH);
   assertEqual("expected net premium", expectedEconomics.netPremium, 95n * WEI_PER_ETH / 100n);
   assertEqual("expected candidate distribution", expectedEconomics.candidateDistribution, 475n * WEI_PER_ETH / 1000n);
-  assertEqual("expected assigned reward", expectedEconomics.assignedReward, 19n * WEI_PER_ETH / 100n);
-  assertEqual("expected seller proceeds", expectedEconomics.sellerProceeds, 176n * WEI_PER_ETH / 100n);
+  assertEqual("expected assigned reward", expectedEconomics.assignedReward, profile === AMOUNT_RANK_PROFILE ? 475n * WEI_PER_ETH / 1000n : 19n * WEI_PER_ETH / 100n);
+  assertEqual("expected seller proceeds", expectedEconomics.sellerProceeds, profile === AMOUNT_RANK_PROFILE ? 1475n * WEI_PER_ETH / 1000n : 176n * WEI_PER_ETH / 100n);
   assertEqual("expected losing refund", expectedEconomics.losingRefund, BIDDER_B_CAP);
   assertEqual("expected total deposits", expectedEconomics.totalDeposits, 35n * WEI_PER_ETH / 10n);
 
@@ -507,6 +549,7 @@ async function main() {
   assertEqual("seller credit", toBigInt(await publicClient.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "sellerCredits", args: [actors.owner.address] })), expectedEconomics.sellerProceeds);
   assertEqual("protocol fee credit", toBigInt(await publicClient.readContract({ address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "protocolFeeCredits", args: [actors.owner.address] })), expectedEconomics.protocolFee);
   assertEqual("escrow after finalization", await publicClient.getBalance({ address: deployment.contracts.escrowVault }), expectedEconomics.totalDeposits);
+  await checkScores(3);
   ok("Auction finalized");
 
   activeStep = "pull actions";
