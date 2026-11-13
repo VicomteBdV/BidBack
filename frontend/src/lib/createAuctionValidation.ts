@@ -35,7 +35,7 @@ function validateTokenId(value: string) {
 
 export function getCreateAuctionValidationIssue(
   values: CreateAuctionValues,
-  options: { minAuctionDuration?: string | bigint | null; paused?: boolean } = {}
+  options: { minAuctionDuration?: string | bigint | null; paused?: boolean; maxAmount?: bigint | null } = {}
 ): CreateAuctionValidationIssue | null {
   const nftContract = values.nftContract.trim();
 
@@ -75,6 +75,9 @@ export function getCreateAuctionValidationIssue(
 
     const parsed = parseEther(values.startPriceEth.trim());
     if (parsed < 0n) return { field: "startPriceEth", message: "Start price must be zero or greater." };
+    if (options.maxAmount !== undefined && options.maxAmount !== null && parsed > options.maxAmount) {
+      return { field: "startPriceEth", message: "Start price exceeds this auction implementation's maximum amount." };
+    }
   } catch {
     return { field: "startPriceEth", message: "Start price must be a valid ETH amount." };
   }
@@ -86,7 +89,7 @@ export function getCreateAuctionValidationIssue(
 
 export function validateCreateAuctionFields(
   values: CreateAuctionValues,
-  options: { minAuctionDuration?: string | bigint | null; paused?: boolean } = {}
+  options: { minAuctionDuration?: string | bigint | null; paused?: boolean; maxAmount?: bigint | null } = {}
 ) {
   return getCreateAuctionValidationIssue(values, options)?.message ?? null;
 }

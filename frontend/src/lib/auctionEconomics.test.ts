@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildAuctionEconomicSummary } from "@/lib/auctionEconomics";
 import type { SerializedAuction } from "@/lib/auctionTypes";
-import { auctionDetailFixture, testAddresses } from "@/test/fixtures";
+import { auctionDetailFixture, testAddresses, amountRankFormulaFixture } from "@/test/fixtures";
 
 function finalizedAuction(): SerializedAuction {
   return {
@@ -135,4 +135,14 @@ describe("buildAuctionEconomicSummary", () => {
     expect(summary.settlement.protocolFeeCredit.status).toBe("unavailable");
     expect(() => JSON.stringify(summary)).not.toThrow();
   });
+});
+
+it("propagates captured h only for a supported reported formula without altering settlement", () => {
+  const auction = { ...auctionDetailFixture.auction, formula: amountRankFormulaFixture,
+    paramsSnapshot: { ...auctionDetailFixture.auction.paramsSnapshot!, rankSoftness: "8" } };
+  const result = buildAuctionEconomicSummary(auction);
+  expect(result.parameters).toMatchObject({ formulaStatus: "supported", rankSoftness: "8" });
+  expect(result.settlement).toEqual(buildAuctionEconomicSummary(auctionDetailFixture.auction).settlement);
+  const unknown = buildAuctionEconomicSummary({ ...auction, formula: { ...amountRankFormulaFixture, status: "unavailable" as const } });
+  expect(unknown.parameters?.rankSoftness).toBeUndefined();
 });

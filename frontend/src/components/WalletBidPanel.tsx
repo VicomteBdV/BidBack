@@ -17,6 +17,7 @@ import { StateNotice } from "@/components/ui/StateNotice";
 import { WalletTransactionStatus } from "@/components/WalletTransactionStatus";
 import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { readAuctionFormula, amountRankMaximum } from "@/lib/auctionFormula";
 import { getBidActionState, parseBidAmount, sameAddress } from "@/lib/auctionActionState";
 import type { SerializedAuction } from "@/lib/auctionTypes";
 import { targetChainId, targetChainLabel } from "@/lib/chains";
@@ -851,6 +852,7 @@ export function WalletBidPanel({
   const [isDeploymentLoading, setIsDeploymentLoading] = useState(true);
 
   const [minimumNextBid, setMinimumNextBid] = useState<bigint | null>(null);
+  const [verifiedMaxCap, setVerifiedMaxCap] = useState<bigint | null>(null);
   const [currentCap, setCurrentCap] = useState<bigint | null>(null);
   const [verifiedChainTimestamp, setVerifiedChainTimestamp] = useState<bigint | null>(null);
   const [verifiedAuctionState, setVerifiedAuctionState] = useState<SerializedAuction["state"] | null>(null);
@@ -962,6 +964,7 @@ export function WalletBidPanel({
     setIsLoadingBidData(false);
     setMessage(null);
     setMinimumNextBid(null);
+      setVerifiedMaxCap(null);
     setCurrentCap(null);
     setVerifiedChainTimestamp(null);
     setVerifiedAuctionState(null);
@@ -1034,6 +1037,7 @@ export function WalletBidPanel({
     nowSeconds: verifiedChainTimestamp ?? auctionChainTimestamp,
     minimumNextBid,
     currentCap,
+    maxCap: verifiedMaxCap,
     bidAmountEth
   });
   const parsedEnteredAmount = parseBidAmount(bidAmountEth, isStepUp ? "step-up-delta" : "total-cap").value;
@@ -1075,7 +1079,7 @@ export function WalletBidPanel({
     }
     const blockNumber = block.number;
     const auctionHouse = deployment.contracts.auctionHouse;
-    const [onchainAuction, modules, minimumRequired] = await Promise.all([
+    const [onchainAuction, modules, minimumRequired, formula] = await Promise.all([
       publicClient.readContract({
         address: auctionHouse,
         abi: auctionHouseAbi,
@@ -1096,7 +1100,8 @@ export function WalletBidPanel({
         functionName: "minimumNextBid",
         args: [auctionIdBigInt],
         blockNumber
-      })
+      }),
+      readAuctionFormula(publicClient, auctionHouse, blockNumber)
     ]);
 
     const mismatches = immutableAuctionMismatches(onchainAuction, auction);
@@ -1120,6 +1125,7 @@ export function WalletBidPanel({
 
     return {
       minimumRequired,
+      maxCap: amountRankMaximum(formula),
       walletCap,
       blockTimestamp: block.timestamp,
       blockNumber,
@@ -1229,6 +1235,7 @@ export function WalletBidPanel({
         : minimumRequired;
 
       setMinimumNextBid(minimumRequired);
+      setVerifiedMaxCap(snapshot.maxCap);
       setCurrentCap(walletCap);
       setVerifiedChainTimestamp(snapshot.blockTimestamp);
       setVerifiedAuctionState(snapshot.liveState as SerializedAuction["state"]);
@@ -1240,6 +1247,7 @@ export function WalletBidPanel({
     } catch (caught) {
       if (!isCurrent()) return;
       setMinimumNextBid(null);
+      setVerifiedMaxCap(null);
       setCurrentCap(null);
       setVerifiedChainTimestamp(null);
       setVerifiedAuctionState(null);
@@ -1446,6 +1454,7 @@ export function WalletBidPanel({
         if (!isCurrentBidOperation(operation)) return;
         const verificationError = lotVerificationMessage(caught);
         setMinimumNextBid(null);
+      setVerifiedMaxCap(null);
         setCurrentCap(null);
         setVerifiedChainTimestamp(null);
         setVerifiedAuctionState(null);
@@ -1475,11 +1484,13 @@ export function WalletBidPanel({
         nowSeconds: snapshot.blockTimestamp,
         minimumNextBid: minimumRequired,
         currentCap: walletCap,
+        maxCap: snapshot.maxCap,
         bidAmountEth
       });
 
       if (!isCurrentBidOperation(operation)) return;
       setMinimumNextBid(minimumRequired);
+      setVerifiedMaxCap(snapshot.maxCap);
       setCurrentCap(walletCap);
       setVerifiedChainTimestamp(snapshot.blockTimestamp);
       setVerifiedAuctionState(snapshot.liveState as SerializedAuction["state"]);

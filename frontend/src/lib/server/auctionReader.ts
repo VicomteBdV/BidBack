@@ -2,9 +2,10 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { createPublicClient, defineChain, http, isAddress, type Address, type PublicClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { auctionHouseAbi } from "@/contracts/auctionHouseAbi";
+import { auctionHouseAbi, amountRankAuctionHouseAbi } from "@/contracts/auctionHouseAbi";
 import { distributionVaultAbi } from "@/contracts/distributionVaultAbi";
 import { escrowVaultAbi } from "@/contracts/escrowVaultAbi";
+import { readAuctionFormula, isSupportedAmountRank } from "@/lib/auctionFormula";
 import { buildAuctionEconomicSummary } from "@/lib/auctionEconomics";
 import { anvilChainId } from "@/lib/chains";
 import type {
@@ -442,6 +443,31 @@ function serializeAuctionParams(raw: unknown): AuctionParamsSnapshot {
   };
 }
 
+// Keep historical ABI decoding separate; tuple length alone never selects a formula.
+export async function readAuctionRuleSnapshot(
+  client: PublicClient, auctionHouse: Address, auctionId: bigint, blockNumber: bigint
+) {
+  const formula = await readAuctionFormula(client, auctionHouse, blockNumber);
+  try {
+    const supported = isSupportedAmountRank(formula);
+    const raw = await client.readContract({
+      address: auctionHouse, abi: supported ? amountRankAuctionHouseAbi : auctionHouseAbi,
+      functionName: "getAuctionParams", args: [auctionId], blockNumber
+    });
+    const paramsSnapshot = serializeAuctionParams(raw);
+    if (supported) {
+      const h = getField(raw, "rankSoftness", 19);
+      if ((typeof h !== "number" && typeof h !== "bigint") || BigInt(h) < 1n || BigInt(h) > 65535n) {
+        throw new Error("Invalid rank softness snapshot");
+      }
+      paramsSnapshot.rankSoftness = BigInt(h).toString();
+    }
+    return { formula, paramsSnapshot, paramsSnapshotError: undefined };
+  } catch {
+    return { formula, paramsSnapshot: undefined, paramsSnapshotError: "Unable to read auction parameter snapshot." };
+  }
+}
+
 function serializeSettlement(raw: unknown): SettlementEconomics {
   return {
     finalized: Boolean(getField(raw, "finalized", 0)),
@@ -572,6 +598,7 @@ async function readBidderEconomics({
   label,
   finalized,
   distributionOpened,
+  readScores,
   blockNumber,
   deployment,
   client
@@ -582,6 +609,7 @@ async function readBidderEconomics({
   label: string;
   finalized: boolean;
   distributionOpened: boolean;
+  readScores?: boolean;
   blockNumber?: bigint;
   deployment: DeploymentFile;
   client: PublicClient;
@@ -602,7 +630,7 @@ async function readBidderEconomics({
     };
   }
 
-  const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed] = await Promise.all([
+  const [cap, refundableAmount, refundClaimed, rewardEntitlement, rewardClaimed, score] = await Promise.all([
     client.readContract({
       blockNumber,
       address: deployment.contracts.escrowVault,
@@ -637,7 +665,11 @@ async function readBidderEconomics({
       abi: distributionVaultAbi,
       functionName: "claimed",
       args: [auctionId, bidder.address]
-    })
+    }),
+    readScores ? client.readContract({
+      blockNumber, address: deployment.contracts.auctionHouse, abi: amountRankAuctionHouseAbi,
+      functionName: "bidderScores", args: [auctionId, bidder.address]
+    }).then((value) => value.toString()).catch(() => undefined) : Promise.resolve(undefined)
   ]);
 
   return {
@@ -645,6 +677,7 @@ async function readBidderEconomics({
     label,
     address: bidder.address,
     configured: true,
+    score,
     cap: cap.toString(),
     refundableAmount: refundableAmount.toString(),
     refundClaimed,
@@ -714,6 +747,7 @@ async function readAuctionEconomics(
       label: "Bidder #1",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
+      readScores: isSupportedAmountRank(auction.formula),
       blockNumber,
       deployment,
       client
@@ -725,6 +759,7 @@ async function readAuctionEconomics(
       label: "Bidder #2",
       finalized: settlement.finalized,
       distributionOpened: distribution.opened,
+      readScores: isSupportedAmountRank(auction.formula),
       blockNumber,
       deployment,
       client
@@ -1056,18 +1091,13 @@ export async function readAuctionById(auctionIdParam: string): Promise<AuctionDe
     tokenId: auction.tokenId
   });
 
-  try {
-    const rawParams = await client.readContract({
-      address: deployment.contracts.auctionHouse,
-      abi: auctionHouseAbi,
-      functionName: "getAuctionParams",
-      args: [auctionId],
-      blockNumber: auction.readBlockNumber ? BigInt(auction.readBlockNumber) : undefined
-    });
-
-    auction.paramsSnapshot = serializeAuctionParams(rawParams);
-  } catch {
-    auction.paramsSnapshotError = "Unable to read auction parameter snapshot.";
+  if (auction.readBlockNumber) {
+    Object.assign(auction, await readAuctionRuleSnapshot(
+      client, deployment.contracts.auctionHouse, auctionId, BigInt(auction.readBlockNumber)
+    ));
+  } else {
+    auction.formula = { status: "unavailable", auctionHouse: deployment.contracts.auctionHouse };
+    auction.paramsSnapshotError = "Unable to read auction parameter snapshot at a pinned block.";
   }
 
   await readAuctionFeeRecipientSnapshot(auction, deployment, client);

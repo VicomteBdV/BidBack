@@ -8,6 +8,7 @@ import {NFTVault} from "./NFTVault.sol";
 import {ParamsController} from "./ParamsController.sol";
 import {IReputationAdapter} from "./interfaces/IReputationAdapter.sol";
 import {Ownable, ZeroAddress} from "./utils/Ownable.sol";
+import {FullMath} from "./utils/FullMath.sol";
 import {ReentrancyGuard} from "./utils/ReentrancyGuard.sol";
 
 error Paused();
@@ -20,10 +21,16 @@ error MaxParticipantsReached();
 error AlreadyFinalized();
 error NotNftClaimant();
 error NFTAlreadyClaimed();
+error AmountTooLarge();
 
 contract AuctionHouse is Ownable, ReentrancyGuard {
     uint256 public constant BPS = 10_000;
     uint256 public constant SCALE = 1e18;
+    uint256 public constant SCORE_SCALE = 1 << 136;
+    uint256 public constant MAX_AMOUNT = (1 << 112) - 1;
+    string public constant FORMULA_ID = "amount-rank-v1";
+    string public constant ARITHMETIC_ID = "floor-delta-q136-muldiv512-v1";
+    string public constant ROUNDING_ID = "hamilton-first-participation-v1";
 
     enum State {
         OPEN,
@@ -78,6 +85,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
 
     mapping(uint256 => Auction) public auctions;
     mapping(uint256 => mapping(address => BidderStats)) public bidderStats;
+    mapping(uint256 => mapping(address => uint256)) public bidderScores;
     mapping(uint256 => ParamsController.Params) private _auctionParams;
     mapping(uint256 => Modules) private _auctionModules;
     mapping(uint256 => address) private _auctionFeeRecipients;
@@ -150,6 +158,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         if (paramsController.paused()) revert Paused();
         if (nft == address(0)) revert ZeroAddress();
         if (duration == 0) revert InvalidDuration();
+        if (startPrice > MAX_AMOUNT) revert AmountTooLarge();
 
         ParamsController.Params memory p = paramsController.params();
         if (duration < p.minAuctionDuration) revert InvalidDuration();
@@ -200,6 +209,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         if (nowTs >= auction.endTime) revert AuctionNotOpen();
 
         ParamsController.Params memory p = _auctionParams[auctionId];
+        if (newCap > MAX_AMOUNT) revert AmountTooLarge();
         uint256 minimumBid = minimumNextBid(auctionId);
         if (newCap < minimumBid) revert BidTooLow();
 
@@ -222,6 +232,10 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         }
 
         stats.maxCap = newCap;
+        // Every accepted bid advances the global rank, including the winner's bids.
+        // Only the bidder's own cap increase earns points; settlement never replays history.
+        bidderScores[auctionId][msg.sender] +=
+            _scoreIncrement(newCap - previousCap, p.rankSoftness, auction.bidCount + 1);
 
         _auctionModules[auctionId].escrowVault.depositCap{value: msg.value}(auctionId, msg.sender, newCap);
 
@@ -279,7 +293,7 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         uint256 candidateDistribution = _candidateDistributionPool(auction, p, premiumNet);
 
         (address[] memory recipients, uint256[] memory amounts, uint256 distributionAmount) =
-            _buildDistribution(auctionId, p, candidateDistribution, modules.reputationAdapter);
+            _buildDistribution(auctionId, candidateDistribution);
 
         modules.distributionVault.openDistribution(
             auctionId, recipients, amounts, IEscrowVault(address(modules.escrowVault))
@@ -367,86 +381,82 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         return candidate > premiumNet ? premiumNet : candidate;
     }
 
-    function _buildDistribution(
-        uint256 auctionId,
-        ParamsController.Params memory p,
-        uint256 pool,
-        IReputationAdapter auctionReputationAdapter
-    )
+    function _scoreIncrement(uint256 delta, uint16 softness, uint256 rank) internal pure returns (uint256) {
+        // delta <= 2^112-1 and Q*h < 2^152. The 512-bit product is divided
+        // before conversion; result <= delta*Q < 2^248. h is snapshotted and positive.
+        return FullMath.mulDiv(delta, SCORE_SCALE * softness, uint256(softness) + rank - 1);
+    }
+
+    function _score(uint256 auctionId, address bidder) internal view returns (uint256) {
+        return bidderScores[auctionId][bidder];
+    }
+
+    function _buildDistribution(uint256 auctionId, uint256 pool)
         internal
         view
         returns (address[] memory recipients, uint256[] memory amounts, uint256 assigned)
     {
-        if (pool == 0) {
-            recipients = new address[](0);
-            amounts = new uint256[](0);
-            return (recipients, amounts, 0);
-        }
-
-        Auction storage auction = auctions[auctionId];
+        if (pool == 0) return (new address[](0), new uint256[](0), 0);
         address[] storage participants = _participants[auctionId];
-        uint256 participantLength = participants.length;
-        uint256[] memory scores = new uint256[](participantLength);
-        uint256 totalScore;
-
-        for (uint256 i = 0; i < participantLength; ++i) {
-            address participant = participants[i];
-            if (participant == auction.highestBidder) continue;
-
-            uint256 score = _score(auctionId, participant, p, auctionReputationAdapter);
-            scores[i] = score;
-            totalScore += score;
+        uint256 length = participants.length;
+        uint256[] memory scores = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            if (participants[i] != auctions[auctionId].highestBidder) {
+                scores[i] = _score(auctionId, participants[i]);
+            }
         }
-
-        if (totalScore == 0) {
-            recipients = new address[](0);
-            amounts = new uint256[](0);
-            return (recipients, amounts, 0);
-        }
-
-        address[] memory tmpRecipients = new address[](participantLength);
-        uint256[] memory tmpAmounts = new uint256[](participantLength);
+        uint256[] memory rewards;
+        (rewards, assigned) = _allocateRewards(scores, pool);
         uint256 count;
-        uint256 perUserCap = (pool * p.perUserRewardCapBps) / BPS;
-
-        for (uint256 i = 0; i < participantLength; ++i) {
-            if (scores[i] == 0) continue;
-
-            uint256 amount = (pool * scores[i]) / totalScore;
-            if (amount > perUserCap) amount = perUserCap;
-            if (amount == 0) continue;
-
-            tmpRecipients[count] = participants[i];
-            tmpAmounts[count] = amount;
-            assigned += amount;
-            count += 1;
+        for (uint256 i = 0; i < length; ++i) {
+            if (rewards[i] != 0) ++count;
         }
-
         recipients = new address[](count);
         amounts = new uint256[](count);
-        for (uint256 i = 0; i < count; ++i) {
-            recipients[i] = tmpRecipients[i];
-            amounts[i] = tmpAmounts[i];
+        count = 0;
+        for (uint256 i = 0; i < length; ++i) {
+            if (rewards[i] == 0) continue;
+            recipients[count] = participants[i];
+            amounts[count++] = rewards[i];
         }
     }
 
-    function _score(
-        uint256 auctionId,
-        address bidder,
-        ParamsController.Params memory p,
-        IReputationAdapter auctionReputationAdapter
-    ) internal view returns (uint256) {
-        Auction storage auction = auctions[auctionId];
-        BidderStats storage stats = bidderStats[auctionId][bidder];
+    function _allocateRewards(uint256[] memory scores, uint256 pool)
+        internal
+        pure
+        returns (uint256[] memory rewards, uint256 assigned)
+    {
+        uint256 length = scores.length;
+        rewards = new uint256[](length);
+        uint256 denominator;
+        // Each bidder's accumulated score <= cap*Q < 2^248; at most 256
+        // participants makes their sum strictly less than 2^256.
+        for (uint256 i = 0; i < length; ++i) denominator += scores[i];
+        if (pool == 0 || denominator == 0) return (rewards, 0);
 
-        uint256 ef = _financialEngagement(stats.maxCap, auction.highestBid, p.efCap);
-        uint256 et = _timeEngagement(stats.firstBidTime, auction.startTime, auction.initialEndTime, p);
-        uint256 ii = _interactionIntensity(stats.significantOverbids, p);
-
-        uint256 weighted = (p.alphaBps * ef + p.betaBps * et + p.gammaBps * ii) / BPS;
-        uint256 reputation = auctionReputationAdapter.reputationBps(bidder);
-
-        return (weighted * reputation) / BPS;
+        uint256[] memory remainders = new uint256[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            rewards[i] = FullMath.mulDiv(pool, scores[i], denominator);
+            remainders[i] = mulmod(pool, scores[i], denominator);
+            assigned += rewards[i];
+        }
+        uint256 residual = pool - assigned;
+        // Hamilton: residual < positive-score count <= 255. Select each positive
+        // remainder at most once; strict > keeps ties in first-participation order.
+        // Both scans are bounded by maxParticipants, never total bid count.
+        for (uint256 unit = 0; unit < residual; ++unit) {
+            uint256 best;
+            uint256 largest;
+            for (uint256 i = 0; i < length; ++i) {
+                if (remainders[i] > largest) {
+                    best = i;
+                    largest = remainders[i];
+                }
+            }
+            rewards[best] += 1;
+            remainders[best] = 0;
+        }
+        return (rewards, pool);
     }
 
     function _setModules(
@@ -473,6 +483,8 @@ contract AuctionHouse is Ownable, ReentrancyGuard {
         );
     }
 
+    // Legacy pure helpers retained solely for historical regression vectors.
+    // These functions are inactive in amount-rank scoring and settlement.
     function _financialEngagement(uint256 maxCap, uint256 finalPrice, uint256 cap) internal pure returns (uint256) {
         if (finalPrice == 0 || maxCap == 0) return 0;
 

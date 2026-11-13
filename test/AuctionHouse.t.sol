@@ -145,7 +145,7 @@ contract AuctionHouseSecurityTest {
         uint256 sellerBefore = SELLER.balance;
         vm.prank(SELLER);
         escrowVault.withdrawSellerProceeds();
-        assertEq(SELLER.balance - sellerBefore, 1.38 ether, "seller proceeds withdrawn");
+        assertEq(SELLER.balance - sellerBefore, 1.2375 ether, "seller proceeds withdrawn");
 
         uint256 feeBefore = FEE_RECIPIENT.balance;
         vm.prank(FEE_RECIPIENT);
@@ -176,7 +176,7 @@ contract AuctionHouseSecurityTest {
         assertEq(auction.bidCount, 3, "step-up adds one bid record");
     }
 
-    function testDistributionWithThreeLosersRespectsCapsAndPremiumNet() external {
+    function testDistributionWithThreeLosersAllocatesFullPoolAndRespectsPremiumNet() external {
         uint256 auctionId = _createAuction(4, 1 ether, 2 hours);
 
         _bid(BIDDER_ONE, auctionId, 1.1 ether);
@@ -194,7 +194,6 @@ contract AuctionHouseSecurityTest {
         uint256 feeAmount = 0.05 ether;
         uint256 premiumNet = premiumGross - feeAmount;
         uint256 pool = premiumNet / 2;
-        uint256 perUserCap = (pool * 4_000) / 10_000;
 
         uint256 rewardOne = distributionVault.entitlementOf(auctionId, BIDDER_ONE);
         uint256 rewardTwo = distributionVault.entitlementOf(auctionId, BIDDER_TWO);
@@ -204,10 +203,9 @@ contract AuctionHouseSecurityTest {
         assertGt(rewardOne, 0, "first loser gets reward");
         assertGt(rewardTwo, 0, "second loser gets reward");
         assertGt(rewardThree, 0, "third loser gets reward");
-        assertLe(rewardOne, perUserCap, "reward one capped");
-        assertLe(rewardTwo, perUserCap, "reward two capped");
-        assertLe(rewardThree, perUserCap, "reward three capped");
-        assertLe(totalAssigned, pool, "assigned rewards stay within pool");
+        // Amount-rank intentionally removes V1's per-wallet reward truncation.
+        assertEq(rewardOne + rewardTwo + rewardThree, pool, "entitlements exhaust pool");
+        assertEq(totalAssigned, pool, "full funded pool assigned");
         assertLe(totalAssigned, premiumNet, "assigned rewards stay within premium net");
 
         _claimRefund(BIDDER_ONE, auctionId);

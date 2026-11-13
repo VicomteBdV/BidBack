@@ -27,7 +27,19 @@ export type NftMetadata = {
   errorMessage?: string;
 };
 
+export type AuctionFormulaMetadata = {
+  status: "supported" | "unavailable";
+  auctionHouse: `0x${string}`;
+  readBlockNumber?: string;
+  formulaId?: string;
+  arithmeticId?: string;
+  roundingId?: string;
+  scoreScale?: string;
+  maxAmount?: string;
+};
+
 export type AuctionParamsSnapshot = {
+  rankSoftness?: string;
   bidbackFeeBps: string;
   redistributionBps: string;
   minParticipants: string;
@@ -76,6 +88,8 @@ export type AuctionSettlementReadiness = {
 };
 
 export type AuctionEconomicParameterSnapshot = {
+  rankSoftness?: string;
+  formulaStatus?: AuctionFormulaMetadata["status"];
   bidbackFeeBps: string;
   redistributionBps: string;
   minPremiumNet: string;
@@ -203,6 +217,7 @@ export type SerializedAuction = {
   finalized: boolean;
   nftMetadata?: NftMetadata;
   paramsSnapshot?: AuctionParamsSnapshot;
+  formula?: AuctionFormulaMetadata;
   paramsSnapshotError?: string;
   auctionFeeRecipient?: `0x${string}`;
   auctionFeeRecipientError?: string;
@@ -214,6 +229,7 @@ export type SerializedAuction = {
 };
 
 export type BidderEconomics = {
+  score?: string;
   role: DevBidderRole;
   label: string;
   address: `0x${string}` | null;

@@ -4,6 +4,8 @@ import {
   validateCreateAuctionFields,
   type CreateAuctionValues
 } from "@/lib/createAuctionValidation";
+import { formatEther } from "viem";
+import { AMOUNT_RANK_MAX_AMOUNT } from "@/lib/auctionFormula";
 import { testAddresses } from "@/test/fixtures";
 
 const validValues: CreateAuctionValues = {
@@ -79,5 +81,15 @@ describe("create auction validation", () => {
 
     expect(error).toBe("Duration must be at least 1 hour.");
     expect(error).not.toContain("minAuctionDuration");
+  });
+});
+
+describe("implementation-specific start price bound", () => {
+  it("accepts the exact maximum and rejects one wei above only when a known maximum is supplied", () => {
+    const above = { ...validValues, startPriceEth: formatEther(AMOUNT_RANK_MAX_AMOUNT + 1n) };
+    expect(validateCreateAuctionFields({ ...validValues, startPriceEth: formatEther(AMOUNT_RANK_MAX_AMOUNT) }, { maxAmount: AMOUNT_RANK_MAX_AMOUNT })).toBeNull();
+    expect(validateCreateAuctionFields(above, { maxAmount: AMOUNT_RANK_MAX_AMOUNT })).toMatch(/maximum amount/);
+    expect(validateCreateAuctionFields(above)).toBeNull();
+    expect(validateCreateAuctionFields(above, { maxAmount: null })).toBeNull();
   });
 });

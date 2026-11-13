@@ -66,12 +66,18 @@ export function AuctionEconomicsPanel({ auction }: { auction: SerializedAuction 
           <p className="mt-2 text-sm leading-6 text-slate-400">
             These are this auction&apos;s captured parameters, not the current global parameters.
           </p>
+          {summary.parameters.formulaStatus === "supported" ? (
+            <p className="mt-2 text-sm leading-6 text-slate-400">The available pool is shared proportionally among losing bidders.
+              The winner is excluded; whole-wei rounding can leave individual rewards at zero. No legacy per-user cap applies.</p>
+          ) : <p className="mt-2 text-sm leading-6 text-amber-200">Active scoring formula unavailable; legacy scoring fields are reference values.</p>}
           <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 xl:grid-cols-3">
             <ParameterItem label="BidBack fee bps" value={summary.parameters.bidbackFeeBps} />
             <ParameterItem label="Redistribution bps" value={summary.parameters.redistributionBps} />
             <ParameterItem label="Minimum premium net" value={formatEth(summary.parameters.minPremiumNet)} />
             <ParameterItem label="Minimum participants" value={summary.parameters.minParticipants} />
-            <ParameterItem label="Per-user reward cap bps" value={summary.parameters.perUserRewardCapBps} />
+            {summary.parameters.formulaStatus === "supported" ? (
+              <ParameterItem label="Chronological curve h" value={summary.parameters.rankSoftness ?? "Unavailable"} />
+            ) : <ParameterItem label="Legacy per-user cap parameter bps" value={summary.parameters.perUserRewardCapBps} />}
             <ParameterItem label="Minimum bid increment bps" value={summary.parameters.minBidIncrementBps} />
           </div>
         </div>

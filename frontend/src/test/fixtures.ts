@@ -1,4 +1,4 @@
-import type { AuctionDetailApiResponse, AuctionSettlementReadiness } from "@/lib/auctionTypes";
+import type { AuctionDetailApiResponse, AuctionSettlementReadiness, AuctionFormulaMetadata } from "@/lib/auctionTypes";
 import type { LocalDeployment } from "@/lib/deployment";
 
 export const testAddresses = {
@@ -238,4 +238,13 @@ export const settledReadinessFixture: AuctionSettlementReadiness = {
   sellerWalletCredit: { status: "known", value: "0" },
   protocolWalletCredit: { status: "known", value: "0" },
   warnings: []
+};
+
+
+// Reported model metadata only; not a deployed-bytecode verification fixture.
+export const amountRankFormulaFixture: AuctionFormulaMetadata = {
+  status: "supported", auctionHouse: testAddresses.auctionHouse, readBlockNumber: "42",
+  formulaId: "amount-rank-v1", arithmeticId: "floor-delta-q136-muldiv512-v1",
+  roundingId: "hamilton-first-participation-v1",
+  scoreScale: (1n << 136n).toString(), maxAmount: ((1n << 112n) - 1n).toString()
 };

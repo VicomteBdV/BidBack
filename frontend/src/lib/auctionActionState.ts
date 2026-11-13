@@ -85,6 +85,7 @@ export function getBidActionState({
   bidAmountEth,
   minimumNextBid,
   currentCap,
+  maxCap,
   auctionState,
   endTime,
   nowSeconds,
@@ -93,6 +94,7 @@ export function getBidActionState({
   bidAmountEth: string;
   minimumNextBid: bigint | null;
   currentCap: bigint | null;
+  maxCap?: bigint | null;
   auctionState: AuctionStateValue;
   endTime?: string | number | bigint | null;
   nowSeconds?: number | bigint;
@@ -125,6 +127,10 @@ export function getBidActionState({
 
   const enteredAmount = parsed.value ?? 0n;
   const bidCap = isStepUp ? currentCap + enteredAmount : enteredAmount;
+
+  if (maxCap !== undefined && maxCap !== null && bidCap > maxCap) {
+    return { disabledReason: "New bid cap exceeds this auction implementation's maximum amount.", parsedBidCap: bidCap, valueToSend: 0n };
+  }
 
   if (bidCap < minimumNextBid) {
     return {
