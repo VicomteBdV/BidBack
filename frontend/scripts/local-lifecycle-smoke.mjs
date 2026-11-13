@@ -9,6 +9,8 @@ import {
   createWalletClient,
   decodeEventLog,
   defineChain,
+  encodeFunctionData,
+  toFunctionSelector,
   http
 } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
@@ -21,6 +23,7 @@ import {
   WEI_PER_ETH,
   assertAddressEqual,
   assertEqual,
+  assertExactRevertCall,
   assertExpectedLocalParams,
   assertLocalChainId,
   assertLoopbackRpcUrl,
@@ -149,15 +152,6 @@ async function sendContract(publicClient, walletClient, request, step) {
     if (error instanceof LifecycleSmokeError) throw error;
     throw new LifecycleSmokeError(step, "successful transaction", readableError(error));
   }
-}
-
-async function expectSimulationRevert(publicClient, request, step) {
-  try {
-    await publicClient.simulateContract(request);
-  } catch {
-    return;
-  }
-  throw new LifecycleSmokeError(step, "revert", "simulation succeeded");
 }
 
 async function main() {
@@ -583,11 +577,21 @@ async function main() {
   ok("Protocol fees withdrawn", formatEth(expectedEconomics.protocolFee));
 
   activeStep = "duplicate-action checks";
-  await expectSimulationRevert(publicClient, { account: actors.bidderA.address, address: deployment.contracts.auctionHouse, abi: auctionHouseAbi, functionName: "claimNft", args: [auctionId] }, "second NFT claim");
-  await expectSimulationRevert(publicClient, { account: actors.bidderB.address, address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "claimRefund", args: [auctionId] }, "second refund claim");
-  await expectSimulationRevert(publicClient, { account: actors.bidderB.address, address: deployment.contracts.distributionVault, abi: distributionVaultAbi, functionName: "claim", args: [auctionId] }, "second reward claim");
-  await expectSimulationRevert(publicClient, { account: actors.owner.address, address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "withdrawSellerProceeds" }, "second seller withdrawal");
-  await expectSimulationRevert(publicClient, { account: actors.owner.address, address: deployment.contracts.escrowVault, abi: escrowVaultAbi, functionName: "withdrawProtocolFees" }, "second protocol fee withdrawal");
+  const duplicateBlock = await publicClient.getBlock({ blockTag: "latest" });
+  const duplicateEvidence = [];
+  for (const [step, account, to, abi, functionName, args, errorSignature] of [
+    ["second NFT claim", actors.bidderA.address, deployment.contracts.auctionHouse, auctionHouseAbi, "claimNft", [auctionId], "NFTAlreadyClaimed()"],
+    ["second refund claim", actors.bidderB.address, deployment.contracts.escrowVault, escrowVaultAbi, "claimRefund", [auctionId], "RefundAlreadyClaimed()"],
+    ["second reward claim", actors.bidderB.address, deployment.contracts.distributionVault, distributionVaultAbi, "claim", [auctionId], "RewardAlreadyClaimed()"],
+    ["second seller withdrawal", actors.owner.address, deployment.contracts.escrowVault, escrowVaultAbi, "withdrawSellerProceeds", [], "NothingToClaim()"],
+    ["second protocol fee withdrawal", actors.owner.address, deployment.contracts.escrowVault, escrowVaultAbi, "withdrawProtocolFees", [], "NothingToClaim()"]
+  ]) {
+    const evidence = await assertExactRevertCall(publicClient, { account, to, data: encodeFunctionData({ abi, functionName, args }),
+      blockNumber: duplicateBlock.number }, toFunctionSelector(errorSignature), step);
+    duplicateEvidence.push({ step, ...evidence, block: { number: duplicateBlock.number.toString(), hash: duplicateBlock.hash } });
+  }
+  assertEqual("duplicate simulation block hash", (await publicClient.getBlock({ blockNumber: duplicateBlock.number })).hash, duplicateBlock.hash);
+  for (const evidence of duplicateEvidence) ok("Duplicate call evidence", JSON.stringify(evidence));
   ok("Double claims and withdrawals rejected");
 
   activeStep = "final balance checks";

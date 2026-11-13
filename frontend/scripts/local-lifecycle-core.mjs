@@ -27,6 +27,38 @@ function formatObserved(value) {
   }
 }
 
+// Only exact no-argument custom-error bytes are evidence. Provider prose,
+// empty data and selector prefixes with trailing bytes are not accepted.
+export function hasExactCustomError(error, expectedSelector) {
+  if (typeof expectedSelector !== "string" || !/^0x[0-9a-f]{8}$/i.test(expectedSelector)) return false;
+  const visited = new Set();
+  try {
+    for (let cause = error, depth = 0; cause && typeof cause === "object" && depth < 10; cause = cause.cause, depth++) {
+      if (visited.has(cause)) return false;
+      visited.add(cause);
+      if (typeof cause.data === "string" && cause.data.toLowerCase() === expectedSelector.toLowerCase()) return true;
+    }
+  } catch {
+    // Malformed provider error objects must also fail closed.
+  }
+  return false;
+}
+
+export async function assertExactRevertCall(client, { account, to, data, blockNumber }, expectedSelector, step) {
+  if (typeof blockNumber !== "bigint" || blockNumber < 0n ||
+      typeof expectedSelector !== "string" || !/^0x[0-9a-f]{8}$/i.test(expectedSelector)) {
+    throw new LifecycleSmokeError(step, "pinned block and four-byte custom-error selector", "invalid call expectation");
+  }
+  let reverted = false;
+  try {
+    await client.request({ method: "eth_call", params: [{ from: account, to, data }, `0x${blockNumber.toString(16)}`] });
+  } catch (error) {
+    reverted = hasExactCustomError(error, expectedSelector);
+  }
+  if (!reverted) throw new LifecycleSmokeError(step, expectedSelector.toLowerCase(), "expected custom-error bytes not established");
+  return { actor: account, target: to, calldata: data, method: "eth_call", result: "expected-revert", errorSelector: expectedSelector.toLowerCase() };
+}
+
 export function normalizeRpcChainId(value) {
   if (typeof value === "bigint") return Number(value);
   if (typeof value === "number" && Number.isSafeInteger(value)) return value;

@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { encodeAbiParameters, toFunctionSelector, isAddress } from "viem";
+import { assertExactRevertCall } from "./local-lifecycle-core.mjs";
 import {
   PHASES, assertBaseSepoliaChainId, assertLifecyclePhase, calculateCanonicalEconomics,
   exactKeys, loadSession, phaseEvidence, publicBlock, readOnlyClient, requireEvidence,
@@ -168,19 +169,14 @@ export async function simulateDuplicates(client, session, manifest, block) {
   for (const [id, signature] of Object.entries(expectations)) {
     const action = actions[id];
     const selector = toFunctionSelector(signature);
-    let reverted = false;
+    let evidence;
     try {
-      await client.call({ account: session.roles[ACTORS[id]], to: action.to, data: action.input, blockNumber: BigInt(block.number) });
-    } catch (error) {
-      // Exact custom-error bytes distinguish a contract revert from a timeout,
-      // HTTP failure or provider prose. Do not retain any raw error object.
-      for (let cause = error, depth = 0; cause && depth < 10; cause = cause.cause, depth++) {
-        if (typeof cause.data === "string" && cause.data.toLowerCase() === selector.toLowerCase()) reverted = true;
-      }
+      evidence = await assertExactRevertCall(client, { account: session.roles[ACTORS[id]], to: action.to,
+        data: action.input, blockNumber: BigInt(block.number) }, selector, `duplicate ${id}`);
+    } catch {
+      throw new EvidenceError("invalid", `duplicate ${id}`);
     }
-    check(reverted, `duplicate ${id}`);
-    results.push({ transactionId: id, actor: session.roles[ACTORS[id]], target: action.to, calldata: action.input,
-      method: "eth_call", result: "expected-revert", errorSelector: selector, block });
+    results.push({ transactionId: id, ...evidence, block });
   }
   check((await client.getBlock({ blockNumber: BigInt(block.number) })).hash.toLowerCase() === block.hash.toLowerCase(), "duplicate simulation block changed");
   return results;

@@ -124,8 +124,15 @@ boundary. A full local Anvil run on 13 November 2026 additionally completed
 deployment, bidding, settlement and every pull action with valueless assets:
 reward `0.475 ETH`, seller proceeds `1.475 ETH`, fee `0.05 ETH`, losing-cap
 refund `1.5 ETH`, and final escrow balance zero. All 24 local transactions
-succeeded and the runner reported failures for five duplicate pull simulations.
-Exact revert causes were not retained; that helper catches any simulation
-exception. This evidence covers
-that deterministic local scenario; public deployment addresses and manifests
-are unchanged, and no new public-chain or production validation is established.
+succeeded. That initial run reported duplicate simulation exceptions without
+retaining their exact causes. A subsequent LIFECYCLE-02 run on the same date
+again completed 24 local transactions and verified all five expected custom
+errors through raw `eth_call` at one pinned block with a block-hash recheck.
+A separate read-only JSON-RPC replay retained error code 3 and the exact
+four-byte selector for each action. Transport failures, successful calls,
+empty/wrong data and selector prefixes with trailing bytes are not accepted.
+The shared collector retains its existing evidence/session shape. These
+observations cover deterministic local scenarios; public deployment addresses
+and manifests are unchanged, and no new public-chain or production validation
+is established. Expected error bytes do not establish source equivalence or
+the honesty of a malicious RPC.

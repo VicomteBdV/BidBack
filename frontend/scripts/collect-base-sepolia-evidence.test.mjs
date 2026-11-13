@@ -44,14 +44,14 @@ function fixture(profile = LEGACY_PROFILE) {
   client.getTransaction = async ({ hash }) => txs[hash];
   client.getTransactionReceipt = async ({ hash }) => receipts[hash];
   const calls = [];
-  const parameterCall = client.call;
-  client.call = async (args) => {
-    if (!args.account) return parameterCall(args);
+  client.request = async ({ method, params }) => {
+    assert.equal(method, "eth_call");
+    assert.equal(params[1], "0x70");
+    const args = params[0];
     calls.push(args);
     const id = ["T7", "T8", "T9", "T10", "T11"].find((id) => actions[id].input === args.data);
-    assert.equal(args.account, roles[ACTORS[id]]);
+    assert.equal(args.from, roles[ACTORS[id]]);
     assert.equal(args.to, actions[id].to);
-    assert.equal(args.blockNumber, 112n);
     const signature = { T7: "NFTAlreadyClaimed()", T8: "RefundAlreadyClaimed()", T9: "RewardAlreadyClaimed()", T10: "NothingToClaim()", T11: "NothingToClaim()" }[id];
     throw { cause: { data: toFunctionSelector(signature) }, message: "https://secret.invalid/API_CREDENTIAL" };
   };
@@ -189,12 +189,36 @@ test("assembly rejects altered nested data, historical block hash and snapshot i
   ]) { const bad = clone(all); mutate(bad); await assert.rejects(assembleEvidence(f.client, bundle, input, bad)); }
 });
 
-test("duplicate simulations reject success, transport failures and unexpected revert selectors", async () => {
-  for (const call of [async () => "0x", async () => { throw new Error("execution reverted https://secret.invalid"); },
-    async () => { throw { data: "0x12345678" }; }]) {
-    const { client } = fixture(); client.call = call;
-    await assert.rejects(simulateDuplicates(client, session, manifest, { number: "112" }), /duplicate T7/);
+test("duplicate simulations reject success, transport failures, empty and unexpected revert selectors", async () => {
+  const expected = toFunctionSelector("NFTAlreadyClaimed()");
+  const cycle = {}; cycle.cause = cycle;
+  let deep = { data: expected };
+  for (let index = 0; index < 10; index++) deep = { cause: deep };
+  for (const request of [async () => "0x", async () => expected,
+    ...[new Error(`execution reverted ${expected} https://secret.invalid`), { data: "0x12345678" },
+      { data: "0x" }, { data: `${expected}00` }, cycle, deep].map((error) => async () => { throw error; })]) {
+    const { client } = fixture(); client.request = request;
+    await assert.rejects(simulateDuplicates(client, session, manifest, { number: "112" }), (error) =>
+      error.status === "invalid" && error.step === "duplicate T7" && !error.message.includes("secret.invalid"));
   }
+});
+
+test("duplicate simulations require every expected selector, the pinned block hash and chain", async () => {
+  const block = { number: "112", hash: hash(112), timestampUtc: "2026-09-11T00:00:00.000Z" };
+  for (let rejectedIndex = 0; rejectedIndex < 5; rejectedIndex++) {
+    const { client } = fixture(); const request = client.request; let index = 0;
+    client.request = async (args) => {
+      if (index++ === rejectedIndex) throw { data: "0x12345678" };
+      return request(args);
+    };
+    await assert.rejects(simulateDuplicates(client, session, manifest, block),
+      new RegExp(`duplicate ${["T7", "T8", "T9", "T10", "T11"][rejectedIndex]}`));
+  }
+  const reorg = fixture(); reorg.client.getBlock = async () => ({ hash: hash(999) });
+  await assert.rejects(simulateDuplicates(reorg.client, session, manifest, block), /block changed/);
+  const wrongChain = fixture(); wrongChain.client.getChainId = async () => 31337;
+  wrongChain.client.request = async () => assert.fail("must reject chain before calls");
+  await assert.rejects(simulateDuplicates(wrongChain.client, session, manifest, block));
 });
 
 test("final verification must still pass after duplicate calls", async () => {
