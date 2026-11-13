@@ -1,5 +1,13 @@
 # BidBack Product Status
 
+## Controlled Node hosting preparation
+
+The existing application now has a portable Node 22 standalone container and an explicit controlled-testnet startup guard. Its profile is limited to `84532`, local-development actions must be exactly false, Anvil key variables must be absent, and public browser values plus deployment-manifest bytes must match the build stamp. [HOSTED_TESTNET.md](./HOSTED_TESTNET.md) describes the artifact and required validation.
+
+The included `84532` manifest remains historical. No hosting account, public site, RPC service, new public-chain deployment or production network is selected by this technical preparation. Local artifact validation, browser/wallet validation, dependency-security acceptance and a matching amount-rank testnet repetition remain distinct evidence. No product gate advances from packaging alone.
+
+Local image validation on 13 November 2026 passed28 guard tests on Node22.23.5,14 startup-rejection cases and13 container-loopback HTTP requests, including nine guarded routes returning404 and safe503 handling for an unavailable synthetic RPC. Actual UID1000, protected code/stamp/manifest, writable cache and exclusion of environment/local-deployment/session-CA artifacts were checked. Synthetic context canaries were excluded. No host/public ingress, browser, wallet or public blockchain result is inferred.
+
 ## Amount/rank source update — 12 November 2026
 
 The Product Owner selected amount and chronological rank as the redistribution rule and authorized this contract/frontend integration. The new source accumulates own-cap increases weighted by `h/(h+r-1)`, with default `h=4`, captures `h` in the existing parameter snapshot, excludes the winner's whole score and allocates the full funded pool by largest remainders. Fees, premium-only funding, custody and refunds are preserved. The legacy per-user cap and EF/ET/II/reputation calculation are inactive in this implementation.

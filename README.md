@@ -100,6 +100,8 @@ Stores bounded economic and safety parameters.
 
 ## Current Product Status and Roadmap
 
+For a portable Node 22 package of the existing application, see [controlled testnet hosting](docs/HOSTED_TESTNET.md). It checks public build/runtime configuration and the historical `84532` manifest before startup, with local-development actions disabled. Packaging is separate from a new on-chain deployment or a hosted release.
+
 The amount/rank source implementation passed full local Anvil lifecycles on 13 November 2026 but has not been deployed publicly by this change. The latest local check requires exact custom-error bytes for five duplicate pull calls at one pinned block; transport failures do not satisfy it. Earlier local/testnet validation below concerns the previous implementation. Lifecycle tools select an explicit profile and keep historical records separate; mocked checks and local runs do not establish a new public-chain cycle. See [implementation and tooling limits](docs/AMOUNT_RANK_MODEL.md#validation-and-operational-limits).
 
 The current source of truth is [`docs/PRODUCT_STATUS.md`](docs/PRODUCT_STATUS.md). BidBack is **Demo-ready for a controlled local demonstration** as of the 22 August 2026 checkpoint. **One complete canonical Base Sepolia cycle validated:** auction `#2` completed across five distinct public role wallets with a separately deployed valueless test-only NFT, reconciled economics, final-state verification, and rejected duplicate-action simulations. This is one bounded public-testnet scenario, not broad Base Sepolia validation. BidBack is not Controlled beta-ready, Public beta-ready, or Production-ready.
