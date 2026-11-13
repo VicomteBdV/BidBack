@@ -188,7 +188,7 @@ Failures use this form and set a non-zero process exit code:
 | Deployment or artifact missing | Run the root smoke command, not the frontend-only lifecycle command. |
 | Token #2 unavailable | Rerun the root command so it creates and synchronizes a fresh deployment. |
 | Unexpected parameter value | Review the local parameter defaults; the deterministic scenario intentionally fails on economic drift. |
-| Reward is zero | Treat this as a failure for this scenario; the expected positive entitlement is exactly `0.19 ETH`. |
+| Reward is zero | Treat this as a failure for this scenario; `amount-rank-v1` expects exactly `0.475 ETH`. The historical `legacy-capped-v1` reference is `0.19 ETH`. |
 
 ## Base Sepolia Distinction
 
