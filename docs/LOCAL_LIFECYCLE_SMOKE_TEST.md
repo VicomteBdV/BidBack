@@ -19,12 +19,22 @@ The initial tooling adaptation was checked with pure calculations, mocked RPC
 transports and a fake-npm wrapper boundary. On 13 November 2026, the full root
 command below also passed on a fresh loopback Anvil chain `31337`, using
 Node.js 24.19.0 and Foundry/Anvil 1.9.0 with valueless development assets.
-All 24 local transactions succeeded. The run checked the new reward, seller
-proceeds and fee, reported failures for five duplicate pull simulations, and
-ended with zero escrow balance. Exact revert causes were not retained; the
-existing duplicate-check helper catches any simulation exception. No public-chain lifecycle or
-production readiness is established. An instruction example is not permission
-to repeat an operational run.
+All 24 local transactions succeeded. That initial run checked the new reward,
+seller proceeds and fee and ended with zero escrow balance. Its old duplicate
+helper reported exceptions without retaining exact causes; that limitation
+remains part of the historical record.
+
+A subsequent LIFECYCLE-02 run on the same date passed the full root command,
+including 22 core tests, with another 24 successful local transactions and zero
+final escrow balance. The shared checker now requires each exact four-byte
+custom error from raw `eth_call` at one pinned block, with a block-hash recheck.
+The five observations were independently repeated through raw JSON-RPC: each
+returned error code 3 and its expected selector. Structured console records
+retain actor, target, calldata, block and selector without raw provider errors.
+Success, transport errors, empty/wrong data and trailing bytes fail the check.
+The complete targeted Node run passed 108 test executions with zero failures
+or skips. No public-chain lifecycle or production readiness is established.
+An instruction example is not permission to repeat an operational run.
 
 ## Prerequisites
 
@@ -151,7 +161,7 @@ The script verifies:
 - final settlement, refunds, rewards, credits and reserves;
 - NFT, refund, reward, seller proceeds and protocol fee pull actions separately;
 - final NFT ownership, claim flags, zero credits, zero reserve and zero escrow balance;
-- rejection of every duplicate claim and withdrawal through read-only simulations.
+- rejection of each duplicate claim and withdrawal through pinned read-only `eth_call`, requiring `NFTAlreadyClaimed()`, `RefundAlreadyClaimed()`, `RewardAlreadyClaimed()` or `NothingToClaim()` as applicable, with exact four-byte data and a final block-hash recheck.
 
 EOA balance deltas are not used for economic assertions because they include gas costs.
 

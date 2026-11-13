@@ -5,6 +5,8 @@ import {
   LifecycleSmokeError,
   WEI_PER_ETH,
   assertEqual,
+  assertExactRevertCall,
+  hasExactCustomError,
   assertExpectedLocalParams,
   assertLocalChainId,
   assertLoopbackRpcUrl,
@@ -15,6 +17,62 @@ import {
 } from "./local-lifecycle-core.mjs";
 
 const address = (suffix) => `0x${suffix.toString(16).padStart(40, "0")}`;
+
+test("exact custom errors require all four bytes rather than provider prose or a prefix", () => {
+  const selector = "0xabcdef12";
+  assert.equal(hasExactCustomError({ data: selector.toUpperCase().replace("0X", "0x") }, selector), true);
+  assert.equal(hasExactCustomError({ cause: { cause: { data: selector } } }, selector), true);
+  for (const error of [null, undefined, selector, new Error(`execution reverted ${selector}`),
+    { message: selector }, { data: "0x" }, { data: "0xabcdef" }, { data: "0x12345678" },
+    { data: `${selector}00` }, { data: { data: selector } }, { cause: { data: "" } }]) {
+    assert.equal(hasExactCustomError(error, selector), false);
+  }
+  for (const invalid of [undefined, "0x", "0x123", `${selector}00`]) assert.equal(hasExactCustomError({ data: invalid }, invalid), false);
+});
+
+test("custom-error cause traversal is bounded, cycle-safe and fails closed on malformed objects", () => {
+  const selector = "0xabcdef12";
+  const wrap = (count) => {
+    let error = { data: selector };
+    for (let index = 0; index < count; index++) error = { cause: error };
+    return error;
+  };
+  assert.equal(hasExactCustomError(wrap(9), selector), true);
+  assert.equal(hasExactCustomError(wrap(10), selector), false);
+  const cycle = {}; cycle.cause = { cause: cycle };
+  assert.equal(hasExactCustomError(cycle, selector), false);
+  assert.equal(hasExactCustomError({ get data() { throw new Error("untrusted getter"); } }, selector), false);
+});
+
+test("exact revert call pins raw eth_call and returns only bounded public evidence", async () => {
+  const selector = "0xabcdef12";
+  const call = { account: address(1), to: address(2), data: "0x12345678", blockNumber: 112n };
+  const requests = [];
+  const client = { request: async (request) => {
+    requests.push(request);
+    throw { cause: { data: selector }, message: "https://user:SECRET@rpc.invalid" };
+  } };
+  assert.deepEqual(await assertExactRevertCall(client, call, selector, "duplicate"), {
+    actor: call.account, target: call.to, calldata: call.data, method: "eth_call", result: "expected-revert", errorSelector: selector
+  });
+  assert.deepEqual(requests, [{ method: "eth_call", params: [{ from: call.account, to: call.to, data: call.data }, "0x70"] }]);
+});
+
+test("exact revert call rejects success, transport errors, empty/wrong reverts and unpinned expectations", async () => {
+  const selector = "0xabcdef12";
+  const call = { account: address(1), to: address(2), data: "0x12345678", blockNumber: 112n };
+  const cycle = {}; cycle.cause = cycle;
+  for (const request of [async () => selector, async () => "0x",
+    ...[new Error(`execution reverted ${selector} SECRET`), { data: "0x" }, { data: "0x12345678" },
+      { data: `${selector}00` }, cycle].map((error) => async () => { throw error; })]) {
+    await assert.rejects(assertExactRevertCall({ request }, call, selector, "duplicate"), (error) =>
+      error instanceof LifecycleSmokeError && error.step === "duplicate" && !error.message.includes("SECRET"));
+  }
+  for (const blockNumber of [undefined, "112", -1n]) {
+    await assert.rejects(assertExactRevertCall({ request: () => assert.fail("must not call") }, { ...call, blockNumber }, selector, "duplicate"));
+  }
+  await assert.rejects(assertExactRevertCall({ request: () => assert.fail("must not call") }, call, "0x", "duplicate"));
+});
 
 function deployment(chainId = LOCAL_ANVIL_CHAIN_ID) {
   return {
